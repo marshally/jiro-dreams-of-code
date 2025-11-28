@@ -9,24 +9,25 @@ A disciplined AI agent orchestration system that builds software using the shoku
 1. [Overview](#overview)
 2. [Philosophy](#philosophy)
 3. [Architecture](#architecture)
-4. [CLI Commands](#cli-commands)
-5. [Core Workflow](#core-workflow)
-6. [Agent System](#agent-system)
-7. [Commit Discipline](#commit-discipline)
-8. [Preflight & Postflight Checks](#preflight--postflight-checks)
-9. [Configuration System](#configuration-system)
-10. [Data Storage](#data-storage)
-11. [Web UI](#web-ui)
-12. [Issue Tracker Facade](#issue-tracker-facade)
-13. [Context Tracking](#context-tracking)
-14. [Error Handling & Human Escalation](#error-handling--human-escalation)
-15. [Directory Structure](#directory-structure)
-16. [Project Setup](#project-setup)
-17. [Steel Thread Scope](#steel-thread-scope)
-18. [Definition of Done](#definition-of-done)
-19. [Design Principle: Python Over LLM](#design-principle-python-over-llm)
-20. [Customizable Assets](#customizable-assets)
-21. [Future Enhancements](#future-enhancements)
+4. [CLI Style Guide](#cli-style-guide)
+5. [CLI Commands](#cli-commands)
+6. [Core Workflow](#core-workflow)
+7. [Agent System](#agent-system)
+8. [Commit Discipline](#commit-discipline)
+9. [Preflight & Postflight Checks](#preflight--postflight-checks)
+10. [Configuration System](#configuration-system)
+11. [Data Storage](#data-storage)
+12. [Web UI](#web-ui)
+13. [Issue Tracker Facade](#issue-tracker-facade)
+14. [Context Tracking](#context-tracking)
+15. [Error Handling & Human Escalation](#error-handling--human-escalation)
+16. [Directory Structure](#directory-structure)
+17. [Project Setup](#project-setup)
+18. [Steel Thread Scope](#steel-thread-scope)
+19. [Definition of Done](#definition-of-done)
+20. [Design Principle: Python Over LLM](#design-principle-python-over-llm)
+21. [Customizable Assets](#customizable-assets)
+22. [Future Enhancements](#future-enhancements)
 
 ---
 
@@ -110,6 +111,145 @@ Every commit should be reviewable by another agent or human. The granularity ena
 | Testing | pytest, pytest-asyncio, pytest-cov, pytest-httpx, VCR |
 | Linting | Ruff |
 | Type Checking | mypy |
+
+---
+
+## CLI Style Guide
+
+### Command Naming Convention
+
+jiro follows the **verb-noun** pattern used by git, docker, and kubectl:
+
+```
+jiro <verb> [noun] [options]
+```
+
+| Pattern | Example | Description |
+|---------|---------|-------------|
+| `jiro <verb>` | `jiro init`, `jiro execute` | Single action |
+| `jiro <noun> <verb>` | `jiro tasks list`, `jiro config set` | Resource + action |
+| `jiro <noun> <verb> <target>` | `jiro tasks show TASK_ID` | Resource + action + target |
+
+### Naming Rules
+
+1. **Lowercase only**: All commands and subcommands are lowercase
+2. **Short and memorable**: Prefer `tasks` over `task-management`
+3. **Verbs are imperative**: `list`, `show`, `create`, not `listing`, `showing`
+4. **Nouns are plural for collections**: `tasks`, `assets`, `logs`
+5. **No abbreviations unless standard**: `config` (standard), not `cfg`
+
+### Standard Verbs
+
+| Verb | Meaning | Example |
+|------|---------|---------|
+| `list` | Show all items | `jiro tasks list` |
+| `show` | Show single item detail | `jiro tasks show TASK_ID` |
+| `create` | Create new item | (future: `jiro tasks create`) |
+| `update` | Modify existing item | (future: `jiro tasks update`) |
+| `delete` | Remove item | (future: `jiro tasks delete`) |
+
+### Output Formats
+
+Every command that produces output **must** support three formats:
+
+```bash
+jiro tasks list              # Human-readable (default)
+jiro tasks list --json       # JSON for machine parsing
+jiro tasks list --toon       # TOON for LLM token efficiency
+```
+
+#### Human-Readable (Default)
+
+Rich formatted output with colors, tables, and progress indicators:
+
+```
+Tasks (3 total)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✓ JIRO-1  Add user login          completed
+● JIRO-2  Implement OAuth         in_progress
+○ JIRO-3  Add session handling    pending
+```
+
+#### JSON (`--json`)
+
+Standard JSON for scripting and machine consumption:
+
+```json
+{
+  "tasks": [
+    {"id": "JIRO-1", "title": "Add user login", "status": "completed"},
+    {"id": "JIRO-2", "title": "Implement OAuth", "status": "in_progress"},
+    {"id": "JIRO-3", "title": "Add session handling", "status": "pending"}
+  ]
+}
+```
+
+#### TOON (`--toon`)
+
+[Token-Oriented Object Notation](https://github.com/toon-format/toon) for LLM inputs—~40% fewer tokens than JSON:
+
+```
+tasks[3]{id,title,status}:
+ JIRO-1,Add user login,completed
+ JIRO-2,Implement OAuth,in_progress
+ JIRO-3,Add session handling,pending
+```
+
+### Option Naming
+
+1. **Long form required**: Every option must have `--long-form`
+2. **Short form optional**: Common options may have `-s` short form
+3. **Boolean flags**: Use `--flag/--no-flag` pattern for toggles
+4. **Consistent across commands**: Same option = same name everywhere
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--json` | | JSON output format |
+| `--toon` | | TOON output format |
+| `--verbose` | `-v` | Increase verbosity (stackable: `-vv`) |
+| `--quiet` | `-q` | Suppress non-error output |
+| `--help` | `-h` | Show help |
+| `--version` | | Show version |
+| `--epic` | `-e` | Filter by epic |
+| `--status` | `-s` | Filter by status |
+
+### Help Text Standards
+
+Every command must have:
+
+1. **One-line description**: Shown in parent command's help
+2. **Detailed description**: Shown in `--help` for the command
+3. **Examples**: At least one usage example
+4. **Option documentation**: Every option explained
+
+```bash
+$ jiro tasks --help
+
+Usage: jiro tasks [OPTIONS] COMMAND [ARGS]...
+
+  Manage and view tasks in the issue tracker.
+
+Commands:
+  list   List all tasks with optional filters
+  show   Show detailed information about a task
+  next   Show the next task to be executed
+
+Examples:
+  jiro tasks list
+  jiro tasks list --status pending --epic JIRO-42
+  jiro tasks show JIRO-15
+```
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Success |
+| 1 | General error |
+| 2 | Invalid usage / bad arguments |
+| 3 | Configuration error |
+| 4 | Resource not found |
+| 5 | Operation halted (human intervention needed) |
 
 ---
 
