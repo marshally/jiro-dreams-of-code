@@ -26,7 +26,7 @@ repos:
     hooks:
       - id: pytest-unit
         name: pytest (unit tests)
-        entry: pytest -m unit --no-cov -q
+        entry: uv run pytest -m unit -p no:cov -q -o addopts=
         language: system
         pass_filenames: false
         always_run: true
@@ -47,7 +47,7 @@ repos:
     hooks:
       - id: pytest-full
         name: pytest (unit + integration)
-        entry: pytest -m "unit or integration" --no-cov -q
+        entry: uv run pytest -m "unit or integration" -p no:cov -q -o addopts=
         language: system
         pass_filenames: false
         always_run: true
