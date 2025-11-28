@@ -9,6 +9,13 @@ repos:
         always_run: true
         pass_filenames: false
 
+      - id: isolate-beads
+        name: Isolate .beads commits
+        entry: bash -c 'beads=$(git diff --cached --name-only | grep "^\.beads/" || true); other=$(git diff --cached --name-only | grep -v "^\.beads/" || true); if [ -n "$beads" ] && [ -n "$other" ]; then echo "ERROR - .beads/ files must be committed separately from other files."; echo ""; echo "Staged .beads files:"; echo "$beads"; echo ""; echo "Staged other files:"; echo "$other"; exit 1; fi'
+        language: system
+        always_run: true
+        pass_filenames: false
+
   # Standard file checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
