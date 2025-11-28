@@ -1,4 +1,4 @@
-.PHONY: setup install dev hooks test lint
+.PHONY: setup install dev hooks test lint typecheck format pre-commit
 
 # System prerequisites (run once per machine)
 setup:
@@ -24,3 +24,15 @@ test:
 # Run linter
 lint:
 	uv run ruff check .
+
+# Run type checker
+typecheck:
+	uv run mypy src/
+
+# Format code
+format:
+	uv run ruff format .
+
+# Run full pre-commit suite
+pre-commit:
+	uv run pre-commit run --all-files
