@@ -16,3 +16,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI pre-commit job plus markdown formatting enforcement
 - Dependabot automation for pip/uv and GitHub Actions
 - Publish workflow to build/test/tag releases via PyPI
+- AGENTS.md with commit philosophy and PR protocol
+- Pre-commit hook to prevent direct commits to main branch
+- Pre-commit hook to isolate .beads commits from code changes
