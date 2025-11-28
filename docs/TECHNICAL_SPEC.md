@@ -24,7 +24,9 @@ A disciplined AI agent orchestration system that builds software using the shoku
 16. [Project Setup](#project-setup)
 17. [Steel Thread Scope](#steel-thread-scope)
 18. [Definition of Done](#definition-of-done)
-19. [Future Enhancements](#future-enhancements)
+19. [Design Principle: Python Over LLM](#design-principle-python-over-llm)
+20. [Customizable Assets](#customizable-assets)
+21. [Future Enhancements](#future-enhancements)
 
 ---
 
@@ -45,6 +47,8 @@ jiro-dreams-of-code is a CLI and web-based tool that:
 - **Agent review**: Every commit is validated against discipline rules
 - **Context awareness**: Track token usage to optimize agent efficiency
 - **Parallelizable work**: Epics are independent workstreams that can run concurrently
+- **Python over LLM**: Anything that can be done deterministically with Python code should be—conserves context and ensures precision
+- **Customizable assets**: All scripts and prompts are bundled in the package but overridable per-project or per-user
 
 ---
 
@@ -205,6 +209,23 @@ jiro web [--daemon]
 ```
 - Start web UI on localhost:8888
 - `--daemon`: Run in background
+
+### Asset Management
+
+```bash
+jiro assets list
+```
+- List all assets and their source locations
+
+```bash
+jiro assets which <asset-path>
+```
+- Show where a specific asset is loaded from
+
+```bash
+jiro assets customize <asset-path> [--local|--project|--global]
+```
+- Copy package default to specified location for customization
 
 ---
 
@@ -870,10 +891,25 @@ jiro-dreams-of-code/
 │       │   ├── connection.py
 │       │   ├── models.py
 │       │   └── migrations/
-│       └── config/
+│       ├── config/
+│       │   ├── __init__.py
+│       │   ├── schema.py         # Config schema/validation
+│       │   └── loader.py         # Config loading/merging
+│       └── assets/               # Package default assets
 │           ├── __init__.py
-│           ├── schema.py         # Config schema/validation
-│           └── loader.py         # Config loading/merging
+│           ├── loader.py         # Asset resolution logic
+│           ├── prompts/
+│           │   ├── dreaming_agent.md
+│           │   ├── planning_agent.md
+│           │   ├── execution_agent.md
+│           │   └── review_agent.md
+│           └── templates/
+│               ├── commit/
+│               │   ├── default.txt
+│               │   ├── tdd_red.txt
+│               │   ├── tdd_green.txt
+│               │   └── refactor.txt
+│               └── spec_schema.md
 ├── tests/
 │   ├── conftest.py
 │   ├── factories.py
@@ -966,6 +1002,9 @@ The minimum viable release includes:
 - [x] `jiro mode [stealth|local]`
 - [x] `jiro logs`
 - [x] `jiro web [--daemon]`
+- [x] `jiro assets list`
+- [x] `jiro assets which <asset-path>`
+- [x] `jiro assets customize <asset-path>`
 
 ### Core Features
 - [x] Spec generation with defined schema
@@ -981,6 +1020,7 @@ The minimum viable release includes:
 - [x] SQLite database for metrics/sessions
 - [x] Structured logging with verbosity levels
 - [x] Web UI with spec refinement, task list, execution status
+- [x] Asset system with package defaults and user overrides
 
 ### Deferred to Future
 - [ ] Parallel execution with git worktrees
@@ -1004,6 +1044,120 @@ Every feature must include:
 6. **Doctor updated** - If applicable, health checks added
 
 Coverage requirement: 70-80%
+
+---
+
+## Design Principle: Python Over LLM
+
+### Rationale
+
+LLM context is expensive and non-deterministic. Whenever behavior can be implemented with deterministic Python code, it **must** be.
+
+**Use Python for:**
+- Git operations (commit, checkout, branch, push)
+- File system operations (read, write, list)
+- Running tests and linters (subprocess calls)
+- Parsing and validating commit messages
+- Config file loading and merging
+- Database operations
+- Determining relevant tests (convention-based matching)
+- Commit message formatting from templates
+- Preflight/postflight check orchestration
+- Diffing and displaying changes
+
+**Use LLM for:**
+- Generating specs from natural language
+- Breaking specs into tasks
+- Writing code and tests
+- Refining specs through conversation
+- Making judgment calls (e.g., "is this a behavior-neutral refactoring?")
+- Reviewing commits for conceptual violations
+
+### Benefits
+
+1. **Context conservation**: Python operations consume zero tokens
+2. **Precision**: Deterministic behavior, no hallucination risk
+3. **Speed**: Python executes instantly vs. LLM round-trips
+4. **Testability**: Python logic can be unit tested thoroughly
+5. **Cost**: Fewer tokens = lower API costs
+
+---
+
+## Customizable Assets
+
+### Overview
+
+All scripts and prompts are bundled in the Python package but can be overridden at project or user level.
+
+### Asset Types
+
+| Type | Description | Example |
+|------|-------------|---------|
+| **Prompts** | System prompts for each agent type | `dreaming_agent.md`, `review_agent.md` |
+| **Templates** | Commit message templates, spec schema | `commit_template.txt`, `spec_schema.md` |
+| **Scripts** | Shell/Python scripts for common operations | `run_tests.sh`, `lint_files.py` |
+
+### Resolution Order (highest to lowest)
+
+1. **Local** (`.jiro-dreams-of-code/assets/`)
+2. **Project** (`~/.jiro-dreams-of-code/$PROJECT_NAME/assets/`)
+3. **Global** (`~/.jiro-dreams-of-code/assets/`)
+4. **Package defaults** (bundled in `jiro` package)
+
+### Directory Structure
+
+```
+# Package defaults (bundled)
+src/jiro/assets/
+├── prompts/
+│   ├── dreaming_agent.md
+│   ├── planning_agent.md
+│   ├── execution_agent.md
+│   └── review_agent.md
+├── templates/
+│   ├── commit/
+│   │   ├── default.txt
+│   │   ├── tdd_red.txt
+│   │   ├── tdd_green.txt
+│   │   └── refactor.txt
+│   └── spec_schema.md
+└── scripts/
+    └── (reserved for future use)
+
+# User overrides (any level)
+.jiro-dreams-of-code/assets/
+├── prompts/
+│   └── execution_agent.md    # Override just this one
+└── templates/
+    └── commit/
+        └── default.txt       # Custom commit format
+```
+
+### Usage
+
+```python
+from jiro.assets import load_asset
+
+# Loads with resolution order: local → project → global → package
+prompt = load_asset("prompts/execution_agent.md")
+template = load_asset("templates/commit/tdd_red.txt")
+```
+
+### CLI for Asset Management
+
+```bash
+# List all assets and their sources
+jiro assets list
+
+# Show where a specific asset is loaded from
+jiro assets which prompts/execution_agent.md
+
+# Copy package default to local for customization
+jiro assets customize prompts/execution_agent.md --local
+
+# Copy to global (user-wide)
+jiro assets customize prompts/execution_agent.md --global
+```
 
 ---
 
