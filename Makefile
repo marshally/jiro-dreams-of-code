@@ -27,7 +27,7 @@ lint:
 
 # Run type checker
 typecheck:
-	uv run mypy src/
+	uv run python -m mypy src/
 
 # Format code
 format:
