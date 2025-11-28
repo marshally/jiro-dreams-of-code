@@ -1,0 +1,43 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  PYTHON_VERSION: "3.12"
+  UV_CACHE_DIR: /tmp/.uv-cache
+
+jobs:
+  build-and-publish:
+    name: Build and Publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --dev --all-extras
+
+      - name: Run tests
+        run: uv run pytest
+
+      - name: Build artifacts
+        run: uv build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
