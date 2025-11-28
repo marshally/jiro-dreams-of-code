@@ -12,3 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial project scaffolding
 - Technical specification document
 - Beads issue tracking integration
+- Developer make targets for type checking, formatting, and pre-commit
+- CI pre-commit job plus markdown formatting enforcement
+- Dependabot automation for pip/uv and GitHub Actions
+- Publish workflow to build/test/tag releases via PyPI
