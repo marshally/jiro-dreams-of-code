@@ -1,4 +1,7 @@
-.PHONY: hooks
+.PHONY: setup hooks
+
+setup:
+	uv pip install -e ".[dev,test]"
 
 hooks:
 	pre-commit install
