@@ -1,6 +1,6 @@
 """Main CLI entry point for jiro-dreams-of-code."""
 
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -26,7 +26,7 @@ def version_callback(value: bool) -> None:
 @app.callback()
 def main(
     version: Annotated[
-        Optional[bool],
+        bool | None,
         typer.Option("--version", callback=version_callback, help="Show version and exit"),
     ] = None,
 ) -> None:
@@ -94,14 +94,16 @@ def doctor(
     console.print("  - Test and lint commands work")
     console.print("  - Beads database accessible")
     if fix:
-        console.print("\n[green]With --fix:[/green] Will attempt to create missing directories and fix issues")
+        console.print(
+            "\n[green]With --fix:[/green] Will attempt to create missing directories and fix issues"
+        )
 
 
 @app.command()
 def dream(
     prompt: Annotated[str, typer.Argument(help="Natural language description of what to build")],
     model: Annotated[
-        Optional[str], typer.Option("--model", help="Override the model for this operation")
+        str | None, typer.Option("--model", help="Override the model for this operation")
     ] = None,
 ) -> None:
     """
@@ -127,9 +129,7 @@ def dream(
 @app.command()
 def plan(
     spec: Annotated[str, typer.Option("--spec", help="Path to specification file")],
-    refinement: Annotated[
-        Optional[str], typer.Argument(help="Optional refinement prompt")
-    ] = None,
+    refinement: Annotated[str | None, typer.Argument(help="Optional refinement prompt")] = None,
 ) -> None:
     """
     Parse spec and generate epics + tasks.
@@ -164,12 +164,12 @@ app.add_typer(tasks_app, name="tasks")
 @tasks_app.command("list")
 def tasks_list(
     status: Annotated[
-        Optional[str],
-        typer.Option("--status", "-s", help="Filter by status (open, in_progress, closed, blocked)"),
+        str | None,
+        typer.Option(
+            "--status", "-s", help="Filter by status (open, in_progress, closed, blocked)"
+        ),
     ] = None,
-    epic: Annotated[
-        Optional[str], typer.Option("--epic", "-e", help="Filter by epic ID")
-    ] = None,
+    epic: Annotated[str | None, typer.Option("--epic", "-e", help="Filter by epic ID")] = None,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     toon: Annotated[bool, typer.Option("--toon", help="Output as TOON format")] = False,
 ) -> None:
@@ -220,9 +220,7 @@ def tasks_show(
 
 @tasks_app.command("next")
 def tasks_next(
-    epic: Annotated[
-        Optional[str], typer.Option("--epic", "-e", help="Filter by epic ID")
-    ] = None,
+    epic: Annotated[str | None, typer.Option("--epic", "-e", help="Filter by epic ID")] = None,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     toon: Annotated[bool, typer.Option("--toon", help="Output as TOON format")] = False,
 ) -> None:
@@ -244,7 +242,7 @@ def tasks_next(
 @app.command()
 def execute(
     epic: Annotated[
-        Optional[str], typer.Option("--epic", help="Limit execution to a specific epic")
+        str | None, typer.Option("--epic", help="Limit execution to a specific epic")
     ] = None,
 ) -> None:
     """
@@ -363,7 +361,7 @@ def config_set(
 @app.command()
 def mode(
     target_mode: Annotated[
-        Optional[str], typer.Argument(help="Mode to switch to: stealth or local")
+        str | None, typer.Argument(help="Mode to switch to: stealth or local")
     ] = None,
 ) -> None:
     """
@@ -388,9 +386,7 @@ def mode(
 @app.command()
 def logs(
     follow: Annotated[bool, typer.Option("--follow", "-f", help="Follow log output")] = False,
-    tail: Annotated[
-        Optional[int], typer.Option("--tail", "-n", help="Show last N lines")
-    ] = None,
+    tail: Annotated[int | None, typer.Option("--tail", "-n", help="Show last N lines")] = None,
 ) -> None:
     """
     View logs with filtering options.
@@ -410,9 +406,7 @@ def logs(
 
 @app.command()
 def web(
-    daemon: Annotated[
-        bool, typer.Option("--daemon", help="Run web UI in background")
-    ] = False,
+    daemon: Annotated[bool, typer.Option("--daemon", help="Run web UI in background")] = False,
     port: Annotated[int, typer.Option("--port", help="Port to run on")] = 8888,
 ) -> None:
     """
@@ -478,12 +472,8 @@ def assets_which(
 @assets_app.command("customize")
 def assets_customize(
     asset_path: Annotated[str, typer.Argument(help="Asset path to customize")],
-    global_config: Annotated[
-        bool, typer.Option("--global", help="Copy to global assets")
-    ] = False,
-    project: Annotated[
-        bool, typer.Option("--project", help="Copy to project assets")
-    ] = False,
+    global_config: Annotated[bool, typer.Option("--global", help="Copy to global assets")] = False,
+    project: Annotated[bool, typer.Option("--project", help="Copy to project assets")] = False,
     local: Annotated[bool, typer.Option("--local", help="Copy to local assets")] = True,
 ) -> None:
     """
