@@ -24,11 +24,13 @@ Small commits enable flexible git workflows:
 ### Examples
 
 **Good**: Three separate commits
+
 1. "Add User model with validation"
-2. "Add user creation endpoint"
-3. "Add user creation tests"
+1. "Add user creation endpoint"
+1. "Add user creation tests"
 
 **Bad**: One large commit
+
 1. "Add user feature with model, endpoint, and tests"
 
 ## Pull Request Protocol
@@ -36,13 +38,14 @@ Small commits enable flexible git workflows:
 Before creating a pull request, you MUST:
 
 1. **Update CHANGELOG.md** - Add an entry under `[Unreleased]` describing your changes
+
    - Use the appropriate section: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, or `Security`
    - Write clear, user-facing descriptions of what changed
    - Reference issue IDs where applicable
 
-2. **Follow conventional commits** - Use descriptive commit messages
+1. **Follow conventional commits** - Use descriptive commit messages
 
-3. **Ensure tests pass** - Run `pytest` before submitting
+1. **Ensure tests pass** - Run `pytest` before submitting
 
 ## Changelog Format
 

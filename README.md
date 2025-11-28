@@ -71,7 +71,7 @@ See [TECHNICAL_SPEC.md](docs/TECHNICAL_SPEC.md) for complete documentation.
 Commands that rely on Anthropic require a key that can be provided by either:
 
 1. Setting the `ANTHROPIC_API_KEY` environment variable
-2. Storing the key in the system keyring (`jiro doctor` verifies both sources)
+1. Storing the key in the system keyring (`jiro doctor` verifies both sources)
 
 If both are configured, `jiro doctor` emits a warning so you can consolidate to one source. If neither source is available, Anthropic-dependent commands exit immediately with an error rather than prompting mid-task.
 

@@ -7,39 +7,39 @@ A disciplined AI agent orchestration system that builds software using the shoku
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [Philosophy](#philosophy)
-3. [Architecture](#architecture)
-4. [CLI Style Guide](#cli-style-guide)
-5. [CLI Commands](#cli-commands)
-6. [Core Workflow](#core-workflow)
-7. [Agent System](#agent-system)
-8. [Commit Discipline](#commit-discipline)
-9. [Preflight & Postflight Checks](#preflight--postflight-checks)
-10. [Configuration System](#configuration-system)
-11. [Data Storage](#data-storage)
-12. [Web UI](#web-ui)
-13. [Issue Tracker Facade](#issue-tracker-facade)
-14. [Context Tracking](#context-tracking)
-15. [Error Handling & Human Escalation](#error-handling--human-escalation)
-16. [Directory Structure](#directory-structure)
-17. [Project Setup](#project-setup)
-18. [Steel Thread Scope](#steel-thread-scope)
-19. [Definition of Done](#definition-of-done)
-20. [Design Principle: Python Over LLM](#design-principle-python-over-llm)
-21. [Customizable Assets](#customizable-assets)
-22. [Future Enhancements](#future-enhancements)
+1. [Philosophy](#philosophy)
+1. [Architecture](#architecture)
+1. [CLI Style Guide](#cli-style-guide)
+1. [CLI Commands](#cli-commands)
+1. [Core Workflow](#core-workflow)
+1. [Agent System](#agent-system)
+1. [Commit Discipline](#commit-discipline)
+1. [Preflight & Postflight Checks](#preflight--postflight-checks)
+1. [Configuration System](#configuration-system)
+1. [Data Storage](#data-storage)
+1. [Web UI](#web-ui)
+1. [Issue Tracker Facade](#issue-tracker-facade)
+1. [Context Tracking](#context-tracking)
+1. [Error Handling & Human Escalation](#error-handling--human-escalation)
+1. [Directory Structure](#directory-structure)
+1. [Project Setup](#project-setup)
+1. [Steel Thread Scope](#steel-thread-scope)
+1. [Definition of Done](#definition-of-done)
+1. [Design Principle: Python Over LLM](#design-principle-python-over-llm)
+1. [Customizable Assets](#customizable-assets)
+1. [Future Enhancements](#future-enhancements)
 
----
+______________________________________________________________________
 
 ## Overview
 
 jiro-dreams-of-code is a CLI and web-based tool that:
 
 1. Takes a natural language prompt and generates a detailed specification
-2. Breaks specifications into granular, dependency-aware tasks
-3. Spawns AI agents to execute tasks with strict discipline
-4. Enforces commit hygiene through validation rules
-5. Tracks context usage and metrics for every prompt
+1. Breaks specifications into granular, dependency-aware tasks
+1. Spawns AI agents to execute tasks with strict discipline
+1. Enforces commit hygiene through validation rules
+1. Tracks context usage and metrics for every prompt
 
 ### Key Principles
 
@@ -51,7 +51,7 @@ jiro-dreams-of-code is a CLI and web-based tool that:
 - **Python over LLM**: Anything that can be done deterministically with Python code should be—conserves context and ensures precision
 - **Customizable assets**: All scripts and prompts are bundled in the package but overridable per-project or per-user
 
----
+______________________________________________________________________
 
 ## Philosophy
 
@@ -62,11 +62,12 @@ Named after Jiro Ono, the 93-year-old sushi master from "Jiro Dreams of Sushi," 
 - **Discipline over speed**: Correctness and reviewability trump velocity
 
 Every commit should be reviewable by another agent or human. The granularity enables:
+
 - Automated validation of discipline adherence
 - Easy rollback of specific changes
 - Clear audit trail of decision-making
 
----
+______________________________________________________________________
 
 ## Architecture
 
@@ -112,7 +113,7 @@ Every commit should be reviewable by another agent or human. The granularity ena
 | Linting | Ruff |
 | Type Checking | mypy |
 
----
+______________________________________________________________________
 
 ## CLI Style Guide
 
@@ -133,10 +134,10 @@ jiro <verb> [noun] [options]
 ### Naming Rules
 
 1. **Lowercase only**: All commands and subcommands are lowercase
-2. **Short and memorable**: Prefer `tasks` over `task-management`
-3. **Verbs are imperative**: `list`, `show`, `create`, not `listing`, `showing`
-4. **Nouns are plural for collections**: `tasks`, `assets`, `logs`
-5. **No abbreviations unless standard**: `config` (standard), not `cfg`
+1. **Short and memorable**: Prefer `tasks` over `task-management`
+1. **Verbs are imperative**: `list`, `show`, `create`, not `listing`, `showing`
+1. **Nouns are plural for collections**: `tasks`, `assets`, `logs`
+1. **No abbreviations unless standard**: `config` (standard), not `cfg`
 
 ### Standard Verbs
 
@@ -198,9 +199,9 @@ tasks[3]{id,title,status}:
 ### Option Naming
 
 1. **Long form required**: Every option must have `--long-form`
-2. **Short form optional**: Common options may have `-s` short form
-3. **Boolean flags**: Use `--flag/--no-flag` pattern for toggles
-4. **Consistent across commands**: Same option = same name everywhere
+1. **Short form optional**: Common options may have `-s` short form
+1. **Boolean flags**: Use `--flag/--no-flag` pattern for toggles
+1. **Consistent across commands**: Same option = same name everywhere
 
 | Option | Short | Description |
 |--------|-------|-------------|
@@ -218,9 +219,9 @@ tasks[3]{id,title,status}:
 Every command must have:
 
 1. **One-line description**: Shown in parent command's help
-2. **Detailed description**: Shown in `--help` for the command
-3. **Examples**: At least one usage example
-4. **Option documentation**: Every option explained
+1. **Detailed description**: Shown in `--help` for the command
+1. **Examples**: At least one usage example
+1. **Option documentation**: Every option explained
 
 ```bash
 $ jiro tasks --help
@@ -251,7 +252,7 @@ Examples:
 | 4 | Resource not found |
 | 5 | Operation halted (human intervention needed) |
 
----
+______________________________________________________________________
 
 ## CLI Commands
 
@@ -260,6 +261,7 @@ Examples:
 ```bash
 jiro init [--stealth] [--interactive]
 ```
+
 - Creates project configuration and beads database
 - `--stealth`: Store all files in `~/.jiro-dreams-of-code/$PROJECT_NAME/` instead of project root
 - `--interactive`: Prompt for test command, lint command, etc.
@@ -268,6 +270,7 @@ jiro init [--stealth] [--interactive]
 ```bash
 jiro doctor [--fix]
 ```
+
 - Verify installation and configuration health
 - `--fix`: Attempt auto-remediation of fixable issues
 - Validates that an Anthropic API key is available from either the environment or the system keyring (warns if both are configured)
@@ -277,7 +280,7 @@ jiro doctor [--fix]
 Commands that integrate with Anthropic require a key sourced from one of two locations:
 
 1. The `ANTHROPIC_API_KEY` environment variable
-2. The OS keyring entry that `jiro` manages
+1. The OS keyring entry that `jiro` manages
 
 `jiro doctor` inspects both sources, issuing a warning if duplicates are detected so users can consolidate on a single source of truth. If neither source is available, any command that depends on Anthropic exits immediately with a clear error before performing additional work.
 
@@ -286,6 +289,7 @@ Commands that integrate with Anthropic require a key sourced from one of two loc
 ```bash
 jiro dream "prompt"
 ```
+
 - Generate a specification from natural language
 - Opens interactive chat refinement mode
 - Saves spec to `.jiro-dreams-of-code/specs/` (or stealth equivalent)
@@ -293,6 +297,7 @@ jiro dream "prompt"
 ```bash
 jiro plan --spec "auth-system.md" ["optional refinement prompt"]
 ```
+
 - Parse spec and generate epics + tasks
 - Analyze dependencies between tasks
 - Output summary with clickable spec file path
@@ -304,16 +309,19 @@ jiro plan --spec "auth-system.md" ["optional refinement prompt"]
 ```bash
 jiro tasks list
 ```
+
 - Show summary of all tasks (grouped by epic, status)
 
 ```bash
 jiro tasks show TASK_ID
 ```
+
 - Show full detail of a specific task
 
 ```bash
 jiro tasks next
 ```
+
 - Show full detail of the next task to be executed
 
 ### Execution
@@ -321,6 +329,7 @@ jiro tasks next
 ```bash
 jiro execute [--epic EPIC_ID]
 ```
+
 - Run session preflight checks
 - Iteratively execute tasks
 - Run session postflight checks
@@ -329,6 +338,7 @@ jiro execute [--epic EPIC_ID]
 ```bash
 jiro status
 ```
+
 - Show status of all active sessions for this project
 
 ### Configuration
@@ -337,6 +347,7 @@ jiro status
 jiro config [--global|--project|--local] [key] [value]
 jiro config --list [--global|--project|--local]
 ```
+
 - Get/set configuration values (git-style interface)
 - `--global`: `~/.jiro-dreams-of-code/config.yaml`
 - `--project`: `~/.jiro-dreams-of-code/$PROJECT_NAME/config.yaml`
@@ -345,6 +356,7 @@ jiro config --list [--global|--project|--local]
 ```bash
 jiro mode [stealth|local]
 ```
+
 - View or switch between stealth and local modes
 - Migrates all data when switching
 
@@ -353,11 +365,13 @@ jiro mode [stealth|local]
 ```bash
 jiro logs
 ```
+
 - View logs (with filtering options)
 
 ```bash
 jiro web [--daemon]
 ```
+
 - Start web UI on localhost:8888
 - `--daemon`: Run in background
 
@@ -366,19 +380,22 @@ jiro web [--daemon]
 ```bash
 jiro assets list
 ```
+
 - List all assets and their source locations
 
 ```bash
 jiro assets which <asset-path>
 ```
+
 - Show where a specific asset is loaded from
 
 ```bash
 jiro assets customize <asset-path> [--local|--project|--global]
 ```
+
 - Copy package default to specified location for customization
 
----
+______________________________________________________________________
 
 ## Core Workflow
 
@@ -479,7 +496,7 @@ Session Postflight:
   → Branch pushed to origin
 ```
 
----
+______________________________________________________________________
 
 ## Agent System
 
@@ -495,18 +512,21 @@ Session Postflight:
 ### Execution Agent Permissions
 
 **Allowed:**
+
 - File read/write/edit
 - Bash: test commands, lint commands
 - Git: commit, checkout, merge, rebase, push
 - GitHub CLI: `gh pr create`, `gh pr view`
 
 **Not Allowed:**
+
 - Web search (planning agent handles research)
 - Arbitrary bash commands
 
 ### Planning Subagent (Task Preflight)
 
 Before each task executes, a planning subagent:
+
 - Reviews the task specification
 - Identifies specific files, line numbers, byte ranges
 - Updates task with detailed execution hints
@@ -523,11 +543,12 @@ models:
 ```
 
 Configurable per-project and overridable per-invocation:
+
 ```bash
 jiro dream --model claude-opus-4 "complex architectural decision"
 ```
 
----
+______________________________________________________________________
 
 ## Commit Discipline
 
@@ -559,6 +580,7 @@ Context: 12,450 tokens (8,200 → 20,650)
 ```
 
 For TDD Red commits (showing failure):
+
 ```
 🔴 Add failing test for user login validation
 
@@ -586,7 +608,7 @@ Context: 8,200 tokens (0 → 8,200)
 
 **On validation failure**: HALT and page human for help.
 
----
+______________________________________________________________________
 
 ## Preflight & Postflight Checks
 
@@ -657,16 +679,16 @@ Fallback: If no matching tests found, run all tests.
 
 All files modified during the current task.
 
----
+______________________________________________________________________
 
 ## Configuration System
 
 ### Precedence (highest to lowest)
 
 1. CLI flags
-2. Local config (`./.jiro-dreams-of-code.yaml`)
-3. Project config (`~/.jiro-dreams-of-code/$PROJECT_NAME/config.yaml`)
-4. Global config (`~/.jiro-dreams-of-code/config.yaml`)
+1. Local config (`./.jiro-dreams-of-code.yaml`)
+1. Project config (`~/.jiro-dreams-of-code/$PROJECT_NAME/config.yaml`)
+1. Global config (`~/.jiro-dreams-of-code/config.yaml`)
 
 **Conflict handling**: If keys conflict between local and project config, warn the user. Local takes precedence.
 
@@ -720,13 +742,14 @@ jiro config --list
 jiro config --list --global
 ```
 
----
+______________________________________________________________________
 
 ## Data Storage
 
 ### Database: jiro.db (SQLite)
 
 Location:
+
 - Normal mode: `.jiro-dreams-of-code/jiro.db`
 - Stealth mode: `~/.jiro-dreams-of-code/$PROJECT_NAME/jiro.db`
 
@@ -786,10 +809,11 @@ CREATE TABLE commits (
 ### Issue Tracker: Beads
 
 Location:
+
 - Normal mode: `.jiro-dreams-of-code/.beads/`
 - Stealth mode: `~/.jiro-dreams-of-code/$PROJECT_NAME/.beads/`
 
----
+______________________________________________________________________
 
 ## Web UI
 
@@ -803,26 +827,31 @@ Location:
 ### Views
 
 1. **Spec Refinement**
+
    - Left panel: Rendered spec markdown
    - Right panel: Chat interface for refinement
    - Shows diffs after each change
 
-2. **Task List**
+1. **Task List**
+
    - Grouped by epic
    - Status indicators
    - Click to view detail
 
-3. **Execution Status**
+1. **Execution Status**
+
    - Live view of running sessions
    - Current task, phase, context usage
    - Log streaming
 
-4. **Metrics/History**
+1. **Metrics/History**
+
    - Prompt history with context usage
    - Commit history
    - Session history
 
-5. **Logs**
+1. **Logs**
+
    - Live tail during execution
    - Historical browse with filtering
 
@@ -833,7 +862,7 @@ jiro web              # foreground
 jiro web --daemon     # background
 ```
 
----
+______________________________________________________________________
 
 ## Issue Tracker Facade
 
@@ -841,6 +870,7 @@ jiro web --daemon     # background
 
 ```python
 from typing import Protocol
+
 
 class IssueTracker(Protocol):
     def create_task(
@@ -885,7 +915,7 @@ class IssueTracker(Protocol):
 
 **Future**: GitHub Issues, Jira, Linear
 
----
+______________________________________________________________________
 
 ## Context Tracking
 
@@ -913,7 +943,7 @@ Default: 85% of one Haiku context window.
 
 Configurable per task type for complex operations.
 
----
+______________________________________________________________________
 
 ## Error Handling & Human Escalation
 
@@ -933,6 +963,7 @@ Terminal output with clear message. Session pauses until human intervenes.
 ### Recovery
 
 After human fixes the issue:
+
 ```bash
 jiro execute  # resumes from where it left off
 ```
@@ -944,7 +975,7 @@ jiro execute  # resumes from where it left off
 - Email
 - SMS
 
----
+______________________________________________________________________
 
 ## Directory Structure
 
@@ -987,7 +1018,7 @@ Default: Derived from git remote URL (e.g., `github.com/user/repo` → `user-rep
 
 Override: `jiro init --name custom-name`
 
----
+______________________________________________________________________
 
 ## Project Setup
 
@@ -1126,77 +1157,82 @@ jiro = "jiro.cli.main:app"
 ### Git Hooks
 
 **Pre-commit** (relevant files):
+
 - Run tests for changed files
 - Lint changed files
 
 **Pre-push** (all files):
+
 - Run full test suite
 - Lint all files
 
----
+______________________________________________________________________
 
 ## Steel Thread Scope
 
 The minimum viable release includes:
 
 ### CLI Commands
-- [x] `jiro init [--stealth] [--interactive]`
-- [x] `jiro doctor [--fix]`
-- [x] `jiro dream "prompt"` (with chat refinement)
-- [x] `jiro plan --spec "filename" ["prompt"]`
-- [x] `jiro tasks list`
-- [x] `jiro tasks show TASK_ID`
-- [x] `jiro tasks next`
-- [x] `jiro execute [--epic EPIC_ID]`
-- [x] `jiro status`
-- [x] `jiro config [--global|--project|--local] [key] [value]`
-- [x] `jiro mode [stealth|local]`
-- [x] `jiro logs`
-- [x] `jiro web [--daemon]`
-- [x] `jiro assets list`
-- [x] `jiro assets which <asset-path>`
-- [x] `jiro assets customize <asset-path>`
+
+- \[x\] `jiro init [--stealth] [--interactive]`
+- \[x\] `jiro doctor [--fix]`
+- \[x\] `jiro dream "prompt"` (with chat refinement)
+- \[x\] `jiro plan --spec "filename" ["prompt"]`
+- \[x\] `jiro tasks list`
+- \[x\] `jiro tasks show TASK_ID`
+- \[x\] `jiro tasks next`
+- \[x\] `jiro execute [--epic EPIC_ID]`
+- \[x\] `jiro status`
+- \[x\] `jiro config [--global|--project|--local] [key] [value]`
+- \[x\] `jiro mode [stealth|local]`
+- \[x\] `jiro logs`
+- \[x\] `jiro web [--daemon]`
+- \[x\] `jiro assets list`
+- \[x\] `jiro assets which <asset-path>`
+- \[x\] `jiro assets customize <asset-path>`
 
 ### Core Features
-- [x] Spec generation with defined schema
-- [x] Chat-based spec refinement (terminal)
-- [x] Task decomposition with dependency analysis
-- [x] Sequential task execution (parallel deferred)
-- [x] Session preflight/postflight checks
-- [x] Task preflight/postflight checks
-- [x] Commit discipline validation (hardcoded rules)
-- [x] Context tracking for all prompts
-- [x] Issue tracker facade with Beads implementation
-- [x] Config system with three-level precedence
-- [x] SQLite database for metrics/sessions
-- [x] Structured logging with verbosity levels
-- [x] Web UI with spec refinement, task list, execution status
-- [x] Asset system with package defaults and user overrides
+
+- \[x\] Spec generation with defined schema
+- \[x\] Chat-based spec refinement (terminal)
+- \[x\] Task decomposition with dependency analysis
+- \[x\] Sequential task execution (parallel deferred)
+- \[x\] Session preflight/postflight checks
+- \[x\] Task preflight/postflight checks
+- \[x\] Commit discipline validation (hardcoded rules)
+- \[x\] Context tracking for all prompts
+- \[x\] Issue tracker facade with Beads implementation
+- \[x\] Config system with three-level precedence
+- \[x\] SQLite database for metrics/sessions
+- \[x\] Structured logging with verbosity levels
+- \[x\] Web UI with spec refinement, task list, execution status
+- \[x\] Asset system with package defaults and user overrides
 
 ### Deferred to Future
-- [ ] Parallel execution with git worktrees
-- [ ] GitHub Issues, Jira, Linear integrations
-- [ ] Slack/email/SMS notifications
-- [ ] Static analysis for relevant test detection
-- [ ] System keychain for API key storage
-- [ ] Custom commit templates
 
----
+- \[ \] Parallel execution with git worktrees
+- \[ \] GitHub Issues, Jira, Linear integrations
+- \[ \] Slack/email/SMS notifications
+- \[ \] Static analysis for relevant test detection
+- \[ \] System keychain for API key storage
+- \[ \] Custom commit templates
+
+______________________________________________________________________
 
 ## Definition of Done
 
 Every feature must include:
 
 1. **Code written** - Implementation complete
-2. **Has tests** - Unit and/or integration tests with appropriate coverage
-3. **Has observability** - Logging at appropriate levels
-4. **Docs updated** - User-facing documentation current
-5. **Hooked to CLI and Web UI** - If applicable
-6. **Doctor updated** - If applicable, health checks added
+1. **Has tests** - Unit and/or integration tests with appropriate coverage
+1. **Has observability** - Logging at appropriate levels
+1. **Docs updated** - User-facing documentation current
+1. **Hooked to CLI and Web UI** - If applicable
+1. **Doctor updated** - If applicable, health checks added
 
 Coverage requirement: 70-80%
 
----
+______________________________________________________________________
 
 ## Design Principle: Python Over LLM
 
@@ -1205,6 +1241,7 @@ Coverage requirement: 70-80%
 LLM context is expensive and non-deterministic. Whenever behavior can be implemented with deterministic Python code, it **must** be.
 
 **Use Python for:**
+
 - Git operations (commit, checkout, branch, push)
 - File system operations (read, write, list)
 - Running tests and linters (subprocess calls)
@@ -1217,6 +1254,7 @@ LLM context is expensive and non-deterministic. Whenever behavior can be impleme
 - Diffing and displaying changes
 
 **Use LLM for:**
+
 - Generating specs from natural language
 - Breaking specs into tasks
 - Writing code and tests
@@ -1227,12 +1265,12 @@ LLM context is expensive and non-deterministic. Whenever behavior can be impleme
 ### Benefits
 
 1. **Context conservation**: Python operations consume zero tokens
-2. **Precision**: Deterministic behavior, no hallucination risk
-3. **Speed**: Python executes instantly vs. LLM round-trips
-4. **Testability**: Python logic can be unit tested thoroughly
-5. **Cost**: Fewer tokens = lower API costs
+1. **Precision**: Deterministic behavior, no hallucination risk
+1. **Speed**: Python executes instantly vs. LLM round-trips
+1. **Testability**: Python logic can be unit tested thoroughly
+1. **Cost**: Fewer tokens = lower API costs
 
----
+______________________________________________________________________
 
 ## Customizable Assets
 
@@ -1251,9 +1289,9 @@ All scripts and prompts are bundled in the Python package but can be overridden 
 ### Resolution Order (highest to lowest)
 
 1. **Local** (`.jiro-dreams-of-code/assets/`)
-2. **Project** (`~/.jiro-dreams-of-code/$PROJECT_NAME/assets/`)
-3. **Global** (`~/.jiro-dreams-of-code/assets/`)
-4. **Package defaults** (bundled in `jiro` package)
+1. **Project** (`~/.jiro-dreams-of-code/$PROJECT_NAME/assets/`)
+1. **Global** (`~/.jiro-dreams-of-code/assets/`)
+1. **Package defaults** (bundled in `jiro` package)
 
 ### Directory Structure
 
@@ -1310,16 +1348,18 @@ jiro assets customize prompts/execution_agent.md --local
 jiro assets customize prompts/execution_agent.md --global
 ```
 
----
+______________________________________________________________________
 
 ## Future Enhancements
 
 ### Near-term
+
 - Parallel execution with git worktrees
 - Static analysis for relevant test detection
 - Additional issue tracker integrations
 
 ### Medium-term
+
 - Custom commit templates
 - Authentication helpers: `jiro auth login/logout/status` for credential management (post steel thread)
 - System keychain integration
@@ -1327,12 +1367,13 @@ jiro assets customize prompts/execution_agent.md --global
 - Agent memory/learning from past tasks
 
 ### Long-term
+
 - Multi-provider support (OpenAI, local models via LiteLLM)
 - Team collaboration features
 - Analytics dashboard
 - IDE integrations
 
----
+______________________________________________________________________
 
 ## Appendix A: Spec Document Schema
 
@@ -1361,7 +1402,7 @@ jiro assets customize prompts/execution_agent.md --global
 <optional implementation hints, constraints, or considerations>
 ```
 
----
+______________________________________________________________________
 
 ## Appendix B: Chat Refinement Commands
 
@@ -1371,7 +1412,7 @@ During chat refinement (in `jiro dream` or `Proceed? [yes/chat/edit/quit]`):
 - Agent shows diffs after each change
 - Exit with: `done`, `exit`, `/quit`, or Ctrl+D
 
----
+______________________________________________________________________
 
 ## Appendix C: Doctor Checks
 
