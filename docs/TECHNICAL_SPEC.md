@@ -270,6 +270,16 @@ jiro doctor [--fix]
 ```
 - Verify installation and configuration health
 - `--fix`: Attempt auto-remediation of fixable issues
+- Validates that an Anthropic API key is available from either the environment or the system keyring (warns if both are configured)
+
+### Anthropic Credentials
+
+Commands that integrate with Anthropic require a key sourced from one of two locations:
+
+1. The `ANTHROPIC_API_KEY` environment variable
+2. The OS keyring entry that `jiro` manages
+
+`jiro doctor` inspects both sources, issuing a warning if duplicates are detected so users can consolidate on a single source of truth. If neither source is available, any command that depends on Anthropic exits immediately with a clear error before performing additional work.
 
 ### Spec & Planning
 
@@ -281,12 +291,13 @@ jiro dream "prompt"
 - Saves spec to `.jiro-dreams-of-code/specs/` (or stealth equivalent)
 
 ```bash
-jiro plan --spec "filename" ["optional refinement prompt"]
+jiro plan --spec "auth-system.md" ["optional refinement prompt"]
 ```
 - Parse spec and generate epics + tasks
 - Analyze dependencies between tasks
 - Output summary with clickable spec file path
 - Prompt: `Proceed? [yes/chat/edit/quit]`
+- Accepts either the bare spec filename (resolved in `.jiro-dreams-of-code/specs/` or its stealth equivalent) or an explicit path if you store specs elsewhere
 
 ### Task Management
 
@@ -404,7 +415,7 @@ Interactive refinement via chat (terminal or web UI)
 ### 2. Plan Phase
 
 ```
-User: jiro plan --spec "specs/auth-system.md"
+User: jiro plan --spec "auth-system.md"
 
 Agent analyzes spec and produces:
 - Multiple epics (parallelizable workstreams)
@@ -419,7 +430,7 @@ Output:
 ┌─────────────────────────────────────────┐
 │ Planning complete.                      │
 │                                         │
-│ Spec: .jiro-dreams-of-code/specs/auth.md│
+│ Spec: .jiro-dreams-of-code/specs/auth-system.md│
 │                                         │
 │ This will create:                       │
 │ - 3 epics (2 parallel, 1 dependent)     │
@@ -1310,6 +1321,7 @@ jiro assets customize prompts/execution_agent.md --global
 
 ### Medium-term
 - Custom commit templates
+- Authentication helpers: `jiro auth login/logout/status` for credential management (post steel thread)
 - System keychain integration
 - Slack/email/SMS notifications
 - Agent memory/learning from past tasks
