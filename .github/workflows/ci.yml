@@ -60,6 +60,9 @@ jobs:
       - name: Run ruff format check
         run: uv run ruff format --check .
 
+      - name: Run mdformat check
+        run: uv run mdformat --check README.md CHANGELOG.md AGENTS.md docs
+
   typecheck:
     name: Type Check
     runs-on: ubuntu-latest
