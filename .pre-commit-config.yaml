@@ -1,4 +1,14 @@
 repos:
+  # Prevent commits to protected branches
+  - repo: local
+    hooks:
+      - id: no-commit-to-main
+        name: Don't commit to main
+        entry: bash -c 'test "$(git branch --show-current)" != "main" || { echo "ERROR - Cannot commit directly to main branch. Create a feature branch first."; exit 1; }'
+        language: system
+        always_run: true
+        pass_filenames: false
+
   # Standard file checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
