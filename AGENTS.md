@@ -62,6 +62,38 @@ Before creating a pull request, you MUST:
 - Bug fix description (fixes #123)
 ```
 
+## Architecture Decision Records
+
+When making a significant architectural decision, record it as an ADR in `docs/architecture/`.
+
+ADRs should be:
+
+- **Brief** - One page or less
+- **Focused on WHY** - Explain the reasoning, not just the what
+- **Honest about tradeoffs** - Document both positive and negative consequences
+
+Use this template:
+
+```markdown
+# ADR-NNN: Title
+
+## Status
+Accepted | Superseded | Deprecated
+
+## Context
+What problem are we solving? What constraints exist?
+
+## Decision
+What did we decide to do?
+
+## Consequences
+### Positive
+- Benefits of this decision
+
+### Negative
+- Tradeoffs we're accepting
+```
+
 ## Issue Tracking
 
 This project uses [Beads](https://github.com/beads-project/beads) for issue tracking. Use `bd` commands to manage work items rather than markdown TODOs.
