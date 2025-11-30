@@ -558,6 +558,23 @@ ______________________________________________________________________
 
 ## Commit Discipline
 
+Jiro enforces commit discipline through a two-layer system:
+
+1. **Layer 1 - Creation (Python Script)**: Strongly-typed commits are created by a Python script that enforces rules at commit-creation time. The script raises an error if the commit would violate the specification.
+
+1. **Layer 2 - Review (Post-Commit Validation)**: A separate review stage validates the stream of commits after they are created, combining deterministic Python checks (where possible) and LLM analysis (for judgment calls).
+
+### Strongly-Typed Commits
+
+The commit creation script produces "strongly typed" commits—commits that are guaranteed to conform to a specific type's rules. For example, a commit containing only documentation changes is a strongly-typed documentation commit.
+
+**Key Properties:**
+
+- Type is determined by the files changed and the nature of changes
+- Verification results are embedded in the commit message
+- The script refuses to create a commit that violates type rules
+- Each commit type has specific validation rules
+
 ### Commit Types
 
 | Type | Emoji | Rules |
@@ -575,44 +592,88 @@ ______________________________________________________________________
 
 ### Commit Message Format
 
-```
-:emoji: Imperative description of what the commit does
+Commit messages are generated from Jinja2 templates with the following variables:
 
-Task: JIRO-42 - Implement user login endpoint
-Reason: Add authentication capability for API consumers
-Tests: pytest tests/test_auth.py -k "test_login" → 3 passed (0.8s)
-Time: 2m 34s
-Context: 12,450 tokens (8,200 → 20,650)
+| Variable | Description |
+|----------|-------------|
+| `message` | Imperative description of the commit |
+| `task_id` | Task identifier (e.g., JIRO-42) |
+| `task_title` | Task title |
+| `commit_type` | Type of commit (docs, tdd_red, etc.) |
+| `reason` | Why this change is being made |
+| `verification_command` | Command used to verify the change |
+| `verification_results` | Output of the verification command |
+| `time_taken` | Time spent on this commit |
+| `tokens_before` | Context tokens before this work |
+| `tokens_after` | Context tokens after this work |
+
+**Example (Documentation commit):**
+
+```
+📝 Add installation guide to README
+
+Task: JIRO-42 - Document getting started workflow
+Type: documentation
+Reason: Help new users install and configure jiro
+Verification: mdformat --check README.md
+  README.md: OK
+Time: 1m 12s
+Context: 8,200 → 12,450 tokens
 ```
 
-For TDD Red commits (showing failure):
+**Example (TDD Red commit - showing failure):**
 
 ```
 🔴 Add failing test for user login validation
 
-Task: JIRO-42 - Implement user login endpoint
+Task: JIRO-43 - Implement user login endpoint
+Type: tdd_red
 Reason: Establish expected behavior before implementation
-Tests: pytest tests/test_auth.py -k "test_login_validates_email"
+Verification: pytest tests/test_auth.py -k "test_login_validates_email"
   ✗ test_login_validates_email: AssertionError: expected ValidationError
   (1 failed, 0.2s)
 Time: 1m 12s
-Context: 8,200 tokens (0 → 8,200)
+Context: 8,200 → 9,100 tokens
 ```
 
-### Validation Rules (Hardcoded - The Jiro Discipline)
+### Validation Rules (The Jiro Discipline)
 
-| Commit Type | Validation |
-|-------------|------------|
-| Refactoring | Must use behavior-neutral refactorings; include refactoring MCP command + results; never change tests; tests must pass |
-| TDD Red | Only test files changed; test command must show failure |
-| TDD Green | Only code files changed; test command must show success |
-| TDD Refactor | No test changes; tests must pass; no new functionality |
+#### Layer 1: Creation-Time Enforcement (Python)
+
+These rules are enforced by the commit creation script. The commit is rejected if any rule is violated.
+
+| Commit Type | Enforcement Rules |
+|-------------|-------------------|
+| Documentation | Only `.md` files, docstrings, or comment changes allowed |
+| TDD Red | Only test files changed; verification command must show failure |
+| TDD Green | Only code files changed; verification command must show success |
+| TDD Refactor | No test changes; tests must pass |
 | Lint Fix | Single lint error + single fix per commit |
-| Docs (md) | Always isolated; never mixed with code commits |
-| Docstrings | Updated with associated code change |
-| Config | Ideally isolated; warning (not halt) if mixed with code/tests |
+| Config | Only config files changed |
 
-**On validation failure**: HALT and page human for help.
+#### Layer 2: Review-Time Validation (Python + LLM)
+
+After commits are created, the review stage validates them:
+
+**Deterministic checks (Python):**
+
+- Verify files changed match the claimed commit type
+- Verify commit message follows template format
+- Verify task reference is valid
+- Verify verification command was run and results included
+
+**LLM judgment checks:**
+
+- Verify changes semantically match the commit description
+- Verify no scope creep (changes beyond what was claimed)
+- For refactoring: verify behavior is preserved
+- Flag any concerns or violations
+
+### Validation Strictness
+
+**On any validation failure**: HALT immediately and page human for help.
+
+Jiro does not continue past validation failures. The human must review the situation and provide guidance on how to proceed.
 
 ______________________________________________________________________
 
@@ -919,6 +980,13 @@ class IssueTracker(Protocol):
 
 **Steel thread**: Beads (default)
 
+The Beads implementation shells out to the `bd` CLI rather than using Beads as a library. This keeps jiro decoupled from Beads internals and makes it easier to swap implementations.
+
+Each jiro-managed project gets its own isolated Beads database:
+
+- Normal mode: `.jiro-dreams-of-code/.beads/`
+- Stealth mode: `~/.jiro-dreams-of-code/$PROJECT/.beads/`
+
 **Future**: GitHub Issues, Jira, Linear
 
 ______________________________________________________________________
@@ -960,19 +1028,32 @@ ______________________________________________________________________
 | Commit fails validation | HALT, page human |
 | Merge conflict unresolved after N attempts | HALT, page human |
 | Agent stuck/looping (context limit exceeded) | HALT, page human |
-| Task cannot be completed | Mark as blocked, continue to next |
+| Task cannot be completed | HALT, page human |
+
+Jiro does not silently skip failed tasks. All failures require human review.
 
 ### Notification (Steel Thread)
 
-Terminal output with clear message. Session pauses until human intervenes.
+**On halt:**
+
+- Terminal output with clear error message
+- Failing exit code (exit code 5: operation halted)
+- "Halted" record created in SQLite database with reason
+- In interactive mode: option to transition to chat session for human-agent collaboration
 
 ### Recovery
 
-After human fixes the issue:
+Recovery is human-guided, not automatic. After a halt:
+
+1. Human reviews logs and the halt reason
+1. Human diagnoses the issue (may involve manual fixes)
+1. Human provides a prompt explaining how the agent should continue
 
 ```bash
-jiro execute  # resumes from where it left off
+jiro execute --resume "Fixed the merge conflict in auth.py, continue with the remaining steps"
 ```
+
+The resume prompt gives the agent context about what was fixed and how to proceed. Jiro does not automatically retry or guess what went wrong.
 
 ### Future Notification Channels
 
