@@ -60,3 +60,53 @@ class TestPlanningAgentPrompt:
         prompt_path = prompts_dir / "planning_agent.md"
         content = prompt_path.read_text().lower()
         assert "verif" in content or "test" in content
+
+
+class TestExecutionAgentPrompt:
+    """Tests for execution agent prompt."""
+
+    @pytest.fixture
+    def prompts_dir(self) -> Path:
+        """Get the prompts directory path."""
+        return Path(__file__).parent.parent.parent / "src" / "jiro" / "assets" / "prompts"
+
+    @pytest.mark.unit
+    def test_prompt_exists(self, prompts_dir: Path) -> None:
+        """execution_agent.md should exist."""
+        prompt_path = prompts_dir / "execution_agent.md"
+        assert prompt_path.exists(), f"Prompt not found at {prompt_path}"
+
+    @pytest.mark.unit
+    def test_prompt_is_not_empty(self, prompts_dir: Path) -> None:
+        """execution_agent.md should have content."""
+        prompt_path = prompts_dir / "execution_agent.md"
+        content = prompt_path.read_text()
+        assert len(content) > 100, "Prompt content too short"
+
+    @pytest.mark.unit
+    def test_prompt_mentions_plan(self, prompts_dir: Path) -> None:
+        """Prompt should mention receiving plan."""
+        prompt_path = prompts_dir / "execution_agent.md"
+        content = prompt_path.read_text().lower()
+        assert "plan" in content
+
+    @pytest.mark.unit
+    def test_prompt_mentions_commit(self, prompts_dir: Path) -> None:
+        """Prompt should mention creating commits."""
+        prompt_path = prompts_dir / "execution_agent.md"
+        content = prompt_path.read_text().lower()
+        assert "commit" in content
+
+    @pytest.mark.unit
+    def test_prompt_mentions_tools(self, prompts_dir: Path) -> None:
+        """Prompt should mention available tools."""
+        prompt_path = prompts_dir / "execution_agent.md"
+        content = prompt_path.read_text().lower()
+        assert "tool" in content
+
+    @pytest.mark.unit
+    def test_prompt_mentions_mechanical_execution(self, prompts_dir: Path) -> None:
+        """Prompt should emphasize mechanical execution."""
+        prompt_path = prompts_dir / "execution_agent.md"
+        content = prompt_path.read_text().lower()
+        assert "mechanical" in content or "follow" in content or "exactly" in content
