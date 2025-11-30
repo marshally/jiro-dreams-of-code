@@ -43,14 +43,23 @@ ______________________________________________________________________
 
 ### Correct Workflow
 
+**Important**: Beads MCP calls automatically stage `.beads/` files. Always commit beads changes FIRST before committing code.
+
 ```bash
-# Step 1: Stage and commit code changes only
+# Step 1: After claiming a task via beads MCP, unstage everything
+git restore --staged .
+
+# Step 2: Commit beads changes first (task status update)
+git add .beads/
+git commit -m "chore(beads): update task status to in_progress"
+
+# Step 3: Do your work, then stage and commit code
 git add src/path/to/file.py tests/path/to/test.py
 git commit -m "feat: implement feature X"
 
-# Step 2: Stage and commit beads changes separately
+# Step 4: Close task via beads MCP, then commit beads separately
 git add .beads/
-git commit -m "chore(beads): update task status"
+git commit -m "chore(beads): close task"
 ```
 
 ### What NOT to Do
