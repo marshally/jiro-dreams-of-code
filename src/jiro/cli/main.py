@@ -1,11 +1,13 @@
 """Main CLI entry point for jiro-dreams-of-code."""
 
+import logging
 from typing import Annotated
 
 import typer
 from rich.console import Console
 
 from jiro import __version__
+from jiro.core.logging import configure_logging
 
 app = typer.Typer(
     name="jiro",
@@ -29,9 +31,33 @@ def main(
         bool | None,
         typer.Option("--version", callback=version_callback, help="Show version and exit"),
     ] = None,
+    verbose: Annotated[
+        int,
+        typer.Option(
+            "-v",
+            "--verbose",
+            count=True,
+            help="Increase verbosity level (-v for DEBUG, -vv for TRACE)",
+        ),
+    ] = 0,
+    quiet: Annotated[
+        bool,
+        typer.Option("--quiet", "-q", help="Suppress output (CRITICAL level only)"),
+    ] = False,
 ) -> None:
     """jiro-dreams-of-code: Build software with discipline and craft."""
-    pass
+    # Determine log level based on flags
+    if quiet:
+        log_level = logging.CRITICAL
+    elif verbose == 1:
+        log_level = logging.DEBUG
+    elif verbose >= 2:
+        log_level = logging.DEBUG  # Both -v and -vv map to DEBUG for now
+    else:
+        log_level = logging.INFO
+
+    # Initialize logging
+    configure_logging(verbosity=log_level)
 
 
 @app.command()
