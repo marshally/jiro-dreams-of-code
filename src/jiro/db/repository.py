@@ -2,7 +2,7 @@
 
 from sqlite_utils import Database
 
-from jiro.db.models import Session
+from jiro.db.models import Prompt, Session
 
 
 class SessionRepository:
@@ -76,3 +76,81 @@ class SessionRepository:
         """
         rows = list(self.db["sessions"].rows_where("status = ?", [status]))
         return [Session.from_row(row) for row in rows]
+
+
+class PromptRepository:
+    """Repository for Prompt CRUD operations."""
+
+    def __init__(self, db: Database) -> None:
+        """Initialize repository with database connection.
+
+        Args:
+            db: sqlite-utils Database instance.
+        """
+        self.db = db
+
+    def create(self, prompt: Prompt) -> Prompt:
+        """Create a new prompt in the database.
+
+        Args:
+            prompt: Prompt instance to create.
+
+        Returns:
+            The created Prompt instance.
+        """
+        row = prompt.to_row()
+        self.db["prompts"].insert(row)
+        return prompt
+
+    def get(self, prompt_id: str) -> Prompt | None:
+        """Retrieve a prompt by ID.
+
+        Args:
+            prompt_id: ID of the prompt to retrieve.
+
+        Returns:
+            Prompt instance if found, None otherwise.
+        """
+        rows = list(self.db["prompts"].rows_where("id = ?", [prompt_id]))
+        if not rows:
+            return None
+        return Prompt.from_row(rows[0])
+
+    def get_by_session(self, session_id: str) -> list[Prompt]:
+        """Retrieve all prompts for a specific session.
+
+        Args:
+            session_id: Session ID to filter by.
+
+        Returns:
+            List of Prompt instances for the session.
+        """
+        rows = list(self.db["prompts"].rows_where("session_id = ?", [session_id]))
+        return [Prompt.from_row(row) for row in rows]
+
+    def get_by_task(self, task_id: str) -> list[Prompt]:
+        """Retrieve all prompts for a specific task.
+
+        Args:
+            task_id: Task ID to filter by.
+
+        Returns:
+            List of Prompt instances for the task.
+        """
+        rows = list(self.db["prompts"].rows_where("task_id = ?", [task_id]))
+        return [Prompt.from_row(row) for row in rows]
+
+    def get_total_tokens(self, session_id: str) -> int:
+        """Get total tokens_after for a session.
+
+        Args:
+            session_id: Session ID to aggregate tokens for.
+
+        Returns:
+            Sum of tokens_after for all prompts in the session.
+        """
+        result = self.db.execute(
+            "SELECT COALESCE(SUM(tokens_after), 0) as total FROM prompts WHERE session_id = ?",
+            [session_id],
+        ).fetchone()
+        return result[0] if result else 0
