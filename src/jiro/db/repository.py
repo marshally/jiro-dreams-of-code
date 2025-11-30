@@ -2,7 +2,7 @@
 
 from sqlite_utils import Database
 
-from jiro.db.models import Prompt, Session, TaskExecution
+from jiro.db.models import Commit, Prompt, Session, TaskExecution
 
 
 class SessionRepository:
@@ -230,3 +230,84 @@ class TaskExecutionRepository:
         row = execution.to_row()
         self.db["task_executions"].update(execution.id, row)
         return execution
+
+
+class CommitRepository:
+    """Repository for Commit CRUD operations."""
+
+    def __init__(self, db: Database) -> None:
+        """Initialize repository with database connection.
+
+        Args:
+            db: sqlite-utils Database instance.
+        """
+        self.db = db
+
+    def create(self, commit: Commit) -> Commit:
+        """Create a new commit in the database.
+
+        Args:
+            commit: Commit instance to create.
+
+        Returns:
+            The created Commit instance.
+        """
+        row = commit.to_row()
+        self.db["commits"].insert(row)
+        return commit
+
+    def get(self, commit_id: str) -> Commit | None:
+        """Retrieve a commit by ID.
+
+        Args:
+            commit_id: ID of the commit to retrieve.
+
+        Returns:
+            Commit instance if found, None otherwise.
+        """
+        rows = list(self.db["commits"].rows_where("id = ?", [commit_id]))
+        if not rows:
+            return None
+        return Commit.from_row(rows[0])
+
+    def get_by_session(self, session_id: str) -> list[Commit]:
+        """Retrieve all commits for a specific session.
+
+        Args:
+            session_id: Session ID to filter by.
+
+        Returns:
+            List of Commit instances for the session.
+        """
+        rows = list(self.db["commits"].rows_where("session_id = ?", [session_id]))
+        return [Commit.from_row(row) for row in rows]
+
+    def get_by_task(self, task_id: str) -> list[Commit]:
+        """Retrieve all commits for a specific task.
+
+        Args:
+            task_id: Task ID to filter by.
+
+        Returns:
+            List of Commit instances for the task.
+        """
+        rows = list(self.db["commits"].rows_where("task_id = ?", [task_id]))
+        return [Commit.from_row(row) for row in rows]
+
+    def get_by_type(self, session_id: str, commit_type: str) -> list[Commit]:
+        """Retrieve commits for a session filtered by commit type.
+
+        Args:
+            session_id: Session ID to filter by.
+            commit_type: Commit type to filter by.
+
+        Returns:
+            List of Commit instances matching both filters.
+        """
+        rows = list(
+            self.db["commits"].rows_where(
+                "session_id = ? AND commit_type = ?",
+                [session_id, commit_type],
+            )
+        )
+        return [Commit.from_row(row) for row in rows]
