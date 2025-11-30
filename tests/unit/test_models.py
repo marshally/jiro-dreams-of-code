@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pytest
 
-from jiro.db.models import Session, SessionStatus
+from jiro.db.models import AgentType, Prompt, Session, SessionStatus
 
 
 class TestSession:
@@ -156,3 +156,129 @@ class TestSessionStatus:
                 started_at=datetime.now(),
             )
             assert session.status == status
+
+
+class TestPrompt:
+    """Tests for Prompt dataclass."""
+
+    @pytest.mark.unit
+    def test_required_fields(self) -> None:
+        """Prompt should require core fields."""
+        prompt = Prompt(
+            id="prompt-123",
+            agent_type="planning",
+            prompt_text="Analyze this code...",
+            model="claude-opus-4-5-20250514",
+            tokens_before=1000,
+            tokens_after=1500,
+            created_at=datetime(2024, 1, 15, 10, 30, 0),
+        )
+        assert prompt.id == "prompt-123"
+        assert prompt.agent_type == "planning"
+        assert prompt.prompt_text == "Analyze this code..."
+        assert prompt.model == "claude-opus-4-5-20250514"
+        assert prompt.tokens_before == 1000
+        assert prompt.tokens_after == 1500
+
+    @pytest.mark.unit
+    def test_optional_fields_default_to_none(self) -> None:
+        """Optional fields should default to None."""
+        prompt = Prompt(
+            id="prompt-123",
+            agent_type="execution",
+            prompt_text="Execute step 1...",
+            model="claude-haiku-4-5-20250514",
+            tokens_before=500,
+            tokens_after=800,
+            created_at=datetime.now(),
+        )
+        assert prompt.session_id is None
+        assert prompt.task_id is None
+
+    @pytest.mark.unit
+    def test_from_row(self) -> None:
+        """from_row should deserialize from database row."""
+        row = {
+            "id": "prompt-123",
+            "agent_type": "review",
+            "prompt_text": "Review these commits...",
+            "model": "claude-sonnet-4-5-20250514",
+            "tokens_before": 2000,
+            "tokens_after": 2500,
+            "created_at": "2024-01-15T10:30:00",
+            "session_id": "sess-456",
+            "task_id": "task-789",
+        }
+        prompt = Prompt.from_row(row)
+        assert prompt.id == "prompt-123"
+        assert prompt.agent_type == "review"
+        assert prompt.created_at == datetime(2024, 1, 15, 10, 30, 0)
+        assert prompt.session_id == "sess-456"
+        assert prompt.task_id == "task-789"
+
+    @pytest.mark.unit
+    def test_to_row(self) -> None:
+        """to_row should serialize to database row."""
+        prompt = Prompt(
+            id="prompt-123",
+            agent_type="dreaming",
+            prompt_text="Dream up a feature spec...",
+            model="claude-opus-4-5-20250514",
+            tokens_before=100,
+            tokens_after=500,
+            created_at=datetime(2024, 1, 15, 10, 30, 0),
+            session_id="sess-456",
+            task_id=None,
+        )
+        row = prompt.to_row()
+        assert row["id"] == "prompt-123"
+        assert row["agent_type"] == "dreaming"
+        assert row["created_at"] == "2024-01-15T10:30:00"
+        assert row["session_id"] == "sess-456"
+        assert row["task_id"] is None
+
+    @pytest.mark.unit
+    def test_roundtrip(self) -> None:
+        """to_row then from_row should produce equivalent object."""
+        original = Prompt(
+            id="prompt-123",
+            agent_type="planning",
+            prompt_text="Plan the implementation...",
+            model="claude-opus-4-5-20250514",
+            tokens_before=1000,
+            tokens_after=1500,
+            created_at=datetime(2024, 1, 15, 10, 30, 0),
+            session_id="sess-456",
+            task_id="task-789",
+        )
+        row = original.to_row()
+        restored = Prompt.from_row(row)
+        assert restored.id == original.id
+        assert restored.agent_type == original.agent_type
+        assert restored.prompt_text == original.prompt_text
+        assert restored.model == original.model
+        assert restored.tokens_before == original.tokens_before
+        assert restored.tokens_after == original.tokens_after
+        assert restored.created_at == original.created_at
+        assert restored.session_id == original.session_id
+        assert restored.task_id == original.task_id
+
+
+class TestAgentType:
+    """Tests for AgentType type alias."""
+
+    @pytest.mark.unit
+    def test_valid_agent_types(self) -> None:
+        """AgentType should allow valid values."""
+        valid: list[AgentType] = ["dreaming", "planning", "execution", "review"]
+        for agent_type in valid:
+            prompt = Prompt(
+                id="test",
+                agent_type=agent_type,
+                prompt_text="test",
+                model="test",
+                tokens_before=0,
+                tokens_after=0,
+                created_at=datetime.now(),
+            )
+            assert prompt.agent_type == agent_type

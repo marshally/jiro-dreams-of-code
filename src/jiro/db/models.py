@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Literal
 
 SessionStatus = Literal["running", "completed", "failed", "halted"]
+AgentType = Literal["dreaming", "planning", "execution", "review"]
 
 
 @dataclass
@@ -66,4 +67,62 @@ class Session:
                 self.preflight_passed_at.isoformat() if self.preflight_passed_at else None
             ),
             "halt_reason": self.halt_reason,
+        }
+
+
+@dataclass
+class Prompt:
+    """Represents a prompt sent to an agent.
+
+    Records every prompt sent to an agent for context tracking and debugging.
+    """
+
+    id: str
+    agent_type: AgentType
+    prompt_text: str
+    model: str
+    tokens_before: int
+    tokens_after: int
+    created_at: datetime
+    session_id: str | None = None
+    task_id: str | None = None
+
+    @classmethod
+    def from_row(cls, row: dict) -> "Prompt":
+        """Deserialize from a database row.
+
+        Args:
+            row: Dictionary from sqlite-utils query.
+
+        Returns:
+            Prompt instance.
+        """
+        return cls(
+            id=row["id"],
+            agent_type=row["agent_type"],
+            prompt_text=row["prompt_text"],
+            model=row["model"],
+            tokens_before=row["tokens_before"],
+            tokens_after=row["tokens_after"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+            session_id=row.get("session_id"),
+            task_id=row.get("task_id"),
+        )
+
+    def to_row(self) -> dict:
+        """Serialize to a database row.
+
+        Returns:
+            Dictionary suitable for sqlite-utils insert/update.
+        """
+        return {
+            "id": self.id,
+            "agent_type": self.agent_type,
+            "prompt_text": self.prompt_text,
+            "model": self.model,
+            "tokens_before": self.tokens_before,
+            "tokens_after": self.tokens_after,
+            "created_at": self.created_at.isoformat(),
+            "session_id": self.session_id,
+            "task_id": self.task_id,
         }
