@@ -679,6 +679,8 @@ ______________________________________________________________________
 
 ## Preflight & Postflight Checks
 
+> For a visual diagram of the complete session lifecycle, see [SESSION_LIFECYCLE.md](SESSION_LIFECYCLE.md).
+
 ### Session Preflight
 
 Runs once at the start of `jiro execute`:

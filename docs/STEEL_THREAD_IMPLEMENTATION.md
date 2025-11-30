@@ -401,44 +401,12 @@ verification:
 - `src/jiro/core/session.py` - Session lifecycle management
 - `src/jiro/core/executor.py` - Task execution orchestration
 
-**Session Lifecycle:**
+**Lifecycle:** See [SESSION_LIFECYCLE.md](SESSION_LIFECYCLE.md) for the complete session orchestration flow including:
 
-```
-Session Start
-    │
-    ▼
-Session Preflight
-    ├── Git repo clean?
-    ├── On correct branch?
-    ├── Tests pass?
-    └── Linters pass?
-    │
-    ▼
-For each task:
-    │
-    Task Preflight
-    │   ├── Run relevant tests
-    │   ├── Lint relevant files
-    │   └── Planning agent enhances task
-    │
-    ▼
-    Task Execution
-    │   ├── Execution agent follows plan
-    │   └── Creates commits
-    │
-    ▼
-    Task Postflight
-        ├── Review agent validates commits
-        ├── Run relevant tests
-        ├── Lint modified files
-        └── Record results
-    │
-    ▼
-Session Postflight
-    ├── All tests pass?
-    ├── All linters pass?
-    └── Push to origin
-```
+- Session preflight/postflight checks
+- Task preflight/postflight checks
+- Error handling at each phase
+- Database records created
 
 **Acceptance Criteria:**
 
