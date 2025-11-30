@@ -504,10 +504,15 @@ ______________________________________________________________________
 
 | Agent | Model (Default) | Capabilities | Purpose |
 |-------|-----------------|--------------|---------|
-| Dreaming | claude-sonnet-4-5-20250929 | Read, WebSearch | Generate specs from prompts |
-| Planning | claude-sonnet-4-5-20250929 | Read, WebSearch | Break specs into tasks, analyze dependencies |
-| Execution | claude-haiku | Read, Write, Bash (constrained), Git | Execute tasks with TDD discipline |
-| Review | claude-sonnet-4-5-20250929 | Read | Validate commits against discipline rules |
+| Dreaming | claude-opus-4-5 (latest) | Read, WebSearch | Generate specs from prompts |
+| Planning | claude-opus-4-5 (latest) | Read, WebSearch | Break specs into tasks, produce detailed execution plans |
+| Execution | claude-haiku (latest) | Read, Write, Bash (constrained), Git | Mechanically execute plans, create commits |
+| Review | claude-sonnet-4-5 (latest) | Read | Validate commits against discipline rules |
+
+**Model Philosophy:**
+
+- **Planning uses Opus**: The planning agent is the "brain" - it does the smart work of understanding requirements and producing detailed, step-by-step execution plans.
+- **Execution uses Haiku**: The execution agent is the "hands" - it mechanically follows plans without making decisions. This is cost-optimized since there will be many granular execution steps.
 
 ### Execution Agent Permissions
 
@@ -536,16 +541,13 @@ Before each task executes, a planning subagent:
 
 ```yaml
 models:
-  dreaming: claude-sonnet-4-5-20250929
-  planning: claude-sonnet-4-5-20250929
+  dreaming: claude-opus-4-5
   execution: claude-haiku
-  review: claude-sonnet-4-5-20250929
 ```
 
 Configurable per-project and overridable per-invocation:
 
 ```bash
-jiro dream --model claude-opus-4 "complex architectural decision"
 ```
 
 ______________________________________________________________________
@@ -711,10 +713,8 @@ preflight:
   skip_if_recent_minutes: 60
 
 models:
-  dreaming: claude-sonnet-4-5-20250929
-  planning: claude-sonnet-4-5-20250929
+  dreaming: claude-opus-4-5
   execution: claude-haiku
-  review: claude-sonnet-4-5-20250929
 
 limits:
   max_context_percent: 85             # of model's context window
