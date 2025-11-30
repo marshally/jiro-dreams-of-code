@@ -513,6 +513,7 @@ ______________________________________________________________________
 
 - **Planning uses Opus**: The planning agent is the "brain" - it does the smart work of understanding requirements and producing detailed, step-by-step execution plans.
 - **Execution uses Haiku**: The execution agent is the "hands" - it mechanically follows plans without making decisions. This is cost-optimized since there will be many granular execution steps.
+- **Always use latest versions**: Model IDs should resolve to the latest available version of each model family.
 
 ### Execution Agent Permissions
 
@@ -542,12 +543,15 @@ Before each task executes, a planning subagent:
 ```yaml
 models:
   dreaming: claude-opus-4-5
+  planning: claude-opus-4-5
   execution: claude-haiku
+  review: claude-sonnet-4-5
 ```
 
 Configurable per-project and overridable per-invocation:
 
 ```bash
+jiro dream --model claude-sonnet-4-5 "simpler task that doesn't need Opus"
 ```
 
 ______________________________________________________________________
@@ -714,7 +718,9 @@ preflight:
 
 models:
   dreaming: claude-opus-4-5
+  planning: claude-opus-4-5
   execution: claude-haiku
+  review: claude-sonnet-4-5
 
 limits:
   max_context_percent: 85             # of model's context window
