@@ -156,78 +156,12 @@ Build the infrastructure that everything else depends on.
 - `src/jiro/db/models.py` - Dataclasses for sessions, prompts, commits, task_executions
 - `src/jiro/db/repository.py` - Repository classes for each model
 
-**Approach (sqlite-utils + dataclasses):**
+**Schema:** See [DDL.md](DDL.md) for complete database design including:
 
-```python
-from dataclasses import dataclass, asdict
-from datetime import datetime
-from sqlite_utils import Database
-
-
-@dataclass
-class Session:
-    id: str
-    branch_name: str
-    status: str  # running, completed, failed, halted
-    started_at: datetime
-    epic_id: str | None = None
-    ended_at: datetime | None = None
-    preflight_passed_at: datetime | None = None
-    halt_reason: str | None = None
-
-    @classmethod
-    def from_row(cls, row: dict) -> "Session":
-        return cls(**row)
-
-    def to_row(self) -> dict:
-        return asdict(self)
-
-
-class SessionRepository:
-    def __init__(self, db: Database):
-        self.db = db
-        self._ensure_table()
-
-    def _ensure_table(self) -> None:
-        self.db["sessions"].create(
-            {
-                "id": str,
-                "epic_id": str,
-                "branch_name": str,
-                "status": str,
-                "started_at": str,
-                "ended_at": str,
-                "preflight_passed_at": str,
-                "halt_reason": str,
-            },
-            pk="id",
-            if_not_exists=True,
-        )
-
-    def create(self, session: Session) -> Session:
-        self.db["sessions"].insert(session.to_row())
-        return session
-
-    def get(self, session_id: str) -> Session | None:
-        row = self.db["sessions"].get(session_id)
-        return Session.from_row(row) if row else None
-
-    def update(self, session_id: str, **kwargs) -> None:
-        self.db["sessions"].update(session_id, kwargs)
-
-    def list_by_status(self, status: str) -> list[Session]:
-        rows = self.db["sessions"].rows_where("status = ?", [status])
-        return [Session.from_row(r) for r in rows]
-```
-
-**Tables:**
-
-| Table | Purpose |
-|-------|---------|
-| `sessions` | Execution sessions (running, completed, halted) |
-| `prompts` | All prompts sent to agents with token tracking |
-| `task_executions` | Task execution phases and status |
-| `commits` | Commits created with type, verification, timing |
+- Table definitions (sessions, prompts, task_executions, commits)
+- Python dataclass models with `from_row()`/`to_row()` methods
+- sqlite-utils usage patterns
+- Common queries
 
 **Acceptance Criteria:**
 
