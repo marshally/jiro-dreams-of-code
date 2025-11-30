@@ -6,6 +6,8 @@ from typing import Literal
 
 SessionStatus = Literal["running", "completed", "failed", "halted"]
 AgentType = Literal["dreaming", "planning", "execution", "review"]
+TaskPhase = Literal["preflight", "executing", "postflight"]
+TaskStatus = Literal["running", "success", "failed", "halted"]
 
 
 @dataclass
@@ -125,4 +127,60 @@ class Prompt:
             "created_at": self.created_at.isoformat(),
             "session_id": self.session_id,
             "task_id": self.task_id,
+        }
+
+
+@dataclass
+class TaskExecution:
+    """Represents the execution lifecycle of a task.
+
+    Tracks each phase of task execution (preflight, executing, postflight)
+    and their outcomes.
+    """
+
+    id: str
+    task_id: str
+    phase: TaskPhase
+    status: TaskStatus
+    started_at: datetime
+    session_id: str | None = None
+    ended_at: datetime | None = None
+    halt_reason: str | None = None
+
+    @classmethod
+    def from_row(cls, row: dict) -> "TaskExecution":
+        """Deserialize from a database row.
+
+        Args:
+            row: Dictionary from sqlite-utils query.
+
+        Returns:
+            TaskExecution instance.
+        """
+        return cls(
+            id=row["id"],
+            task_id=row["task_id"],
+            phase=row["phase"],
+            status=row["status"],
+            started_at=datetime.fromisoformat(row["started_at"]),
+            session_id=row.get("session_id"),
+            ended_at=(datetime.fromisoformat(row["ended_at"]) if row.get("ended_at") else None),
+            halt_reason=row.get("halt_reason"),
+        )
+
+    def to_row(self) -> dict:
+        """Serialize to a database row.
+
+        Returns:
+            Dictionary suitable for sqlite-utils insert/update.
+        """
+        return {
+            "id": self.id,
+            "task_id": self.task_id,
+            "phase": self.phase,
+            "status": self.status,
+            "started_at": self.started_at.isoformat(),
+            "session_id": self.session_id,
+            "ended_at": self.ended_at.isoformat() if self.ended_at else None,
+            "halt_reason": self.halt_reason,
         }

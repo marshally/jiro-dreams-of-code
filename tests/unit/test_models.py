@@ -4,7 +4,15 @@ from datetime import datetime
 
 import pytest
 
-from jiro.db.models import AgentType, Prompt, Session, SessionStatus
+from jiro.db.models import (
+    AgentType,
+    Prompt,
+    Session,
+    SessionStatus,
+    TaskExecution,
+    TaskPhase,
+    TaskStatus,
+)
 
 
 class TestSession:
@@ -282,3 +290,142 @@ class TestAgentType:
                 created_at=datetime.now(),
             )
             assert prompt.agent_type == agent_type
+
+
+class TestTaskExecution:
+    """Tests for TaskExecution dataclass."""
+
+    @pytest.mark.unit
+    def test_required_fields(self) -> None:
+        """TaskExecution should require core fields."""
+        task_exec = TaskExecution(
+            id="exec-123",
+            task_id="task-456",
+            phase="executing",
+            status="running",
+            started_at=datetime(2024, 1, 15, 10, 30, 0),
+        )
+        assert task_exec.id == "exec-123"
+        assert task_exec.task_id == "task-456"
+        assert task_exec.phase == "executing"
+        assert task_exec.status == "running"
+        assert task_exec.started_at == datetime(2024, 1, 15, 10, 30, 0)
+
+    @pytest.mark.unit
+    def test_optional_fields_default_to_none(self) -> None:
+        """Optional fields should default to None."""
+        task_exec = TaskExecution(
+            id="exec-123",
+            task_id="task-456",
+            phase="preflight",
+            status="running",
+            started_at=datetime.now(),
+        )
+        assert task_exec.session_id is None
+        assert task_exec.ended_at is None
+        assert task_exec.halt_reason is None
+
+    @pytest.mark.unit
+    def test_from_row(self) -> None:
+        """from_row should deserialize from database row."""
+        row = {
+            "id": "exec-123",
+            "task_id": "task-456",
+            "phase": "postflight",
+            "status": "success",
+            "started_at": "2024-01-15T10:30:00",
+            "session_id": "sess-789",
+            "ended_at": "2024-01-15T10:45:00",
+            "halt_reason": None,
+        }
+        task_exec = TaskExecution.from_row(row)
+        assert task_exec.id == "exec-123"
+        assert task_exec.task_id == "task-456"
+        assert task_exec.phase == "postflight"
+        assert task_exec.status == "success"
+        assert task_exec.started_at == datetime(2024, 1, 15, 10, 30, 0)
+        assert task_exec.session_id == "sess-789"
+        assert task_exec.ended_at == datetime(2024, 1, 15, 10, 45, 0)
+
+    @pytest.mark.unit
+    def test_to_row(self) -> None:
+        """to_row should serialize to database row."""
+        task_exec = TaskExecution(
+            id="exec-123",
+            task_id="task-456",
+            phase="executing",
+            status="running",
+            started_at=datetime(2024, 1, 15, 10, 30, 0),
+            session_id="sess-789",
+            ended_at=None,
+            halt_reason=None,
+        )
+        row = task_exec.to_row()
+        assert row["id"] == "exec-123"
+        assert row["task_id"] == "task-456"
+        assert row["phase"] == "executing"
+        assert row["status"] == "running"
+        assert row["started_at"] == "2024-01-15T10:30:00"
+        assert row["session_id"] == "sess-789"
+        assert row["ended_at"] is None
+        assert row["halt_reason"] is None
+
+    @pytest.mark.unit
+    def test_roundtrip(self) -> None:
+        """to_row then from_row should produce equivalent object."""
+        original = TaskExecution(
+            id="exec-123",
+            task_id="task-456",
+            phase="postflight",
+            status="halted",
+            started_at=datetime(2024, 1, 15, 10, 30, 0),
+            session_id="sess-789",
+            ended_at=datetime(2024, 1, 15, 11, 0, 0),
+            halt_reason="Tests failed",
+        )
+        row = original.to_row()
+        restored = TaskExecution.from_row(row)
+        assert restored.id == original.id
+        assert restored.task_id == original.task_id
+        assert restored.phase == original.phase
+        assert restored.status == original.status
+        assert restored.started_at == original.started_at
+        assert restored.session_id == original.session_id
+        assert restored.ended_at == original.ended_at
+        assert restored.halt_reason == original.halt_reason
+
+
+class TestTaskPhase:
+    """Tests for TaskPhase type alias."""
+
+    @pytest.mark.unit
+    def test_valid_phases(self) -> None:
+        """TaskPhase should allow valid values."""
+        valid: list[TaskPhase] = ["preflight", "executing", "postflight"]
+        for phase in valid:
+            task_exec = TaskExecution(
+                id="test",
+                task_id="task-1",
+                phase=phase,
+                status="running",
+                started_at=datetime.now(),
+            )
+            assert task_exec.phase == phase
+
+
+class TestTaskStatus:
+    """Tests for TaskStatus type alias."""
+
+    @pytest.mark.unit
+    def test_valid_statuses(self) -> None:
+        """TaskStatus should allow valid values."""
+        valid: list[TaskStatus] = ["running", "success", "failed", "halted"]
+        for status in valid:
+            task_exec = TaskExecution(
+                id="test",
+                task_id="task-1",
+                phase="executing",
+                status=status,
+                started_at=datetime.now(),
+            )
+            assert task_exec.status == status
