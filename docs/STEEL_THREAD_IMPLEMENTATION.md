@@ -18,21 +18,27 @@ ______________________________________________________________________
 
 ## Architecture Decisions
 
-### Model Selection
+Key architectural decisions are documented as ADRs:
 
-| Agent | Model | Rationale |
-|-------|-------|-----------|
-| Dreaming | Opus 4.5 (latest) | Complex spec generation requires highest capability |
-| Planning | Opus 4.5 (latest) | Smart task decomposition, detailed execution plans |
-| Execution | Haiku (latest) | Cost-optimized for many granular, mechanical tasks |
-| Review | Sonnet (latest) | Validate commits against discipline rules |
+- [ADR-003: Model Selection Strategy](architecture/003-model-selection-strategy.md) - Brain/hands split with Opus for planning, Haiku for execution
+- [ADR-004: Strongly-Typed Commits](architecture/004-strongly-typed-commits.md) - Two-layer validation system
+- [ADR-005: Beads Integration via CLI](architecture/005-beads-integration-via-cli.md) - Shell out to `bd` CLI
+- [ADR-006: Human-Guided Error Recovery](architecture/006-human-guided-error-recovery.md) - HALT and require human input
+- [ADR-007: sqlite-utils Over ORM](architecture/007-sqlite-utils-over-orm.md) - Lightweight database layer
 
-### Agent Responsibility Split
+### Summary
 
-- **Planning Agent (Opus)**: The "brain" - produces detailed step-by-step execution plans
-- **Execution Agent (Haiku)**: The "hands" - mechanically follows plans, doesn't make decisions
+| Decision | Choice |
+|----------|--------|
+| Planning/Dreaming Model | Opus 4.5 (the "brain") |
+| Execution Model | Haiku (the "hands") |
+| Review Model | Sonnet |
+| Commit Validation | Two-layer: Python enforcement + LLM review |
+| Issue Tracker | Beads via `bd` CLI subprocess |
+| Error Recovery | HALT immediately, human provides resume prompt |
+| Database Layer | sqlite-utils (no ORM) |
 
-### Key Technology Choices
+### Technology Stack
 
 | Component | Choice | Notes |
 |-----------|--------|-------|
@@ -40,7 +46,7 @@ ______________________________________________________________________
 | CLI Framework | Typer | Already in skeleton |
 | Console Output | Rich | Tables, panels, progress bars |
 | Web Framework | FastAPI + HTMX | Read-only dashboard |
-| Database | SQLite | Sessions, prompts, commits |
+| Database | sqlite-utils | Lightweight SQLite API with dataclasses |
 | Issue Tracker | Beads via `bd` CLI | Shell out to CLI commands |
 | Logging | structlog | JSONL files + Rich console |
 | Testing | pytest + VCR | Mocked unit tests, recorded integration tests |
@@ -146,70 +152,89 @@ Build the infrastructure that everything else depends on.
 
 **Files to create/modify:**
 
-- `src/jiro/db/connection.py` - SQLite connection management
+- `src/jiro/db/database.py` - sqlite-utils Database wrapper
 - `src/jiro/db/models.py` - Dataclasses for sessions, prompts, commits, task_executions
-- `src/jiro/db/migrations/001_initial.sql` - Initial schema
-- `src/jiro/db/repository.py` - CRUD operations
+- `src/jiro/db/repository.py` - Repository classes for each model
 
-**Schema:**
+**Approach (sqlite-utils + dataclasses):**
 
-```sql
-CREATE TABLE sessions (
-    id TEXT PRIMARY KEY,
-    epic_id TEXT,
-    branch_name TEXT NOT NULL,
-    status TEXT NOT NULL,  -- running, completed, failed, halted
-    started_at TIMESTAMP NOT NULL,
-    ended_at TIMESTAMP,
-    preflight_passed_at TIMESTAMP,
-    halt_reason TEXT
-);
+```python
+from dataclasses import dataclass, asdict
+from datetime import datetime
+from sqlite_utils import Database
 
-CREATE TABLE prompts (
-    id TEXT PRIMARY KEY,
-    session_id TEXT REFERENCES sessions(id),
-    task_id TEXT,
-    agent_type TEXT NOT NULL,  -- dreaming, planning, execution, review
-    prompt_text TEXT NOT NULL,
-    model TEXT NOT NULL,
-    tokens_before INTEGER NOT NULL,
-    tokens_after INTEGER NOT NULL,
-    created_at TIMESTAMP NOT NULL
-);
 
-CREATE TABLE task_executions (
-    id TEXT PRIMARY KEY,
-    task_id TEXT NOT NULL,
-    session_id TEXT REFERENCES sessions(id),
-    phase TEXT NOT NULL,  -- preflight, executing, postflight
-    started_at TIMESTAMP NOT NULL,
-    ended_at TIMESTAMP,
-    status TEXT NOT NULL,  -- running, success, failed, halted
-    halt_reason TEXT
-);
+@dataclass
+class Session:
+    id: str
+    branch_name: str
+    status: str  # running, completed, failed, halted
+    started_at: datetime
+    epic_id: str | None = None
+    ended_at: datetime | None = None
+    preflight_passed_at: datetime | None = None
+    halt_reason: str | None = None
 
-CREATE TABLE commits (
-    id TEXT PRIMARY KEY,
-    task_id TEXT NOT NULL,
-    session_id TEXT REFERENCES sessions(id),
-    sha TEXT NOT NULL,
-    commit_type TEXT NOT NULL,  -- docs (steel thread), future: tdd_red, tdd_green, etc.
-    message TEXT NOT NULL,
-    verification_command TEXT,
-    verification_results TEXT,
-    time_taken_seconds INTEGER,
-    context_tokens_before INTEGER,
-    context_tokens_after INTEGER,
-    created_at TIMESTAMP NOT NULL
-);
+    @classmethod
+    def from_row(cls, row: dict) -> "Session":
+        return cls(**row)
+
+    def to_row(self) -> dict:
+        return asdict(self)
+
+
+class SessionRepository:
+    def __init__(self, db: Database):
+        self.db = db
+        self._ensure_table()
+
+    def _ensure_table(self) -> None:
+        self.db["sessions"].create(
+            {
+                "id": str,
+                "epic_id": str,
+                "branch_name": str,
+                "status": str,
+                "started_at": str,
+                "ended_at": str,
+                "preflight_passed_at": str,
+                "halt_reason": str,
+            },
+            pk="id",
+            if_not_exists=True,
+        )
+
+    def create(self, session: Session) -> Session:
+        self.db["sessions"].insert(session.to_row())
+        return session
+
+    def get(self, session_id: str) -> Session | None:
+        row = self.db["sessions"].get(session_id)
+        return Session.from_row(row) if row else None
+
+    def update(self, session_id: str, **kwargs) -> None:
+        self.db["sessions"].update(session_id, kwargs)
+
+    def list_by_status(self, status: str) -> list[Session]:
+        rows = self.db["sessions"].rows_where("status = ?", [status])
+        return [Session.from_row(r) for r in rows]
 ```
+
+**Tables:**
+
+| Table | Purpose |
+|-------|---------|
+| `sessions` | Execution sessions (running, completed, halted) |
+| `prompts` | All prompts sent to agents with token tracking |
+| `task_executions` | Task execution phases and status |
+| `commits` | Commits created with type, verification, timing |
 
 **Acceptance Criteria:**
 
-- \[ \] Database created on first access
-- \[ \] Migrations run automatically
-- \[ \] All CRUD operations work
-- \[ \] Foreign key constraints enforced
+- \[ \] Tables created on first access via sqlite-utils
+- \[ \] Dataclasses for all models with `from_row`/`to_row`
+- \[ \] Repository classes for CRUD operations
+- \[ \] Foreign key constraints enforced (`PRAGMA foreign_keys = ON`)
 
 #### 1.3 Logging Infrastructure
 
