@@ -110,3 +110,46 @@ class TestExecutionAgentPrompt:
         prompt_path = prompts_dir / "execution_agent.md"
         content = prompt_path.read_text().lower()
         assert "mechanical" in content or "follow" in content or "exactly" in content
+
+
+class TestReviewAgentPrompt:
+    """Tests for review agent prompt."""
+
+    @pytest.fixture
+    def prompts_dir(self) -> Path:
+        """Get the prompts directory path."""
+        return Path(__file__).parent.parent.parent / "src" / "jiro" / "assets" / "prompts"
+
+    @pytest.mark.unit
+    def test_prompt_exists(self, prompts_dir: Path) -> None:
+        """review_agent.md should exist."""
+        prompt_path = prompts_dir / "review_agent.md"
+        assert prompt_path.exists(), f"Prompt not found at {prompt_path}"
+
+    @pytest.mark.unit
+    def test_prompt_is_not_empty(self, prompts_dir: Path) -> None:
+        """review_agent.md should have content."""
+        prompt_path = prompts_dir / "review_agent.md"
+        content = prompt_path.read_text()
+        assert len(content) > 100, "Prompt content too short"
+
+    @pytest.mark.unit
+    def test_prompt_mentions_commit_type(self, prompts_dir: Path) -> None:
+        """Prompt should mention verifying commit types."""
+        prompt_path = prompts_dir / "review_agent.md"
+        content = prompt_path.read_text().lower()
+        assert "commit" in content and "type" in content
+
+    @pytest.mark.unit
+    def test_prompt_mentions_scope(self, prompts_dir: Path) -> None:
+        """Prompt should mention scope creep."""
+        prompt_path = prompts_dir / "review_agent.md"
+        content = prompt_path.read_text().lower()
+        assert "scope" in content
+
+    @pytest.mark.unit
+    def test_prompt_mentions_validation(self, prompts_dir: Path) -> None:
+        """Prompt should mention validation."""
+        prompt_path = prompts_dir / "review_agent.md"
+        content = prompt_path.read_text().lower()
+        assert "valid" in content or "verif" in content
