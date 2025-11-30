@@ -1,0 +1,17 @@
+📝 docs({{ task_id }}): {{ reason }}
+
+Task: {{ task_id }} ({{ task_type }})
+
+{{ reason }}
+
+Verification:
+  Command: {{ verification_command }}
+  Result: {{ verification_results }}
+
+Metrics:
+  Time: {{ time_taken_seconds }}s
+  Context: {{ context_tokens_before }} → {{ context_tokens_after }} tokens (Δ{{ context_tokens_after - context_tokens_before }})
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
