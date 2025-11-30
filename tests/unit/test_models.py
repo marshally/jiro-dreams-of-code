@@ -6,6 +6,8 @@ import pytest
 
 from jiro.db.models import (
     AgentType,
+    Commit,
+    CommitType,
     Prompt,
     Session,
     SessionStatus,
@@ -429,3 +431,166 @@ class TestTaskStatus:
                 started_at=datetime.now(),
             )
             assert task_exec.status == status
+
+
+class TestCommit:
+    """Tests for Commit dataclass."""
+
+    @pytest.mark.unit
+    def test_required_fields(self) -> None:
+        """Commit should require core fields."""
+        commit = Commit(
+            id="commit-123",
+            task_id="task-456",
+            sha="abc123def456",
+            commit_type="docs",
+            message="Add documentation for feature X",
+            created_at=datetime(2024, 1, 15, 10, 30, 0),
+        )
+        assert commit.id == "commit-123"
+        assert commit.task_id == "task-456"
+        assert commit.sha == "abc123def456"
+        assert commit.commit_type == "docs"
+        assert commit.message == "Add documentation for feature X"
+        assert commit.created_at == datetime(2024, 1, 15, 10, 30, 0)
+
+    @pytest.mark.unit
+    def test_optional_fields_default_to_none(self) -> None:
+        """Optional fields should default to None."""
+        commit = Commit(
+            id="commit-123",
+            task_id="task-456",
+            sha="abc123",
+            commit_type="tdd_red",
+            message="Add failing test",
+            created_at=datetime.now(),
+        )
+        assert commit.session_id is None
+        assert commit.verification_command is None
+        assert commit.verification_results is None
+        assert commit.time_taken_seconds is None
+        assert commit.context_tokens_before is None
+        assert commit.context_tokens_after is None
+
+    @pytest.mark.unit
+    def test_from_row(self) -> None:
+        """from_row should deserialize from database row."""
+        row = {
+            "id": "commit-123",
+            "task_id": "task-456",
+            "sha": "abc123def456",
+            "commit_type": "tdd_green",
+            "message": "Implement feature",
+            "created_at": "2024-01-15T10:30:00",
+            "session_id": "sess-789",
+            "verification_command": "pytest tests/",
+            "verification_results": "All tests passed",
+            "time_taken_seconds": 120,
+            "context_tokens_before": 5000,
+            "context_tokens_after": 7500,
+        }
+        commit = Commit.from_row(row)
+        assert commit.id == "commit-123"
+        assert commit.task_id == "task-456"
+        assert commit.sha == "abc123def456"
+        assert commit.commit_type == "tdd_green"
+        assert commit.message == "Implement feature"
+        assert commit.created_at == datetime(2024, 1, 15, 10, 30, 0)
+        assert commit.session_id == "sess-789"
+        assert commit.verification_command == "pytest tests/"
+        assert commit.verification_results == "All tests passed"
+        assert commit.time_taken_seconds == 120
+        assert commit.context_tokens_before == 5000
+        assert commit.context_tokens_after == 7500
+
+    @pytest.mark.unit
+    def test_to_row(self) -> None:
+        """to_row should serialize to database row."""
+        commit = Commit(
+            id="commit-123",
+            task_id="task-456",
+            sha="abc123def456",
+            commit_type="tdd_refactor",
+            message="Refactor code",
+            created_at=datetime(2024, 1, 15, 10, 30, 0),
+            session_id="sess-789",
+            verification_command="pytest",
+            verification_results="OK",
+            time_taken_seconds=60,
+            context_tokens_before=3000,
+            context_tokens_after=3500,
+        )
+        row = commit.to_row()
+        assert row["id"] == "commit-123"
+        assert row["task_id"] == "task-456"
+        assert row["sha"] == "abc123def456"
+        assert row["commit_type"] == "tdd_refactor"
+        assert row["message"] == "Refactor code"
+        assert row["created_at"] == "2024-01-15T10:30:00"
+        assert row["session_id"] == "sess-789"
+        assert row["verification_command"] == "pytest"
+        assert row["verification_results"] == "OK"
+        assert row["time_taken_seconds"] == 60
+        assert row["context_tokens_before"] == 3000
+        assert row["context_tokens_after"] == 3500
+
+    @pytest.mark.unit
+    def test_roundtrip(self) -> None:
+        """to_row then from_row should produce equivalent object."""
+        original = Commit(
+            id="commit-123",
+            task_id="task-456",
+            sha="abc123def456789",
+            commit_type="lint_fix",
+            message="Fix linting errors",
+            created_at=datetime(2024, 1, 15, 10, 30, 0),
+            session_id="sess-789",
+            verification_command="ruff check .",
+            verification_results="No errors",
+            time_taken_seconds=15,
+            context_tokens_before=2000,
+            context_tokens_after=2100,
+        )
+        row = original.to_row()
+        restored = Commit.from_row(row)
+        assert restored.id == original.id
+        assert restored.task_id == original.task_id
+        assert restored.sha == original.sha
+        assert restored.commit_type == original.commit_type
+        assert restored.message == original.message
+        assert restored.created_at == original.created_at
+        assert restored.session_id == original.session_id
+        assert restored.verification_command == original.verification_command
+        assert restored.verification_results == original.verification_results
+        assert restored.time_taken_seconds == original.time_taken_seconds
+        assert restored.context_tokens_before == original.context_tokens_before
+        assert restored.context_tokens_after == original.context_tokens_after
+
+
+class TestCommitType:
+    """Tests for CommitType type alias."""
+
+    @pytest.mark.unit
+    def test_valid_commit_types(self) -> None:
+        """CommitType should allow valid values."""
+        valid: list[CommitType] = [
+            "docs",
+            "tdd_red",
+            "tdd_green",
+            "tdd_refactor",
+            "lint_fix",
+            "bug_fix",
+            "config",
+            "test_only",
+            "performance",
+        ]
+        for commit_type in valid:
+            commit = Commit(
+                id="test",
+                task_id="task-1",
+                sha="abc",
+                commit_type=commit_type,
+                message="test",
+                created_at=datetime.now(),
+            )
+            assert commit.commit_type == commit_type

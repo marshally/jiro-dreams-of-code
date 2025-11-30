@@ -8,6 +8,17 @@ SessionStatus = Literal["running", "completed", "failed", "halted"]
 AgentType = Literal["dreaming", "planning", "execution", "review"]
 TaskPhase = Literal["preflight", "executing", "postflight"]
 TaskStatus = Literal["running", "success", "failed", "halted"]
+CommitType = Literal[
+    "docs",
+    "tdd_red",
+    "tdd_green",
+    "tdd_refactor",
+    "lint_fix",
+    "bug_fix",
+    "config",
+    "test_only",
+    "performance",
+]
 
 
 @dataclass
@@ -183,4 +194,71 @@ class TaskExecution:
             "session_id": self.session_id,
             "ended_at": self.ended_at.isoformat() if self.ended_at else None,
             "halt_reason": self.halt_reason,
+        }
+
+
+@dataclass
+class Commit:
+    """Represents a git commit created during task execution.
+
+    Records every commit with verification details and context token tracking.
+    """
+
+    id: str
+    task_id: str
+    sha: str
+    commit_type: CommitType
+    message: str
+    created_at: datetime
+    session_id: str | None = None
+    verification_command: str | None = None
+    verification_results: str | None = None
+    time_taken_seconds: int | None = None
+    context_tokens_before: int | None = None
+    context_tokens_after: int | None = None
+
+    @classmethod
+    def from_row(cls, row: dict) -> "Commit":
+        """Deserialize from a database row.
+
+        Args:
+            row: Dictionary from sqlite-utils query.
+
+        Returns:
+            Commit instance.
+        """
+        return cls(
+            id=row["id"],
+            task_id=row["task_id"],
+            sha=row["sha"],
+            commit_type=row["commit_type"],
+            message=row["message"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+            session_id=row.get("session_id"),
+            verification_command=row.get("verification_command"),
+            verification_results=row.get("verification_results"),
+            time_taken_seconds=row.get("time_taken_seconds"),
+            context_tokens_before=row.get("context_tokens_before"),
+            context_tokens_after=row.get("context_tokens_after"),
+        )
+
+    def to_row(self) -> dict:
+        """Serialize to a database row.
+
+        Returns:
+            Dictionary suitable for sqlite-utils insert/update.
+        """
+        return {
+            "id": self.id,
+            "task_id": self.task_id,
+            "sha": self.sha,
+            "commit_type": self.commit_type,
+            "message": self.message,
+            "created_at": self.created_at.isoformat(),
+            "session_id": self.session_id,
+            "verification_command": self.verification_command,
+            "verification_results": self.verification_results,
+            "time_taken_seconds": self.time_taken_seconds,
+            "context_tokens_before": self.context_tokens_before,
+            "context_tokens_after": self.context_tokens_after,
         }
