@@ -1,5 +1,35 @@
 # Project Instructions for Claude
 
+## Pre-commit Hooks
+
+**CRITICAL**: NEVER skip or bypass pre-commit hooks.
+
+### Rules
+
+1. **NEVER** use `SKIP=<hook-name>` to bypass any hook
+1. **NEVER** use `--no-verify` with git commit
+1. **NEVER** disable hooks temporarily "just this once"
+
+The hooks exist to protect code quality. If a hook fails:
+
+- **Fix the underlying issue** - don't bypass the hook
+- If a hook modifies files (formatting, linting), re-add the files and retry
+- If you don't understand why a hook failed, investigate before proceeding
+
+### Why This Matters
+
+Hooks enforce:
+
+- Code formatting consistency
+- Linting rules
+- Test passing
+- Commit isolation rules
+- Security checks
+
+Bypassing them creates technical debt and can introduce bugs or security issues.
+
+______________________________________________________________________
+
 ## Beads Commit Isolation
 
 **CRITICAL**: `.beads/` files must ALWAYS be committed separately from all other files.
@@ -7,7 +37,6 @@
 ### Rules
 
 1. **NEVER** add `.beads/` files to the same commit as code, tests, docs, or any other files
-1. **NEVER** use `SKIP=isolate-beads` or any mechanism to bypass the pre-commit hook
 1. **ALWAYS** commit in this order:
    - First: Commit your code/test changes (without .beads files)
    - Second: Commit .beads changes separately
@@ -27,12 +56,9 @@ git commit -m "chore(beads): update task status"
 ### What NOT to Do
 
 ```bash
-# WRONG - Never do this:
+# WRONG - Never mix beads with other files:
 git add src/file.py .beads/issues.jsonl
 git commit -m "feat: implement feature"
-
-# WRONG - Never bypass the hook:
-SKIP=isolate-beads git commit -m "..."
 ```
 
 ### Why This Matters
@@ -49,5 +75,3 @@ If you see "ERROR - .beads/ files must be committed separately":
 1. Run `git reset HEAD .beads/` to unstage beads files
 1. Commit your code changes
 1. Then `git add .beads/ && git commit -m "chore(beads): ..."`
-
-Do NOT work around the hook with SKIP or --no-verify.
