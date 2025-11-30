@@ -2,7 +2,7 @@
 
 from sqlite_utils import Database
 
-from jiro.db.models import Prompt, Session
+from jiro.db.models import Prompt, Session, TaskExecution
 
 
 class SessionRepository:
@@ -154,3 +154,79 @@ class PromptRepository:
             [session_id],
         ).fetchone()
         return result[0] if result else 0
+
+
+class TaskExecutionRepository:
+    """Repository for TaskExecution CRUD operations."""
+
+    def __init__(self, db: Database) -> None:
+        """Initialize repository with database connection.
+
+        Args:
+            db: sqlite-utils Database instance.
+        """
+        self.db = db
+
+    def create(self, execution: TaskExecution) -> TaskExecution:
+        """Create a new task execution in the database.
+
+        Args:
+            execution: TaskExecution instance to create.
+
+        Returns:
+            The created TaskExecution instance.
+        """
+        row = execution.to_row()
+        self.db["task_executions"].insert(row)
+        return execution
+
+    def get(self, execution_id: str) -> TaskExecution | None:
+        """Retrieve a task execution by ID.
+
+        Args:
+            execution_id: ID of the task execution to retrieve.
+
+        Returns:
+            TaskExecution instance if found, None otherwise.
+        """
+        rows = list(self.db["task_executions"].rows_where("id = ?", [execution_id]))
+        if not rows:
+            return None
+        return TaskExecution.from_row(rows[0])
+
+    def get_by_session(self, session_id: str) -> list[TaskExecution]:
+        """Retrieve all task executions for a specific session.
+
+        Args:
+            session_id: Session ID to filter by.
+
+        Returns:
+            List of TaskExecution instances for the session.
+        """
+        rows = list(self.db["task_executions"].rows_where("session_id = ?", [session_id]))
+        return [TaskExecution.from_row(row) for row in rows]
+
+    def get_by_task(self, task_id: str) -> list[TaskExecution]:
+        """Retrieve all task executions for a specific task.
+
+        Args:
+            task_id: Task ID to filter by.
+
+        Returns:
+            List of TaskExecution instances for the task.
+        """
+        rows = list(self.db["task_executions"].rows_where("task_id = ?", [task_id]))
+        return [TaskExecution.from_row(row) for row in rows]
+
+    def update(self, execution: TaskExecution) -> TaskExecution:
+        """Update an existing task execution in the database.
+
+        Args:
+            execution: TaskExecution instance with updated values.
+
+        Returns:
+            The updated TaskExecution instance.
+        """
+        row = execution.to_row()
+        self.db["task_executions"].update(execution.id, row)
+        return execution
