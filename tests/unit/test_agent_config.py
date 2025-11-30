@@ -2,7 +2,7 @@
 
 import pytest
 
-from jiro.agents.base import AgentConfig
+from jiro.agents.base import AgentConfig, AgentResult
 
 
 class TestAgentConfig:
@@ -90,3 +90,56 @@ class TestAgentConfig:
         assert config.allowed_tools == ["Read", "Grep", "Glob"]
         assert config.permission_mode == "plan"
         assert config.max_turns == 5
+
+
+class TestAgentResult:
+    """Tests for AgentResult dataclass."""
+
+    @pytest.mark.unit
+    def test_required_fields(self) -> None:
+        """AgentResult should require all core fields."""
+        result = AgentResult(
+            success=True,
+            output="Task completed successfully.",
+            tokens_before=1000,
+            tokens_after=1500,
+        )
+        assert result.success is True
+        assert result.output == "Task completed successfully."
+        assert result.tokens_before == 1000
+        assert result.tokens_after == 1500
+
+    @pytest.mark.unit
+    def test_error_defaults_to_none(self) -> None:
+        """error should default to None."""
+        result = AgentResult(
+            success=True,
+            output="Done.",
+            tokens_before=500,
+            tokens_after=800,
+        )
+        assert result.error is None
+
+    @pytest.mark.unit
+    def test_success_with_error(self) -> None:
+        """AgentResult can have error even with success=False."""
+        result = AgentResult(
+            success=False,
+            output="",
+            tokens_before=1000,
+            tokens_after=1200,
+            error="Test failed with exit code 1",
+        )
+        assert result.success is False
+        assert result.error == "Test failed with exit code 1"
+
+    @pytest.mark.unit
+    def test_tokens_delta(self) -> None:
+        """tokens_after - tokens_before gives context delta."""
+        result = AgentResult(
+            success=True,
+            output="Generated code.",
+            tokens_before=5000,
+            tokens_after=7500,
+        )
+        assert result.tokens_after - result.tokens_before == 2500
