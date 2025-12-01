@@ -294,6 +294,40 @@ def _display_tasks_table(tasks):
     console.print(table)
 
 
+def _display_task_detail(task):
+    """Display detailed information about a single task."""
+    # Create a table for the task details
+    table = Table(title=f"Task: {task.id}")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", style="white")
+
+    # Add basic information
+    table.add_row("ID", task.id)
+    table.add_row("Title", task.title)
+    table.add_row("Description", task.description or "-")
+    table.add_row("Type", task.task_type)
+    table.add_row("Status", task.status)
+    table.add_row("Priority", str(task.priority) if task.priority is not None else "-")
+
+    # Add epic info if present
+    if task.epic_id:
+        table.add_row("Epic", task.epic_id)
+
+    # Add timestamps
+    if task.created_at:
+        table.add_row("Created", task.created_at.isoformat())
+    if task.updated_at:
+        table.add_row("Updated", task.updated_at.isoformat())
+    if task.closed_at:
+        table.add_row("Closed", task.closed_at.isoformat())
+
+    # Add labels if present
+    if task.labels:
+        table.add_row("Labels", ", ".join(task.labels))
+
+    console.print(table)
+
+
 @tasks_app.command("list")
 def tasks_list(
     status: Annotated[
@@ -361,9 +395,31 @@ def tasks_show(
         jiro tasks show JIRO-15
         jiro tasks show JIRO-15 --json
     """
-    console.print("[yellow]Not implemented yet[/yellow]")
-    console.print(f"\nTask ID: {task_id}")
-    console.print("\nThis command will display full task details")
+    try:
+        project_root = Path.cwd()
+        project_name = project_root.name
+        _ = load_config(project_root, project_name)
+        tracker = BeadsTracker(project_root, stealth=False)
+
+        # Get the task
+        task = tracker.get_task(task_id)
+
+        if json_output:
+            # Output as JSON
+            json_output_data = _format_task_json(task)
+            console.print(json.dumps(json_output_data))
+        elif toon:
+            console.print("[yellow]TOON format not implemented yet[/yellow]")
+        else:
+            # Display as Rich formatted output
+            _display_task_detail(task)
+
+    except KeyError as e:
+        console.print(f"[red]Error: Task not found - {str(e)}[/red]")
+        raise typer.Exit(code=1) from e
+    except Exception as e:  # noqa: B904
+        console.print(f"[red]Error showing task: {str(e)}[/red]")
+        raise typer.Exit(code=1) from e
 
 
 @tasks_app.command("next")

@@ -401,3 +401,228 @@ class TestTasksListCommand:
         assert result.exit_code == 0
         # Type should be visible
         assert "feature" in result.stdout.lower()
+
+
+class TestTasksShowCommand:
+    """Tests for tasks show command."""
+
+    @pytest.mark.unit
+    def test_tasks_show_help(self, cli_runner: CliRunner) -> None:
+        """Tasks show command should display help."""
+        result = cli_runner.invoke(app, ["tasks", "show", "--help"])
+        assert result.exit_code == 0
+        assert "Show" in result.stdout or "show" in result.stdout
+
+    @pytest.mark.unit
+    @mock.patch("jiro.cli.main.load_config")
+    @mock.patch("jiro.cli.main.BeadsTracker")
+    def test_tasks_show_basic(
+        self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
+    ) -> None:
+        """Tasks show should display full task details."""
+        # Mock the config
+        mock_config_instance = mock.Mock()
+        mock_config.return_value = mock_config_instance
+
+        # Mock the BeadsTracker
+        mock_tracker = mock.Mock()
+        mock_tracker.get_task.return_value = sample_task
+        mock_beads_class.return_value = mock_tracker
+
+        result = cli_runner.invoke(app, ["tasks", "show", "test-1"])
+        assert result.exit_code == 0
+        assert "test-1" in result.stdout
+        assert "Test Task" in result.stdout
+        mock_tracker.get_task.assert_called_once_with("test-1")
+
+    @pytest.mark.unit
+    @mock.patch("jiro.cli.main.load_config")
+    @mock.patch("jiro.cli.main.BeadsTracker")
+    def test_tasks_show_displays_description(
+        self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
+    ) -> None:
+        """Tasks show should display task description."""
+        # Mock the config
+        mock_config_instance = mock.Mock()
+        mock_config.return_value = mock_config_instance
+
+        # Mock the BeadsTracker
+        mock_tracker = mock.Mock()
+        mock_tracker.get_task.return_value = sample_task
+        mock_beads_class.return_value = mock_tracker
+
+        result = cli_runner.invoke(app, ["tasks", "show", "test-1"])
+        assert result.exit_code == 0
+        assert "Test description" in result.stdout
+
+    @pytest.mark.unit
+    @mock.patch("jiro.cli.main.load_config")
+    @mock.patch("jiro.cli.main.BeadsTracker")
+    def test_tasks_show_displays_status(
+        self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
+    ) -> None:
+        """Tasks show should display task status."""
+        # Mock the config
+        mock_config_instance = mock.Mock()
+        mock_config.return_value = mock_config_instance
+
+        # Mock the BeadsTracker
+        mock_tracker = mock.Mock()
+        mock_tracker.get_task.return_value = sample_task
+        mock_beads_class.return_value = mock_tracker
+
+        result = cli_runner.invoke(app, ["tasks", "show", "test-1"])
+        assert result.exit_code == 0
+        assert "open" in result.stdout
+
+    @pytest.mark.unit
+    @mock.patch("jiro.cli.main.load_config")
+    @mock.patch("jiro.cli.main.BeadsTracker")
+    def test_tasks_show_displays_priority(
+        self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
+    ) -> None:
+        """Tasks show should display task priority."""
+        # Mock the config
+        mock_config_instance = mock.Mock()
+        mock_config.return_value = mock_config_instance
+
+        # Mock the BeadsTracker
+        mock_tracker = mock.Mock()
+        mock_tracker.get_task.return_value = sample_task
+        mock_beads_class.return_value = mock_tracker
+
+        result = cli_runner.invoke(app, ["tasks", "show", "test-1"])
+        assert result.exit_code == 0
+        assert "1" in result.stdout or "Priority" in result.stdout
+
+    @pytest.mark.unit
+    @mock.patch("jiro.cli.main.load_config")
+    @mock.patch("jiro.cli.main.BeadsTracker")
+    def test_tasks_show_displays_labels(
+        self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
+    ) -> None:
+        """Tasks show should display task labels."""
+        # Mock the config
+        mock_config_instance = mock.Mock()
+        mock_config.return_value = mock_config_instance
+
+        # Mock the BeadsTracker
+        mock_tracker = mock.Mock()
+        mock_tracker.get_task.return_value = sample_task
+        mock_beads_class.return_value = mock_tracker
+
+        result = cli_runner.invoke(app, ["tasks", "show", "test-1"])
+        assert result.exit_code == 0
+        assert "test" in result.stdout or "label" in result.stdout.lower()
+
+    @pytest.mark.unit
+    @mock.patch("jiro.cli.main.load_config")
+    @mock.patch("jiro.cli.main.BeadsTracker")
+    def test_tasks_show_json_output(
+        self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
+    ) -> None:
+        """Tasks show should output JSON when --json flag is used."""
+        # Mock the config
+        mock_config_instance = mock.Mock()
+        mock_config.return_value = mock_config_instance
+
+        # Mock the BeadsTracker
+        mock_tracker = mock.Mock()
+        mock_tracker.get_task.return_value = sample_task
+        mock_beads_class.return_value = mock_tracker
+
+        result = cli_runner.invoke(app, ["tasks", "show", "test-1", "--json"])
+        assert result.exit_code == 0
+        # Should be valid JSON
+        output = json.loads(result.stdout)
+        assert output["id"] == "test-1"
+        assert output["title"] == "Test Task"
+        assert output["description"] == "Test description"
+
+    @pytest.mark.unit
+    @mock.patch("jiro.cli.main.load_config")
+    @mock.patch("jiro.cli.main.BeadsTracker")
+    def test_tasks_show_json_contains_all_fields(
+        self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
+    ) -> None:
+        """Tasks show JSON should contain all task fields."""
+        # Mock the config
+        mock_config_instance = mock.Mock()
+        mock_config.return_value = mock_config_instance
+
+        # Mock the BeadsTracker
+        mock_tracker = mock.Mock()
+        mock_tracker.get_task.return_value = sample_task
+        mock_beads_class.return_value = mock_tracker
+
+        result = cli_runner.invoke(app, ["tasks", "show", "test-1", "--json"])
+        assert result.exit_code == 0
+        output = json.loads(result.stdout)
+        assert "id" in output
+        assert "title" in output
+        assert "status" in output
+        assert "priority" in output
+        assert "task_type" in output
+        assert "created_at" in output
+        assert "updated_at" in output
+        assert "labels" in output
+
+    @pytest.mark.unit
+    @mock.patch("jiro.cli.main.load_config")
+    @mock.patch("jiro.cli.main.BeadsTracker")
+    def test_tasks_show_task_not_found(
+        self, mock_beads_class, mock_config, cli_runner: CliRunner
+    ) -> None:
+        """Tasks show should handle task not found gracefully."""
+        # Mock the config
+        mock_config_instance = mock.Mock()
+        mock_config.return_value = mock_config_instance
+
+        # Mock the BeadsTracker
+        mock_tracker = mock.Mock()
+        mock_tracker.get_task.side_effect = KeyError("Task not found")
+        mock_beads_class.return_value = mock_tracker
+
+        result = cli_runner.invoke(app, ["tasks", "show", "nonexistent"])
+        assert result.exit_code == 1
+        assert "Error" in result.stdout or "not found" in result.stdout.lower()
+
+    @pytest.mark.unit
+    @mock.patch("jiro.cli.main.load_config")
+    @mock.patch("jiro.cli.main.BeadsTracker")
+    def test_tasks_show_with_epic(
+        self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task_in_progress
+    ) -> None:
+        """Tasks show should display epic ID if task is in an epic."""
+        # Mock the config
+        mock_config_instance = mock.Mock()
+        mock_config.return_value = mock_config_instance
+
+        # Mock the BeadsTracker
+        mock_tracker = mock.Mock()
+        mock_tracker.get_task.return_value = sample_task_in_progress
+        mock_beads_class.return_value = mock_tracker
+
+        result = cli_runner.invoke(app, ["tasks", "show", "test-2"])
+        assert result.exit_code == 0
+        assert "epic-1" in result.stdout or "epic" in result.stdout.lower()
+
+    @pytest.mark.unit
+    @mock.patch("jiro.cli.main.load_config")
+    @mock.patch("jiro.cli.main.BeadsTracker")
+    def test_tasks_show_with_closed_task(
+        self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task_closed
+    ) -> None:
+        """Tasks show should display closed_at timestamp for closed tasks."""
+        # Mock the config
+        mock_config_instance = mock.Mock()
+        mock_config.return_value = mock_config_instance
+
+        # Mock the BeadsTracker
+        mock_tracker = mock.Mock()
+        mock_tracker.get_task.return_value = sample_task_closed
+        mock_beads_class.return_value = mock_tracker
+
+        result = cli_runner.invoke(app, ["tasks", "show", "test-3"])
+        assert result.exit_code == 0
+        assert "closed" in result.stdout.lower()
