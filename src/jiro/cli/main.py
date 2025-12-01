@@ -10,7 +10,7 @@ from rich.table import Table
 
 from jiro import __version__
 from jiro.cli.doctor import fix_missing_config, fix_missing_directories, run_doctor
-from jiro.cli.status import status
+from jiro.cli.status import app as status_app
 from jiro.cli.tasks import app as tasks_app
 from jiro.core.logging import configure_logging
 
@@ -218,6 +218,9 @@ def plan(
 # Wire tasks subcommand from tasks module
 app.add_typer(tasks_app, name="tasks")
 
+# Wire status subcommand from status module
+app.add_typer(status_app, name="status")
+
 
 @app.command()
 def execute(
@@ -243,10 +246,6 @@ def execute(
     console.print("  - Run session postflight checks")
     if epic:
         console.print(f"  - Limited to epic: {epic}")
-
-
-# Wire status command from status module
-app.command()(status)
 
 
 # Create config subcommand group

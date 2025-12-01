@@ -11,6 +11,8 @@ from rich.table import Table
 from jiro.db.database import get_database
 from jiro.db.repository import PromptRepository, SessionRepository, TaskExecutionRepository
 
+app = typer.Typer()
+
 console = Console()
 
 
@@ -115,6 +117,7 @@ def _display_session_table(sessions, task_repo, prompt_repo):
             console.print(f"  Tokens Used: {total_tokens:,}")
 
 
+@app.callback(invoke_without_command=True)
 def status(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     toon: Annotated[bool, typer.Option("--toon", help="Output as TOON format")] = False,
