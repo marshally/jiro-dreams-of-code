@@ -82,8 +82,8 @@ class TestTasksListCommand:
         assert "List" in result.stdout or "list" in result.stdout
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_list_basic(
         self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
     ) -> None:
@@ -102,8 +102,8 @@ class TestTasksListCommand:
         assert "test-1" in result.stdout or "Test Task" in result.stdout
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_list_with_status_filter(
         self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
     ) -> None:
@@ -125,8 +125,8 @@ class TestTasksListCommand:
         assert call_kwargs.get("status") == "open"
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_list_with_status_short_flag(
         self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
     ) -> None:
@@ -148,8 +148,8 @@ class TestTasksListCommand:
         assert call_kwargs.get("status") == "in_progress"
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_list_with_epic_filter(
         self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
     ) -> None:
@@ -171,8 +171,8 @@ class TestTasksListCommand:
         assert call_kwargs.get("epic_id") == "epic-1"
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_list_with_epic_short_flag(
         self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
     ) -> None:
@@ -194,8 +194,8 @@ class TestTasksListCommand:
         assert call_kwargs.get("epic_id") == "epic-2"
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_list_with_both_filters(
         self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
     ) -> None:
@@ -218,8 +218,8 @@ class TestTasksListCommand:
         assert call_kwargs.get("epic_id") == "epic-1"
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_list_json_output(
         self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
     ) -> None:
@@ -243,8 +243,8 @@ class TestTasksListCommand:
         assert output[0]["title"] == "Test Task"
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_list_json_with_filters(
         self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
     ) -> None:
@@ -267,8 +267,8 @@ class TestTasksListCommand:
         assert call_kwargs.get("status") == "open"
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_list_multiple_tasks(
         self,
         mock_beads_class,
@@ -300,8 +300,8 @@ class TestTasksListCommand:
         assert "test-3" in result.stdout or "Closed Task" in result.stdout
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_list_empty_result(
         self, mock_beads_class, mock_config, cli_runner: CliRunner
     ) -> None:
@@ -321,8 +321,8 @@ class TestTasksListCommand:
         assert result.stdout is not None
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_list_empty_json(
         self, mock_beads_class, mock_config, cli_runner: CliRunner
     ) -> None:
@@ -342,8 +342,8 @@ class TestTasksListCommand:
         assert output == []
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_list_displays_priority(
         self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
     ) -> None:
@@ -361,8 +361,8 @@ class TestTasksListCommand:
         assert result.exit_code == 0
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_list_displays_status(
         self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
     ) -> None:
@@ -382,8 +382,8 @@ class TestTasksListCommand:
         assert "open" in result.stdout.lower()
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_list_displays_task_type(
         self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
     ) -> None:
@@ -414,8 +414,8 @@ class TestTasksShowCommand:
         assert "Show" in result.stdout or "show" in result.stdout
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_show_basic(
         self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
     ) -> None:
@@ -436,8 +436,8 @@ class TestTasksShowCommand:
         mock_tracker.get_task.assert_called_once_with("test-1")
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_show_displays_description(
         self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
     ) -> None:
@@ -456,8 +456,8 @@ class TestTasksShowCommand:
         assert "Test description" in result.stdout
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_show_displays_status(
         self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
     ) -> None:
@@ -476,8 +476,8 @@ class TestTasksShowCommand:
         assert "open" in result.stdout
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_show_displays_priority(
         self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
     ) -> None:
@@ -496,8 +496,8 @@ class TestTasksShowCommand:
         assert "1" in result.stdout or "Priority" in result.stdout
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_show_displays_labels(
         self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
     ) -> None:
@@ -516,8 +516,8 @@ class TestTasksShowCommand:
         assert "test" in result.stdout or "label" in result.stdout.lower()
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_show_json_output(
         self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
     ) -> None:
@@ -540,8 +540,8 @@ class TestTasksShowCommand:
         assert output["description"] == "Test description"
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_show_json_contains_all_fields(
         self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
     ) -> None:
@@ -568,8 +568,8 @@ class TestTasksShowCommand:
         assert "labels" in output
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_show_task_not_found(
         self, mock_beads_class, mock_config, cli_runner: CliRunner
     ) -> None:
@@ -588,8 +588,8 @@ class TestTasksShowCommand:
         assert "Error" in result.stdout or "not found" in result.stdout.lower()
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_show_with_epic(
         self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task_in_progress
     ) -> None:
@@ -608,8 +608,8 @@ class TestTasksShowCommand:
         assert "epic-1" in result.stdout or "epic" in result.stdout.lower()
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_show_with_closed_task(
         self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task_closed
     ) -> None:
@@ -639,8 +639,8 @@ class TestTasksNextCommand:
         assert "Show" in result.stdout or "next" in result.stdout
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_next_finds_ready_task(
         self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
     ) -> None:
@@ -663,8 +663,8 @@ class TestTasksNextCommand:
         assert call_kwargs.get("epic_id") is None
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_next_with_epic_filter(
         self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task_in_progress
     ) -> None:
@@ -686,8 +686,8 @@ class TestTasksNextCommand:
         assert call_kwargs.get("epic_id") == "epic-1"
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_next_with_epic_short_flag(
         self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task_in_progress
     ) -> None:
@@ -709,8 +709,8 @@ class TestTasksNextCommand:
         assert call_kwargs.get("epic_id") == "epic-2"
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_next_no_ready_task(
         self, mock_beads_class, mock_config, cli_runner: CliRunner
     ) -> None:
@@ -730,8 +730,8 @@ class TestTasksNextCommand:
         assert "no" in result.stdout.lower() or "ready" in result.stdout.lower()
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_next_json_output(
         self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
     ) -> None:
@@ -754,8 +754,8 @@ class TestTasksNextCommand:
         assert output["title"] == "Test Task"
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_next_json_output_with_no_task(
         self, mock_beads_class, mock_config, cli_runner: CliRunner
     ) -> None:
@@ -776,8 +776,8 @@ class TestTasksNextCommand:
         assert output is None or output == {}
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.main.load_config")
-    @mock.patch("jiro.cli.main.BeadsTracker")
+    @mock.patch("jiro.cli.tasks.load_config")
+    @mock.patch("jiro.cli.tasks.BeadsTracker")
     def test_tasks_next_json_with_epic_filter(
         self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task_in_progress
     ) -> None:
