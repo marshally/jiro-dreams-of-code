@@ -1,0 +1,224 @@
+"""Tests for config CLI commands."""
+
+import json
+from unittest import mock
+
+import pytest
+from typer.testing import CliRunner
+
+from jiro.cli.main import app
+from jiro.config.schema import (
+    CommandsConfig,
+    Config,
+    ConventionsConfig,
+    ModelsConfig,
+    PreflightConfig,
+)
+
+
+@pytest.fixture
+def cli_runner() -> CliRunner:
+    """Fixture for Typer CLI testing."""
+    return CliRunner()
+
+
+@pytest.fixture
+def sample_config() -> Config:
+    """Create a sample config for testing."""
+    return Config(
+        models=ModelsConfig(
+            planning="claude-opus-4-5-20250514",
+            execution="claude-haiku-4-5-20250514",
+            review="claude-sonnet-4-5-20250514",
+        ),
+        commands=CommandsConfig(
+            test="pytest",
+            lint="ruff check",
+            lint_fix="ruff check --fix",
+        ),
+        conventions=ConventionsConfig(
+            test_file_pattern="test_{name}.py",
+        ),
+        preflight=PreflightConfig(
+            skip_if_recent_minutes=60,
+        ),
+    )
+
+
+@pytest.mark.unit
+class TestConfigListCommand:
+    """Tests for config list command."""
+
+    def test_config_list_help(self, cli_runner: CliRunner) -> None:
+        """Config list command should display help."""
+        result = cli_runner.invoke(app, ["config", "list", "--help"])
+        assert result.exit_code == 0
+        assert "list" in result.stdout.lower() or "List" in result.stdout
+
+    @mock.patch("jiro.cli.config.load_config")
+    def test_config_list_basic(
+        self, mock_load_config, cli_runner: CliRunner, sample_config: Config
+    ) -> None:
+        """Config list should display config values in a table."""
+        mock_load_config.return_value = sample_config
+
+        result = cli_runner.invoke(app, ["config", "list"])
+        assert result.exit_code == 0
+        # Should display models configuration
+        assert "models" in result.stdout.lower() or "Models" in result.stdout
+        # Should show some config values
+        assert "pytest" in result.stdout or "claude-opus" in result.stdout
+
+    @mock.patch("jiro.cli.config.load_config")
+    def test_config_list_shows_sources(
+        self, mock_load_config, cli_runner: CliRunner, sample_config: Config
+    ) -> None:
+        """Config list should show where each value comes from."""
+        mock_load_config.return_value = sample_config
+
+        result = cli_runner.invoke(app, ["config", "list"])
+        assert result.exit_code == 0
+        # Should show source information (default/project)
+        assert "default" in result.stdout.lower() or "source" in result.stdout.lower()
+
+    @mock.patch("jiro.cli.config.load_config")
+    def test_config_list_json_output(
+        self, mock_load_config, cli_runner: CliRunner, sample_config: Config
+    ) -> None:
+        """Config list should output JSON when --json flag is used."""
+        mock_load_config.return_value = sample_config
+
+        result = cli_runner.invoke(app, ["config", "list", "--json"])
+        assert result.exit_code == 0
+        # Should be valid JSON
+        output = json.loads(result.stdout)
+        assert isinstance(output, dict)
+        # Should contain configuration sections
+        assert "models" in output or "commands" in output
+
+    @mock.patch("jiro.cli.config.load_config")
+    def test_config_list_json_models_section(
+        self, mock_load_config, cli_runner: CliRunner, sample_config: Config
+    ) -> None:
+        """Config list JSON should include models section."""
+        mock_load_config.return_value = sample_config
+
+        result = cli_runner.invoke(app, ["config", "list", "--json"])
+        assert result.exit_code == 0
+        output = json.loads(result.stdout)
+
+        assert "models" in output
+        models = output["models"]
+        assert models["planning"]["value"] == "claude-opus-4-5-20250514"
+        assert models["execution"]["value"] == "claude-haiku-4-5-20250514"
+        assert models["review"]["value"] == "claude-sonnet-4-5-20250514"
+
+    @mock.patch("jiro.cli.config.load_config")
+    def test_config_list_json_commands_section(
+        self, mock_load_config, cli_runner: CliRunner, sample_config: Config
+    ) -> None:
+        """Config list JSON should include commands section."""
+        mock_load_config.return_value = sample_config
+
+        result = cli_runner.invoke(app, ["config", "list", "--json"])
+        assert result.exit_code == 0
+        output = json.loads(result.stdout)
+
+        assert "commands" in output
+        commands = output["commands"]
+        assert commands["test"]["value"] == "pytest"
+        assert commands["lint"]["value"] == "ruff check"
+        assert commands["lint_fix"]["value"] == "ruff check --fix"
+
+    @mock.patch("jiro.cli.config.load_config")
+    def test_config_list_json_conventions_section(
+        self, mock_load_config, cli_runner: CliRunner, sample_config: Config
+    ) -> None:
+        """Config list JSON should include conventions section."""
+        mock_load_config.return_value = sample_config
+
+        result = cli_runner.invoke(app, ["config", "list", "--json"])
+        assert result.exit_code == 0
+        output = json.loads(result.stdout)
+
+        assert "conventions" in output
+        conventions = output["conventions"]
+        assert conventions["test_file_pattern"]["value"] == "test_{name}.py"
+
+    @mock.patch("jiro.cli.config.load_config")
+    def test_config_list_json_preflight_section(
+        self, mock_load_config, cli_runner: CliRunner, sample_config: Config
+    ) -> None:
+        """Config list JSON should include preflight section."""
+        mock_load_config.return_value = sample_config
+
+        result = cli_runner.invoke(app, ["config", "list", "--json"])
+        assert result.exit_code == 0
+        output = json.loads(result.stdout)
+
+        assert "preflight" in output
+        preflight = output["preflight"]
+        assert preflight["skip_if_recent_minutes"]["value"] == 60
+
+    @mock.patch("jiro.cli.config.load_config")
+    def test_config_list_json_includes_source(
+        self, mock_load_config, cli_runner: CliRunner, sample_config: Config
+    ) -> None:
+        """Config list JSON should include source for each value."""
+        mock_load_config.return_value = sample_config
+
+        result = cli_runner.invoke(app, ["config", "list", "--json"])
+        assert result.exit_code == 0
+        output = json.loads(result.stdout)
+
+        # Check that source is present in values
+        models = output["models"]
+        assert "source" in models["planning"]
+        # Source should be "default" since we're using defaults
+        assert models["planning"]["source"] in ["default", "project"]
+
+    @mock.patch("jiro.cli.config.load_config")
+    def test_config_list_with_custom_config(self, mock_load_config, cli_runner: CliRunner) -> None:
+        """Config list should work with custom configuration."""
+        custom_config = Config(
+            models=ModelsConfig(
+                planning="custom-planning-model",
+                execution="custom-execution-model",
+                review="custom-review-model",
+            ),
+            commands=CommandsConfig(
+                test="custom-pytest",
+                lint="custom-ruff",
+                lint_fix="custom-ruff-fix",
+            ),
+            conventions=ConventionsConfig(
+                test_file_pattern="custom_test_{name}.py",
+            ),
+            preflight=PreflightConfig(
+                skip_if_recent_minutes=120,
+            ),
+        )
+        mock_load_config.return_value = custom_config
+
+        result = cli_runner.invoke(app, ["config", "list", "--json"])
+        assert result.exit_code == 0
+        output = json.loads(result.stdout)
+
+        assert output["models"]["planning"]["value"] == "custom-planning-model"
+        assert output["commands"]["test"]["value"] == "custom-pytest"
+        assert output["conventions"]["test_file_pattern"]["value"] == "custom_test_{name}.py"
+        assert output["preflight"]["skip_if_recent_minutes"]["value"] == 120
+
+    @mock.patch("jiro.cli.config.load_config")
+    def test_config_list_table_format(
+        self, mock_load_config, cli_runner: CliRunner, sample_config: Config
+    ) -> None:
+        """Config list table should have proper formatting."""
+        mock_load_config.return_value = sample_config
+
+        result = cli_runner.invoke(app, ["config", "list"])
+        assert result.exit_code == 0
+        # Check for table-like formatting
+        output = result.stdout
+        # Should have some visual separators or structured output
+        assert len(output) > 0

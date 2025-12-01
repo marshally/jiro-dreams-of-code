@@ -9,6 +9,7 @@ from rich.console import Console
 from rich.table import Table
 
 from jiro import __version__
+from jiro.cli.config import app as config_app
 from jiro.cli.doctor import fix_missing_config, fix_missing_directories, run_doctor
 from jiro.cli.status import app as status_app
 from jiro.cli.tasks import app as tasks_app
@@ -221,6 +222,9 @@ app.add_typer(tasks_app, name="tasks")
 # Wire status subcommand from status module
 app.add_typer(status_app, name="status")
 
+# Wire config subcommand from config module
+app.add_typer(config_app, name="config")
+
 
 @app.command()
 def execute(
@@ -246,81 +250,6 @@ def execute(
     console.print("  - Run session postflight checks")
     if epic:
         console.print(f"  - Limited to epic: {epic}")
-
-
-# Create config subcommand group
-config_app = typer.Typer(
-    name="config",
-    help="Get/set configuration values",
-    no_args_is_help=True,
-)
-app.add_typer(config_app, name="config")
-
-
-@config_app.command("list")
-def config_list(
-    global_config: Annotated[bool, typer.Option("--global", help="Show global config")] = False,
-    project: Annotated[bool, typer.Option("--project", help="Show project config")] = False,
-    local: Annotated[bool, typer.Option("--local", help="Show local config")] = False,
-) -> None:
-    """
-    List all configuration values.
-
-    Shows effective configuration with source scope.
-
-    Examples:
-        jiro config list
-        jiro config list --global
-        jiro config list --project
-    """
-    console.print("[yellow]Not implemented yet[/yellow]")
-    console.print("\nThis command will list configuration values")
-
-
-@config_app.command("get")
-def config_get(
-    key: Annotated[str, typer.Argument(help="Configuration key (e.g., commands.test)")],
-) -> None:
-    """
-    Get a configuration value.
-
-    Shows the effective value and which scope it comes from.
-
-    Examples:
-        jiro config get commands.test
-        jiro config get models.execution
-    """
-    console.print("[yellow]Not implemented yet[/yellow]")
-    console.print(f"\nKey: {key}")
-    console.print("\nThis command will show the effective configuration value")
-
-
-@config_app.command("set")
-def config_set(
-    key: Annotated[str, typer.Argument(help="Configuration key")],
-    value: Annotated[str, typer.Argument(help="Configuration value")],
-    global_config: Annotated[bool, typer.Option("--global", help="Set in global config")] = False,
-    project: Annotated[bool, typer.Option("--project", help="Set in project config")] = False,
-    local: Annotated[bool, typer.Option("--local", help="Set in local config")] = False,
-) -> None:
-    """
-    Set a configuration value.
-
-    Examples:
-        jiro config set commands.test "pytest" --local
-        jiro config set models.execution "claude-sonnet-4-5-20250929" --global
-    """
-    console.print("[yellow]Not implemented yet[/yellow]")
-    console.print(f"\nKey: {key}")
-    console.print(f"Value: {value}")
-    if global_config:
-        console.print("Scope: global")
-    elif project:
-        console.print("Scope: project")
-    elif local:
-        console.print("Scope: local")
-    else:
-        console.print("Scope: (will determine automatically)")
 
 
 @app.command()
