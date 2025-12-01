@@ -8,6 +8,7 @@ import pytest
 
 from jiro.cli.doctor import (
     DoctorResult,
+    FixResult,
     check_api_key,
     check_beads,
     check_claude_sdk,
@@ -17,6 +18,8 @@ from jiro.cli.doctor import (
     check_lint_command,
     check_python_version,
     check_test_command,
+    fix_missing_config,
+    fix_missing_directories,
     run_doctor,
 )
 from jiro.config.schema import Config
@@ -443,3 +446,196 @@ class TestRunDoctor:
                 "directories",
             }
             assert expected_checks == set(result.checks.keys())
+
+
+class TestFixResult:
+    """Tests for FixResult dataclass."""
+
+    @pytest.mark.unit
+    def test_fix_result_creation(self) -> None:
+        """FixResult should be created with fix data."""
+        result = FixResult(
+            directories_created=["src", "tests"],
+            config_created=True,
+            errors=[],
+        )
+        assert result.directories_created == ["src", "tests"]
+        assert result.config_created is True
+        assert result.errors == []
+
+    @pytest.mark.unit
+    def test_fix_result_with_errors(self) -> None:
+        """FixResult should track errors from failed fixes."""
+        result = FixResult(
+            directories_created=["src"],
+            config_created=False,
+            errors=["Failed to create config"],
+        )
+        assert result.directories_created == ["src"]
+        assert result.config_created is False
+        assert len(result.errors) == 1
+        assert "Failed to create config" in result.errors
+
+
+class TestFixMissingDirectories:
+    """Tests for fix_missing_directories function."""
+
+    @pytest.mark.unit
+    def test_create_missing_directories(self, tmp_path: Path) -> None:
+        """Should create missing directories."""
+        # Verify directories don't exist
+        src_dir = tmp_path / "src"
+        tests_dir = tmp_path / "tests"
+        assert not src_dir.exists()
+        assert not tests_dir.exists()
+
+        # Fix missing directories
+        result = fix_missing_directories(tmp_path)
+
+        # Verify directories were created
+        assert src_dir.exists()
+        assert tests_dir.exists()
+        assert src_dir in result
+        assert tests_dir in result
+
+    @pytest.mark.unit
+    def test_skip_existing_directories(self, tmp_path: Path) -> None:
+        """Should not create directories that already exist."""
+        # Create src directory
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()
+        tests_dir = tmp_path / "tests"
+
+        # Fix missing directories
+        result = fix_missing_directories(tmp_path)
+
+        # Only tests should be in result
+        assert tests_dir in result
+        assert src_dir not in result
+        assert tests_dir.exists()
+
+    @pytest.mark.unit
+    def test_return_empty_list_if_all_exist(self, tmp_path: Path) -> None:
+        """Should return empty list if all directories exist."""
+        # Create both directories
+        (tmp_path / "src").mkdir()
+        (tmp_path / "tests").mkdir()
+
+        # Fix missing directories
+        result = fix_missing_directories(tmp_path)
+
+        # Should return empty list
+        assert result == []
+
+    @pytest.mark.unit
+    def test_default_to_cwd(self, tmp_path: Path, monkeypatch) -> None:
+        """Should default to current working directory."""
+        # Change to temp directory
+        monkeypatch.chdir(tmp_path)
+
+        # Fix missing directories without specifying path
+        result = fix_missing_directories()
+
+        # Verify directories were created
+        assert (tmp_path / "src").exists()
+        assert (tmp_path / "tests").exists()
+        assert len(result) == 2
+
+
+class TestFixMissingConfig:
+    """Tests for fix_missing_config function."""
+
+    @pytest.mark.unit
+    def test_create_missing_config(self, tmp_path: Path, monkeypatch) -> None:
+        """Should create missing config with default values."""
+        # Set up fake home directory for stealth mode
+        fake_home = tmp_path / "home"
+        fake_home.mkdir()
+        monkeypatch.setenv("HOME", str(fake_home))
+
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+
+        # Config should not exist initially
+        from jiro.core.paths import get_config_path
+
+        config_path = get_config_path(project_root, stealth=True, project_name="test-project")
+        assert not config_path.exists()
+
+        # Fix missing config
+        result = fix_missing_config(project_root, "test-project")
+
+        # Verify config was created
+        assert config_path.exists()
+        assert result is True
+
+    @pytest.mark.unit
+    def test_skip_existing_config(self, tmp_path: Path, monkeypatch) -> None:
+        """Should not overwrite existing config."""
+        # Set up fake home directory
+        fake_home = tmp_path / "home"
+        fake_home.mkdir()
+        monkeypatch.setenv("HOME", str(fake_home))
+
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+
+        # Create existing config
+        from jiro.core.paths import get_config_path
+
+        config_path = get_config_path(project_root, stealth=True, project_name="test-project")
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text("existing: true\n")
+
+        # Fix missing config
+        result = fix_missing_config(project_root, "test-project")
+
+        # Should return False (not created)
+        assert result is False
+
+        # Verify original config unchanged
+        assert "existing: true" in config_path.read_text()
+
+    @pytest.mark.unit
+    def test_default_to_cwd(self, tmp_path: Path, monkeypatch) -> None:
+        """Should default to current working directory."""
+        # Set up fake home directory
+        fake_home = tmp_path / "home"
+        fake_home.mkdir()
+        monkeypatch.setenv("HOME", str(fake_home))
+
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+        monkeypatch.chdir(project_root)
+
+        # Fix missing config without specifying path
+        result = fix_missing_config()
+
+        # Verify config was created
+        from jiro.core.paths import get_config_path
+
+        config_path = get_config_path(project_root, stealth=True, project_name="project")
+        assert config_path.exists()
+        assert result is True
+
+    @pytest.mark.unit
+    def test_config_has_valid_structure(self, tmp_path: Path, monkeypatch) -> None:
+        """Created config should have valid YAML structure."""
+        # Set up fake home directory
+        fake_home = tmp_path / "home"
+        fake_home.mkdir()
+        monkeypatch.setenv("HOME", str(fake_home))
+
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+
+        # Fix missing config
+        fix_missing_config(project_root, "test-project")
+
+        # Verify config can be loaded
+        from jiro.config.loader import load_config
+
+        config = load_config(project_root, "test-project")
+        assert config is not None
+        assert hasattr(config, "commands")
+        assert hasattr(config, "models")

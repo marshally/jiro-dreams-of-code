@@ -7,8 +7,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import structlog
+import yaml
 
 from jiro.config.loader import load_config
+from jiro.core.paths import get_config_path
 from jiro.core.session import CheckResult
 
 
@@ -24,6 +26,21 @@ class DoctorResult:
 
     passed: bool
     checks: dict[str, CheckResult] = field(default_factory=dict)
+    errors: list[str] = field(default_factory=list)
+
+
+@dataclass
+class FixResult:
+    """Result of running doctor fixes.
+
+    Attributes:
+        directories_created: List of Path objects for directories that were created.
+        config_created: Whether the config file was created.
+        errors: List of error messages from failed fixes.
+    """
+
+    directories_created: list[Path] = field(default_factory=list)
+    config_created: bool = False
     errors: list[str] = field(default_factory=list)
 
 
@@ -338,6 +355,118 @@ def check_directories(project_root: Path | None = None) -> CheckResult:
             passed=False,
             error=f"Error checking directories: {str(e)}",
         )
+
+
+def fix_missing_directories(project_root: Path | None = None) -> list[Path]:
+    """Fix missing required project directories.
+
+    Creates src and tests directories if they don't exist.
+
+    Args:
+        project_root: Optional project root path. Defaults to current directory.
+
+    Returns:
+        List of Path objects for directories that were created.
+    """
+    if project_root is None:
+        project_root = Path.cwd()
+
+    required_dirs = [
+        project_root / "src",
+        project_root / "tests",
+    ]
+
+    created = []
+    for dir_path in required_dirs:
+        if not dir_path.exists():
+            try:
+                dir_path.mkdir(parents=True, exist_ok=True)
+                created.append(dir_path)
+            except Exception as e:
+                # Log the error but continue
+                logger = structlog.get_logger()
+                logger.warning(
+                    "failed_to_create_directory",
+                    directory=str(dir_path),
+                    error=str(e),
+                )
+
+    return created
+
+
+def fix_missing_config(project_root: Path | None = None, project_name: str | None = None) -> bool:
+    """Fix missing project configuration file.
+
+    Creates default config.yaml if it doesn't exist.
+
+    Args:
+        project_root: Optional project root path. Defaults to current directory.
+        project_name: Optional project name for scoped config. Defaults to project root name.
+
+    Returns:
+        True if config was created, False if it already existed.
+    """
+    logger = structlog.get_logger()
+
+    if project_root is None:
+        project_root = Path.cwd()
+
+    if project_name is None:
+        project_name = project_root.name
+
+    config_path = get_config_path(project_root, stealth=True, project_name=project_name)
+
+    # If config already exists, don't overwrite it
+    if config_path.exists():
+        return False
+
+    # Create parent directories if needed
+    try:
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        logger.error(
+            "failed_to_create_config_directory",
+            directory=str(config_path.parent),
+            error=str(e),
+        )
+        return False
+
+    # Create default config YAML
+    try:
+        default_config = {
+            "models": {
+                "planning": "claude-opus-4-5-20250514",
+                "execution": "claude-haiku-4-5-20250514",
+                "review": "claude-sonnet-4-5-20250514",
+            },
+            "commands": {
+                "test": "pytest",
+                "lint": "ruff check",
+                "lint_fix": "ruff check --fix",
+            },
+            "conventions": {
+                "test_file_pattern": "test_{name}.py",
+            },
+            "preflight": {
+                "skip_if_recent_minutes": 60,
+            },
+        }
+
+        with open(config_path, "w") as f:
+            yaml.dump(default_config, f, default_flow_style=False)
+
+        logger.info(
+            "config_created",
+            config_path=str(config_path),
+        )
+        return True
+    except Exception as e:
+        logger.error(
+            "failed_to_create_config_file",
+            config_path=str(config_path),
+            error=str(e),
+        )
+        return False
 
 
 def run_doctor(project_root: Path | None = None) -> DoctorResult:
