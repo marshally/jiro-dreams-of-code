@@ -178,6 +178,7 @@ def config_list(
 @app.command("get")
 def config_get(
     key: Annotated[str, typer.Argument(help="Configuration key (e.g., commands.test)")],
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """
     Get a configuration value.
@@ -187,10 +188,29 @@ def config_get(
     Examples:
         jiro config get commands.test
         jiro config get models.execution
+        jiro config get models.planning --json
     """
-    console.print("[yellow]Not implemented yet[/yellow]")
-    console.print(f"\nKey: {key}")
-    console.print("\nThis command will show the effective configuration value")
+    config = _get_config()
+    flattened = _flatten_config(config)
+
+    if key not in flattened:
+        console.print(f"[red]Error: Configuration key '{key}' not found[/red]")
+        raise typer.Exit(code=1)
+
+    config_item = flattened[key]
+
+    if json_output:
+        output = {
+            "key": key,
+            "value": config_item["value"],
+            "source": config_item["source"],
+        }
+        console.print(json.dumps(output))
+    else:
+        # Display in human-readable format
+        console.print(f"[cyan]Key:[/cyan] {key}")
+        console.print(f"[cyan]Value:[/cyan] {config_item['value']}")
+        console.print(f"[cyan]Source:[/cyan] {config_item['source']}")
 
 
 @app.command("set")
