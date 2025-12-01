@@ -11,6 +11,7 @@ from rich.table import Table
 from jiro import __version__
 from jiro.cli.config import app as config_app
 from jiro.cli.doctor import fix_missing_config, fix_missing_directories, run_doctor
+from jiro.cli.logs import app as logs_app
 from jiro.cli.mode import app as mode_app
 from jiro.cli.status import app as status_app
 from jiro.cli.tasks import app as tasks_app
@@ -257,25 +258,8 @@ def execute(
 app.add_typer(mode_app, name="mode")
 
 
-@app.command()
-def logs(
-    follow: Annotated[bool, typer.Option("--follow", "-f", help="Follow log output")] = False,
-    tail: Annotated[int | None, typer.Option("--tail", "-n", help="Show last N lines")] = None,
-) -> None:
-    """
-    View logs with filtering options.
-
-    Examples:
-        jiro logs
-        jiro logs --follow
-        jiro logs --tail 100
-    """
-    console.print("[yellow]Not implemented yet[/yellow]")
-    console.print("\nThis command will display logs")
-    if follow:
-        console.print("  - Following output")
-    if tail:
-        console.print(f"  - Showing last {tail} lines")
+# Wire logs subcommand from logs module
+app.add_typer(logs_app, name="logs")
 
 
 @app.command()
