@@ -1,5 +1,6 @@
 """Main CLI entry point for jiro-dreams-of-code."""
 
+import json
 import logging
 from pathlib import Path
 from typing import Annotated
@@ -10,7 +11,10 @@ from rich.table import Table
 
 from jiro import __version__
 from jiro.cli.doctor import fix_missing_config, fix_missing_directories, run_doctor
+from jiro.config.loader import load_config
 from jiro.core.logging import configure_logging
+from jiro.trackers.beads import BeadsTracker
+from jiro.trackers.interface import TaskStatus
 
 app = typer.Typer(
     name="jiro",
@@ -222,6 +226,74 @@ tasks_app = typer.Typer(
 app.add_typer(tasks_app, name="tasks")
 
 
+def _format_task_json(task):
+    """Convert a Task object to a JSON-serializable dictionary."""
+    return {
+        "id": task.id,
+        "title": task.title,
+        "task_type": task.task_type,
+        "status": task.status,
+        "priority": task.priority,
+        "epic_id": task.epic_id,
+        "description": task.description,
+        "created_at": task.created_at.isoformat() if task.created_at else None,
+        "updated_at": task.updated_at.isoformat() if task.updated_at else None,
+        "closed_at": task.closed_at.isoformat() if task.closed_at else None,
+        "labels": task.labels or [],
+    }
+
+
+def _group_tasks_by_status(tasks):
+    """Group tasks by their status."""
+    grouped = {}
+    for task in tasks:
+        if task.status not in grouped:
+            grouped[task.status] = []
+        grouped[task.status].append(task)
+    return grouped
+
+
+def _display_tasks_table(tasks):
+    """Display tasks in a Rich table format."""
+    if not tasks:
+        console.print("[yellow]No tasks found[/yellow]")
+        return
+
+    # Group tasks by status for better readability
+    grouped = _group_tasks_by_status(tasks)
+
+    # Create a table
+    table = Table(title="Tasks")
+    table.add_column("ID", style="cyan")
+    table.add_column("Title", style="white")
+    table.add_column("Type", style="magenta")
+    table.add_column("Status", style="green")
+    table.add_column("Priority", style="yellow")
+    table.add_column("Epic", style="blue")
+
+    # Sort status order for display
+    status_order = ["open", "in_progress", "blocked", "closed"]
+    sorted_statuses = [s for s in status_order if s in grouped] + [
+        s for s in grouped if s not in status_order
+    ]
+
+    for status in sorted_statuses:
+        status_tasks = grouped[status]
+        for task in status_tasks:
+            epic_display = task.epic_id if task.epic_id else "-"
+            priority_display = str(task.priority) if task.priority is not None else "-"
+            table.add_row(
+                task.id,
+                task.title,
+                task.task_type,
+                task.status,
+                priority_display,
+                epic_display,
+            )
+
+    console.print(table)
+
+
 @tasks_app.command("list")
 def tasks_list(
     status: Annotated[
@@ -244,18 +316,33 @@ def tasks_list(
         jiro tasks list --status pending --epic JIRO-42
         jiro tasks list --json
     """
-    console.print("[yellow]Not implemented yet[/yellow]")
-    console.print("\nThis command will display all tasks")
-    if status:
-        console.print(f"  - Filtered by status: {status}")
-    if epic:
-        console.print(f"  - Filtered by epic: {epic}")
-    if json_output:
-        console.print("  - Output format: JSON")
-    elif toon:
-        console.print("  - Output format: TOON")
-    else:
-        console.print("  - Output format: Human-readable (default)")
+    try:
+        project_root = Path.cwd()
+        project_name = project_root.name
+        _ = load_config(project_root, project_name)
+        tracker = BeadsTracker(project_root, stealth=False)
+
+        # Convert status to proper type if provided
+        status_filter: TaskStatus | None = None
+        if status:
+            status_filter = status  # type: ignore
+
+        # List tasks with filters
+        tasks = tracker.list_tasks(status=status_filter, epic_id=epic)
+
+        if json_output:
+            # Output as JSON
+            json_output_data = [_format_task_json(task) for task in tasks]
+            console.print(json.dumps(json_output_data))
+        elif toon:
+            console.print("[yellow]TOON format not implemented yet[/yellow]")
+        else:
+            # Display as Rich table
+            _display_tasks_table(tasks)
+
+    except Exception as e:  # noqa: B904
+        console.print(f"[red]Error listing tasks: {str(e)}[/red]")
+        raise typer.Exit(code=1) from e
 
 
 @tasks_app.command("show")
