@@ -10,6 +10,7 @@ from rich.table import Table
 
 from jiro import __version__
 from jiro.cli.doctor import fix_missing_config, fix_missing_directories, run_doctor
+from jiro.cli.status import status
 from jiro.cli.tasks import app as tasks_app
 from jiro.core.logging import configure_logging
 
@@ -244,22 +245,8 @@ def execute(
         console.print(f"  - Limited to epic: {epic}")
 
 
-@app.command()
-def status(
-    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
-    toon: Annotated[bool, typer.Option("--toon", help="Output as TOON format")] = False,
-) -> None:
-    """
-    Show status of all active sessions for this project.
-
-    Displays running sessions, current task, progress, and context usage.
-
-    Examples:
-        jiro status
-        jiro status --json
-    """
-    console.print("[yellow]Not implemented yet[/yellow]")
-    console.print("\nThis command will display active session status")
+# Wire status command from status module
+app.command()(status)
 
 
 # Create config subcommand group
