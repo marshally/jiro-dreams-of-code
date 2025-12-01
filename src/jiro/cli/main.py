@@ -1,12 +1,15 @@
 """Main CLI entry point for jiro-dreams-of-code."""
 
 import logging
+from pathlib import Path
 from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.table import Table
 
 from jiro import __version__
+from jiro.cli.doctor import fix_missing_config, fix_missing_directories, run_doctor
 from jiro.core.logging import configure_logging
 
 app = typer.Typer(
@@ -111,18 +114,50 @@ def doctor(
         jiro doctor
         jiro doctor --fix
     """
-    console.print("[yellow]Not implemented yet[/yellow]")
-    console.print("\nThis command will check:")
-    console.print("  - Python version (3.12+)")
-    console.print("  - Claude Agent SDK installed")
-    console.print("  - Anthropic API key configured")
-    console.print("  - Git available")
-    console.print("  - Test and lint commands work")
-    console.print("  - Beads database accessible")
+    project_root = Path.cwd()
+
+    # Run all health checks
+    doctor_result = run_doctor(project_root)
+
+    # Display results in a table
+    table = Table(title="Health Check Results")
+    table.add_column("Check", style="cyan")
+    table.add_column("Status", style="magenta")
+    table.add_column("Details", style="yellow")
+
+    for check_name, check_result in doctor_result.checks.items():
+        status = "[green]PASS[/green]" if check_result.passed else "[red]FAIL[/red]"
+        details = "" if check_result.passed else check_result.error
+        table.add_row(check_name, status, details)
+
+    console.print(table)
+
+    # Apply fixes if requested
     if fix:
+        console.print("\n[cyan]Attempting to fix issues...[/cyan]")
+
+        # Fix missing directories
+        created_dirs = fix_missing_directories(project_root)
+        if created_dirs:
+            console.print(f"[green]Created {len(created_dirs)} directory/directories:[/green]")
+            for dir_path in created_dirs:
+                console.print(f"  - {dir_path}")
+
+        # Fix missing config
+        config_created = fix_missing_config(project_root, project_root.name)
+        if config_created:
+            config_path = project_root / ".jiro-dreams-of-code" / "config.yaml"
+            console.print(f"[green]Created config file:[/green] {config_path}")
+
+        if not created_dirs and not config_created:
+            console.print("[yellow]No fixable issues found[/yellow]")
+
+    # Exit with error code if checks failed
+    if not doctor_result.passed:
         console.print(
-            "\n[green]With --fix:[/green] Will attempt to create missing directories and fix issues"
+            "\n[red]Some checks failed. Run with --fix to attempt auto-remediation.[/red]"
         )
+        raise typer.Exit(code=1)
 
 
 @app.command()
