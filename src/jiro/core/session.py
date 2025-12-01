@@ -38,6 +38,21 @@ class PreflightResult:
     errors: list[str] = field(default_factory=list)
 
 
+@dataclass
+class PostflightResult:
+    """Result of running all postflight checks.
+
+    Attributes:
+        passed: Whether all checks passed.
+        checks: Dictionary mapping check names to CheckResult objects.
+        errors: List of error messages from failed checks.
+    """
+
+    passed: bool
+    checks: dict[str, CheckResult] = field(default_factory=dict)
+    errors: list[str] = field(default_factory=list)
+
+
 def check_git_clean() -> bool:
     """Check if the git working directory is clean.
 
@@ -302,6 +317,158 @@ def run_preflight(config: Config) -> PreflightResult:
     # Log results
     logger.info(
         "preflight_checks_completed",
+        passed=all_passed,
+        checks={name: check.passed for name, check in checks.items()},
+        errors=errors if errors else None,
+    )
+
+    return result
+
+
+def run_full_tests(config: Config) -> bool:
+    """Run the full test suite.
+
+    Args:
+        config: Configuration object containing test command.
+
+    Returns:
+        True if tests pass, False otherwise.
+    """
+    try:
+        test_command = config.commands.test
+        result = subprocess.run(
+            [test_command],
+            capture_output=True,
+            text=True,
+            check=False,
+            shell=True,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def run_full_lint(config: Config) -> bool:
+    """Run the full linting suite.
+
+    Args:
+        config: Configuration object containing lint command.
+
+    Returns:
+        True if linting passes, False otherwise.
+    """
+    try:
+        lint_command = config.commands.lint
+        result = subprocess.run(
+            [lint_command],
+            capture_output=True,
+            text=True,
+            check=False,
+            shell=True,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def push_to_origin() -> bool:
+    """Push the current branch to origin.
+
+    Returns:
+        True if push succeeds, False otherwise.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "push", "origin", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def run_postflight(config: Config) -> PostflightResult:
+    """Run all postflight checks.
+
+    Orchestrates all postflight checks and returns a comprehensive result
+    with details about each check.
+
+    Args:
+        config: Configuration object with check settings.
+
+    Returns:
+        PostflightResult containing results of all checks and overall status.
+    """
+    logger = structlog.get_logger()
+
+    checks: dict[str, CheckResult] = {}
+    errors: list[str] = []
+
+    # Run run_full_tests
+    try:
+        full_tests = run_full_tests(config)
+        checks["full_tests"] = CheckResult(
+            name="full_tests",
+            passed=full_tests,
+            error=None if full_tests else "Full test suite failed",
+        )
+        if not full_tests:
+            errors.append("full_tests: Full test suite failed")
+    except Exception as e:
+        checks["full_tests"] = CheckResult(
+            name="full_tests",
+            passed=False,
+            error=str(e),
+        )
+        errors.append(f"full_tests: {str(e)}")
+
+    # Run run_full_lint
+    try:
+        full_lint = run_full_lint(config)
+        checks["full_lint"] = CheckResult(
+            name="full_lint",
+            passed=full_lint,
+            error=None if full_lint else "Full lint failed",
+        )
+        if not full_lint:
+            errors.append("full_lint: Full lint failed")
+    except Exception as e:
+        checks["full_lint"] = CheckResult(
+            name="full_lint",
+            passed=False,
+            error=str(e),
+        )
+        errors.append(f"full_lint: {str(e)}")
+
+    # Run push_to_origin
+    try:
+        push_success = push_to_origin()
+        checks["push_to_origin"] = CheckResult(
+            name="push_to_origin",
+            passed=push_success,
+            error=None if push_success else "Push to origin failed",
+        )
+        if not push_success:
+            errors.append("push_to_origin: Push to origin failed")
+    except Exception as e:
+        checks["push_to_origin"] = CheckResult(
+            name="push_to_origin",
+            passed=False,
+            error=str(e),
+        )
+        errors.append(f"push_to_origin: {str(e)}")
+
+    # Determine overall result
+    all_passed = all(check.passed for check in checks.values())
+
+    # Create result
+    result = PostflightResult(passed=all_passed, checks=checks, errors=errors)
+
+    # Log results
+    logger.info(
+        "postflight_checks_completed",
         passed=all_passed,
         checks={name: check.passed for name, check in checks.items()},
         errors=errors if errors else None,
