@@ -626,3 +626,175 @@ class TestTasksShowCommand:
         result = cli_runner.invoke(app, ["tasks", "show", "test-3"])
         assert result.exit_code == 0
         assert "closed" in result.stdout.lower()
+
+
+class TestTasksNextCommand:
+    """Tests for tasks next command."""
+
+    @pytest.mark.unit
+    def test_tasks_next_help(self, cli_runner: CliRunner) -> None:
+        """Tasks next command should display help."""
+        result = cli_runner.invoke(app, ["tasks", "next", "--help"])
+        assert result.exit_code == 0
+        assert "Show" in result.stdout or "next" in result.stdout
+
+    @pytest.mark.unit
+    @mock.patch("jiro.cli.main.load_config")
+    @mock.patch("jiro.cli.main.BeadsTracker")
+    def test_tasks_next_finds_ready_task(
+        self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
+    ) -> None:
+        """Tasks next should find and display the next ready task."""
+        # Mock the config
+        mock_config_instance = mock.Mock()
+        mock_config.return_value = mock_config_instance
+
+        # Mock the BeadsTracker
+        mock_tracker = mock.Mock()
+        mock_tracker.get_next_ready_task.return_value = sample_task
+        mock_beads_class.return_value = mock_tracker
+
+        result = cli_runner.invoke(app, ["tasks", "next"])
+        assert result.exit_code == 0
+        assert "test-1" in result.stdout or "Test Task" in result.stdout
+        mock_tracker.get_next_ready_task.assert_called_once()
+        # Should be called with no epic filter
+        call_kwargs = mock_tracker.get_next_ready_task.call_args[1]
+        assert call_kwargs.get("epic_id") is None
+
+    @pytest.mark.unit
+    @mock.patch("jiro.cli.main.load_config")
+    @mock.patch("jiro.cli.main.BeadsTracker")
+    def test_tasks_next_with_epic_filter(
+        self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task_in_progress
+    ) -> None:
+        """Tasks next should filter by epic ID."""
+        # Mock the config
+        mock_config_instance = mock.Mock()
+        mock_config.return_value = mock_config_instance
+
+        # Mock the BeadsTracker
+        mock_tracker = mock.Mock()
+        mock_tracker.get_next_ready_task.return_value = sample_task_in_progress
+        mock_beads_class.return_value = mock_tracker
+
+        result = cli_runner.invoke(app, ["tasks", "next", "--epic", "epic-1"])
+        assert result.exit_code == 0
+        # Verify get_next_ready_task was called with epic_id filter
+        mock_tracker.get_next_ready_task.assert_called_once()
+        call_kwargs = mock_tracker.get_next_ready_task.call_args[1]
+        assert call_kwargs.get("epic_id") == "epic-1"
+
+    @pytest.mark.unit
+    @mock.patch("jiro.cli.main.load_config")
+    @mock.patch("jiro.cli.main.BeadsTracker")
+    def test_tasks_next_with_epic_short_flag(
+        self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task_in_progress
+    ) -> None:
+        """Tasks next should accept -e shorthand for epic."""
+        # Mock the config
+        mock_config_instance = mock.Mock()
+        mock_config.return_value = mock_config_instance
+
+        # Mock the BeadsTracker
+        mock_tracker = mock.Mock()
+        mock_tracker.get_next_ready_task.return_value = sample_task_in_progress
+        mock_beads_class.return_value = mock_tracker
+
+        result = cli_runner.invoke(app, ["tasks", "next", "-e", "epic-2"])
+        assert result.exit_code == 0
+        # Verify get_next_ready_task was called with epic_id filter
+        mock_tracker.get_next_ready_task.assert_called_once()
+        call_kwargs = mock_tracker.get_next_ready_task.call_args[1]
+        assert call_kwargs.get("epic_id") == "epic-2"
+
+    @pytest.mark.unit
+    @mock.patch("jiro.cli.main.load_config")
+    @mock.patch("jiro.cli.main.BeadsTracker")
+    def test_tasks_next_no_ready_task(
+        self, mock_beads_class, mock_config, cli_runner: CliRunner
+    ) -> None:
+        """Tasks next should handle gracefully when no task is ready."""
+        # Mock the config
+        mock_config_instance = mock.Mock()
+        mock_config.return_value = mock_config_instance
+
+        # Mock the BeadsTracker returning None
+        mock_tracker = mock.Mock()
+        mock_tracker.get_next_ready_task.return_value = None
+        mock_beads_class.return_value = mock_tracker
+
+        result = cli_runner.invoke(app, ["tasks", "next"])
+        assert result.exit_code == 0
+        # Should display a message that no tasks are ready
+        assert "no" in result.stdout.lower() or "ready" in result.stdout.lower()
+
+    @pytest.mark.unit
+    @mock.patch("jiro.cli.main.load_config")
+    @mock.patch("jiro.cli.main.BeadsTracker")
+    def test_tasks_next_json_output(
+        self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task
+    ) -> None:
+        """Tasks next should output JSON when --json flag is used."""
+        # Mock the config
+        mock_config_instance = mock.Mock()
+        mock_config.return_value = mock_config_instance
+
+        # Mock the BeadsTracker
+        mock_tracker = mock.Mock()
+        mock_tracker.get_next_ready_task.return_value = sample_task
+        mock_beads_class.return_value = mock_tracker
+
+        result = cli_runner.invoke(app, ["tasks", "next", "--json"])
+        assert result.exit_code == 0
+        # Should be valid JSON
+        output = json.loads(result.stdout)
+        assert isinstance(output, dict)
+        assert output["id"] == "test-1"
+        assert output["title"] == "Test Task"
+
+    @pytest.mark.unit
+    @mock.patch("jiro.cli.main.load_config")
+    @mock.patch("jiro.cli.main.BeadsTracker")
+    def test_tasks_next_json_output_with_no_task(
+        self, mock_beads_class, mock_config, cli_runner: CliRunner
+    ) -> None:
+        """Tasks next JSON should handle null when no task is ready."""
+        # Mock the config
+        mock_config_instance = mock.Mock()
+        mock_config.return_value = mock_config_instance
+
+        # Mock the BeadsTracker returning None
+        mock_tracker = mock.Mock()
+        mock_tracker.get_next_ready_task.return_value = None
+        mock_beads_class.return_value = mock_tracker
+
+        result = cli_runner.invoke(app, ["tasks", "next", "--json"])
+        assert result.exit_code == 0
+        # Should output null or empty object
+        output = json.loads(result.stdout)
+        assert output is None or output == {}
+
+    @pytest.mark.unit
+    @mock.patch("jiro.cli.main.load_config")
+    @mock.patch("jiro.cli.main.BeadsTracker")
+    def test_tasks_next_json_with_epic_filter(
+        self, mock_beads_class, mock_config, cli_runner: CliRunner, sample_task_in_progress
+    ) -> None:
+        """Tasks next should apply epic filter when outputting JSON."""
+        # Mock the config
+        mock_config_instance = mock.Mock()
+        mock_config.return_value = mock_config_instance
+
+        # Mock the BeadsTracker
+        mock_tracker = mock.Mock()
+        mock_tracker.get_next_ready_task.return_value = sample_task_in_progress
+        mock_beads_class.return_value = mock_tracker
+
+        result = cli_runner.invoke(app, ["tasks", "next", "--json", "--epic", "epic-1"])
+        assert result.exit_code == 0
+        output = json.loads(result.stdout)
+        assert output["id"] == "test-2"
+        mock_tracker.get_next_ready_task.assert_called_once()
+        call_kwargs = mock_tracker.get_next_ready_task.call_args[1]
+        assert call_kwargs.get("epic_id") == "epic-1"

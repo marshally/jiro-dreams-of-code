@@ -436,11 +436,38 @@ def tasks_next(
     Examples:
         jiro tasks next
         jiro tasks next --epic JIRO-42
+        jiro tasks next --json
     """
-    console.print("[yellow]Not implemented yet[/yellow]")
-    console.print("\nThis command will show the next ready task")
-    if epic:
-        console.print(f"  - Filtered by epic: {epic}")
+    try:
+        project_root = Path.cwd()
+        project_name = project_root.name
+        _ = load_config(project_root, project_name)
+        tracker = BeadsTracker(project_root, stealth=False)
+
+        # Get the next ready task, optionally filtered by epic
+        task = tracker.get_next_ready_task(epic_id=epic)
+
+        if task is None:
+            if json_output:
+                # Output null for no task (use plain print to avoid Rich wrapping)
+                print("null")
+            else:
+                console.print("[yellow]No ready tasks found[/yellow]")
+            return
+
+        if json_output:
+            # Output as JSON (use plain print to avoid Rich wrapping)
+            json_output_data = _format_task_json(task)
+            print(json.dumps(json_output_data))
+        elif toon:
+            console.print("[yellow]TOON format not implemented yet[/yellow]")
+        else:
+            # Display as Rich formatted output
+            _display_task_detail(task)
+
+    except Exception as e:  # noqa: B904
+        console.print(f"[red]Error getting next task: {str(e)}[/red]")
+        raise typer.Exit(code=1) from e
 
 
 @app.command()
