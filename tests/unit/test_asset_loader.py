@@ -45,6 +45,14 @@ class TestLoadPrompt:
         assert "review" in content.lower()
 
     @pytest.mark.unit
+    def test_load_prompt_dreaming_agent(self) -> None:
+        """load_prompt should load dreaming_agent.md content."""
+        from jiro.assets.loader import load_prompt
+
+        content = load_prompt("dreaming_agent.md")
+        assert "dream" in content.lower() or "spec" in content.lower()
+
+    @pytest.mark.unit
     def test_load_prompt_not_found(self) -> None:
         """load_prompt should raise FileNotFoundError for missing prompt."""
         from jiro.assets.loader import load_prompt
@@ -129,6 +137,7 @@ class TestListAssets:
         assert "planning_agent.md" in prompt_names
         assert "execution_agent.md" in prompt_names
         assert "review_agent.md" in prompt_names
+        assert "dreaming_agent.md" in prompt_names
 
     @pytest.mark.unit
     def test_list_assets_includes_templates(self) -> None:
