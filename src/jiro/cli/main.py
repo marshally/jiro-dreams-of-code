@@ -11,6 +11,7 @@ from rich.table import Table
 from jiro import __version__
 from jiro.cli.config import app as config_app
 from jiro.cli.doctor import fix_missing_config, fix_missing_directories, run_doctor
+from jiro.cli.mode import app as mode_app
 from jiro.cli.status import app as status_app
 from jiro.cli.tasks import app as tasks_app
 from jiro.core.logging import configure_logging
@@ -252,29 +253,8 @@ def execute(
         console.print(f"  - Limited to epic: {epic}")
 
 
-@app.command()
-def mode(
-    target_mode: Annotated[
-        str | None, typer.Argument(help="Mode to switch to: stealth or local")
-    ] = None,
-) -> None:
-    """
-    View or switch between stealth and local modes.
-
-    Stealth mode stores all data in ~/.jiro-dreams-of-code/$PROJECT_NAME/
-    Local mode stores data in .jiro-dreams-of-code/ in project root
-
-    Examples:
-        jiro mode              # Show current mode
-        jiro mode stealth      # Switch to stealth mode
-        jiro mode local        # Switch to local mode
-    """
-    console.print("[yellow]Not implemented yet[/yellow]")
-    if target_mode:
-        console.print(f"\nSwitching to {target_mode} mode")
-        console.print("This will migrate all data")
-    else:
-        console.print("\nCurrent mode: (not yet implemented)")
+# Wire mode subcommand from mode module
+app.add_typer(mode_app, name="mode")
 
 
 @app.command()
