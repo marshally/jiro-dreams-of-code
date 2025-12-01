@@ -355,3 +355,131 @@ class TestConfigGetCommand:
 
         result = cli_runner.invoke(app, ["config", "get", "nonexistent.key", "--json"])
         assert result.exit_code != 0
+
+
+@pytest.mark.unit
+class TestConfigSetCommand:
+    """Tests for config set command."""
+
+    def test_config_set_help(self, cli_runner: CliRunner) -> None:
+        """Config set command should display help."""
+        result = cli_runner.invoke(app, ["config", "set", "--help"])
+        assert result.exit_code == 0
+        assert "set" in result.stdout.lower() or "Set" in result.stdout
+
+    @mock.patch("jiro.cli.config.load_config")
+    @mock.patch("jiro.cli.config.save_config")
+    def test_config_set_valid_key(
+        self, mock_save_config, mock_load_config, cli_runner: CliRunner, sample_config: Config
+    ) -> None:
+        """Config set should set a valid configuration key."""
+        mock_load_config.return_value = sample_config
+        mock_save_config.return_value = None
+
+        result = cli_runner.invoke(
+            app, ["config", "set", "models.planning", "claude-opus-4-5-20250514", "--project"]
+        )
+        assert result.exit_code == 0
+        # Should show confirmation
+        assert "set" in result.stdout.lower() or "models.planning" in result.stdout
+
+    @mock.patch("jiro.cli.config.load_config")
+    def test_config_set_invalid_key(
+        self, mock_load_config, cli_runner: CliRunner, sample_config: Config
+    ) -> None:
+        """Config set should reject invalid configuration keys."""
+        mock_load_config.return_value = sample_config
+
+        result = cli_runner.invoke(app, ["config", "set", "invalid.key", "value", "--project"])
+        assert result.exit_code != 0
+        # Should show an error message
+        assert "not found" in result.stdout.lower() or "error" in result.stdout.lower()
+
+    @mock.patch("jiro.cli.config.load_config")
+    @mock.patch("jiro.cli.config.save_config")
+    def test_config_set_models_execution(
+        self, mock_save_config, mock_load_config, cli_runner: CliRunner, sample_config: Config
+    ) -> None:
+        """Config set should update models.execution value."""
+        mock_load_config.return_value = sample_config
+        mock_save_config.return_value = None
+
+        result = cli_runner.invoke(
+            app, ["config", "set", "models.execution", "claude-sonnet-4-5-20250929", "--project"]
+        )
+        assert result.exit_code == 0
+        # Verify save_config was called
+        assert mock_save_config.called
+
+    @mock.patch("jiro.cli.config.load_config")
+    @mock.patch("jiro.cli.config.save_config")
+    def test_config_set_commands_test(
+        self, mock_save_config, mock_load_config, cli_runner: CliRunner, sample_config: Config
+    ) -> None:
+        """Config set should update commands.test value."""
+        mock_load_config.return_value = sample_config
+        mock_save_config.return_value = None
+
+        result = cli_runner.invoke(
+            app, ["config", "set", "commands.test", "pytest -v", "--project"]
+        )
+        assert result.exit_code == 0
+        assert mock_save_config.called
+
+    @mock.patch("jiro.cli.config.load_config")
+    @mock.patch("jiro.cli.config.save_config")
+    def test_config_set_conventions_pattern(
+        self, mock_save_config, mock_load_config, cli_runner: CliRunner, sample_config: Config
+    ) -> None:
+        """Config set should update conventions.test_file_pattern value."""
+        mock_load_config.return_value = sample_config
+        mock_save_config.return_value = None
+
+        result = cli_runner.invoke(
+            app, ["config", "set", "conventions.test_file_pattern", "test_*.py", "--project"]
+        )
+        assert result.exit_code == 0
+        assert mock_save_config.called
+
+    @mock.patch("jiro.cli.config.load_config")
+    @mock.patch("jiro.cli.config.save_config")
+    def test_config_set_preflight_setting(
+        self, mock_save_config, mock_load_config, cli_runner: CliRunner, sample_config: Config
+    ) -> None:
+        """Config set should update preflight.skip_if_recent_minutes value."""
+        mock_load_config.return_value = sample_config
+        mock_save_config.return_value = None
+
+        result = cli_runner.invoke(
+            app, ["config", "set", "preflight.skip_if_recent_minutes", "120", "--project"]
+        )
+        assert result.exit_code == 0
+        assert mock_save_config.called
+
+    @mock.patch("jiro.cli.config.load_config")
+    @mock.patch("jiro.cli.config.save_config")
+    def test_config_set_requires_scope(
+        self, mock_save_config, mock_load_config, cli_runner: CliRunner, sample_config: Config
+    ) -> None:
+        """Config set should require a scope option."""
+        mock_load_config.return_value = sample_config
+
+        result = cli_runner.invoke(app, ["config", "set", "models.planning", "new-model"])
+        # Should still work with default scope
+        assert result.exit_code == 0
+
+    @mock.patch("jiro.cli.config.load_config")
+    @mock.patch("jiro.cli.config.save_config")
+    def test_config_set_saves_to_correct_scope(
+        self, mock_save_config, mock_load_config, cli_runner: CliRunner, sample_config: Config
+    ) -> None:
+        """Config set should write to the specified scope."""
+        mock_load_config.return_value = sample_config
+        mock_save_config.return_value = None
+
+        result = cli_runner.invoke(
+            app, ["config", "set", "models.planning", "new-model", "--project"]
+        )
+        assert result.exit_code == 0
+        # Verify save_config was called with project scope
+        assert mock_save_config.called

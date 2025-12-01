@@ -8,7 +8,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from jiro.config.loader import load_config
+from jiro.config.loader import load_config, save_config
 from jiro.config.schema import Config
 
 app = typer.Typer(
@@ -213,6 +213,58 @@ def config_get(
         console.print(f"[cyan]Source:[/cyan] {config_item['source']}")
 
 
+def _set_config_value(config: Config, key: str, value: str) -> None:
+    """Set a configuration value by dotted key notation.
+
+    Args:
+        config: The Config object to modify.
+        key: Dotted notation key (e.g., "models.planning").
+        value: The new value to set.
+
+    Raises:
+        ValueError: If the key is not valid.
+    """
+    parts = key.split(".")
+    if len(parts) != 2:
+        raise ValueError(f"Invalid key format: {key}. Use format 'section.key'")
+
+    section, field = parts
+
+    if section == "models":
+        if field == "planning":
+            config.models.planning = value
+        elif field == "execution":
+            config.models.execution = value
+        elif field == "review":
+            config.models.review = value
+        else:
+            raise ValueError(f"Unknown models field: {field}")
+    elif section == "commands":
+        if field == "test":
+            config.commands.test = value
+        elif field == "lint":
+            config.commands.lint = value
+        elif field == "lint_fix":
+            config.commands.lint_fix = value
+        else:
+            raise ValueError(f"Unknown commands field: {field}")
+    elif section == "conventions":
+        if field == "test_file_pattern":
+            config.conventions.test_file_pattern = value
+        else:
+            raise ValueError(f"Unknown conventions field: {field}")
+    elif section == "preflight":
+        if field == "skip_if_recent_minutes":
+            try:
+                config.preflight.skip_if_recent_minutes = int(value)
+            except ValueError as err:
+                raise ValueError(f"Invalid integer value for {key}: {value}") from err
+        else:
+            raise ValueError(f"Unknown preflight field: {field}")
+    else:
+        raise ValueError(f"Unknown configuration section: {section}")
+
+
 @app.command("set")
 def config_set(
     key: Annotated[str, typer.Argument(help="Configuration key")],
@@ -228,14 +280,20 @@ def config_set(
         jiro config set commands.test "pytest" --local
         jiro config set models.execution "claude-sonnet-4-5-20250929" --global
     """
-    console.print("[yellow]Not implemented yet[/yellow]")
-    console.print(f"\nKey: {key}")
-    console.print(f"Value: {value}")
-    if global_config:
-        console.print("Scope: global")
-    elif project:
-        console.print("Scope: project")
-    elif local:
-        console.print("Scope: local")
-    else:
-        console.print("Scope: (will determine automatically)")
+    # Get the current configuration
+    config = _get_config()
+
+    # Validate the key exists
+    try:
+        _set_config_value(config, key, value)
+    except ValueError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(code=1) from e
+
+    # Save the configuration
+    project_root = Path.cwd()
+    project_name = project_root.name
+    save_config(config, project_root, project_name)
+
+    # Show confirmation
+    console.print(f"[green]Successfully set {key} = {value}[/green]")
