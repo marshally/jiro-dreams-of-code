@@ -12,6 +12,7 @@ from jiro import __version__
 from jiro.cli.assets import app as assets_app
 from jiro.cli.config import app as config_app
 from jiro.cli.doctor import fix_missing_config, fix_missing_directories, run_doctor
+from jiro.cli.dream import app as dream_app
 from jiro.cli.init import app as init_app
 from jiro.cli.logs import app as logs_app
 from jiro.cli.mode import app as mode_app
@@ -132,31 +133,8 @@ def doctor(
         raise typer.Exit(code=1)
 
 
-@app.command()
-def dream(
-    prompt: Annotated[str, typer.Argument(help="Natural language description of what to build")],
-    model: Annotated[
-        str | None, typer.Option("--model", help="Override the model for this operation")
-    ] = None,
-) -> None:
-    """
-    Generate a specification from natural language.
-
-    Opens interactive chat refinement mode. Saves spec to
-    .jiro-dreams-of-code/specs/ (or stealth equivalent).
-
-    Examples:
-        jiro dream "build a user authentication system with OAuth"
-        jiro dream "add GraphQL API support" --model claude-opus-4
-    """
-    console.print("[yellow]Not implemented yet[/yellow]")
-    console.print(f"\nPrompt: {prompt}")
-    if model:
-        console.print(f"Model: {model}")
-    console.print("\nThis command will:")
-    console.print("  - Generate initial spec from prompt")
-    console.print("  - Enter interactive refinement chat")
-    console.print("  - Save final spec to specs/")
+# Wire dream subcommand from dream module
+app.add_typer(dream_app, name="dream")
 
 
 @app.command()
