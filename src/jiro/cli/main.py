@@ -9,6 +9,7 @@ from rich.console import Console
 from rich.table import Table
 
 from jiro import __version__
+from jiro.cli.assets import app as assets_app
 from jiro.cli.config import app as config_app
 from jiro.cli.doctor import fix_missing_config, fix_missing_directories, run_doctor
 from jiro.cli.logs import app as logs_app
@@ -286,69 +287,8 @@ def web(
         console.print("  - Running in foreground")
 
 
-# Create assets subcommand group
-assets_app = typer.Typer(
-    name="assets",
-    help="Manage customizable assets (prompts and templates)",
-    no_args_is_help=True,
-)
+# Wire assets subcommand from assets module
 app.add_typer(assets_app, name="assets")
-
-
-@assets_app.command("list")
-def assets_list() -> None:
-    """
-    List all assets and their source locations.
-
-    Shows which assets are loaded from package defaults vs. user overrides.
-
-    Examples:
-        jiro assets list
-    """
-    console.print("[yellow]Not implemented yet[/yellow]")
-    console.print("\nThis command will list all available assets and their sources")
-
-
-@assets_app.command("which")
-def assets_which(
-    asset_path: Annotated[
-        str, typer.Argument(help="Asset path (e.g., prompts/execution_agent.md)")
-    ],
-) -> None:
-    """
-    Show where a specific asset is loaded from.
-
-    Examples:
-        jiro assets which prompts/execution_agent.md
-        jiro assets which templates/commit/default.txt
-    """
-    console.print("[yellow]Not implemented yet[/yellow]")
-    console.print(f"\nAsset: {asset_path}")
-    console.print("\nThis command will show the source location for this asset")
-
-
-@assets_app.command("customize")
-def assets_customize(
-    asset_path: Annotated[str, typer.Argument(help="Asset path to customize")],
-    global_config: Annotated[bool, typer.Option("--global", help="Copy to global assets")] = False,
-    project: Annotated[bool, typer.Option("--project", help="Copy to project assets")] = False,
-    local: Annotated[bool, typer.Option("--local", help="Copy to local assets")] = True,
-) -> None:
-    """
-    Copy package default asset to specified location for customization.
-
-    Examples:
-        jiro assets customize prompts/execution_agent.md --local
-        jiro assets customize templates/commit/default.txt --global
-    """
-    console.print("[yellow]Not implemented yet[/yellow]")
-    console.print(f"\nAsset: {asset_path}")
-    if global_config:
-        console.print("Copying to: global assets")
-    elif project:
-        console.print("Copying to: project assets")
-    else:
-        console.print("Copying to: local assets")
 
 
 if __name__ == "__main__":
