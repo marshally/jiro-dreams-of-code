@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log Viewer - jiro-dreams-of-code</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #0d1117;
+            color: #c9d1d9;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            color: #58a6ff;
+            font-size: 2em;
+        }
+
+        nav {
+            margin-bottom: 20px;
+            padding: 10px 0;
+            border-bottom: 1px solid #30363d;
+        }
+
+        nav a {
+            color: #58a6ff;
+            text-decoration: none;
+            margin-right: 15px;
+            font-weight: 500;
+        }
+
+        nav a:hover {
+            text-decoration: underline;
+        }
+
+        .logs-viewer {
+            background-color: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            overflow: hidden;
+            max-height: 800px;
+            overflow-y: auto;
+        }
+
+        .log-header {
+            background-color: #161b22;
+            padding: 15px;
+            border-bottom: 1px solid #30363d;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .log-header h2 {
+            font-size: 1em;
+            color: #58a6ff;
+            margin: 0;
+        }
+
+        .refresh-status {
+            font-size: 0.85em;
+            color: #8b949e;
+        }
+
+        .log-entry {
+            padding: 12px 15px;
+            border-bottom: 1px solid #30363d;
+            display: grid;
+            grid-template-columns: 200px 80px 1fr;
+            gap: 15px;
+            transition: background-color 0.2s;
+        }
+
+        .log-entry:hover {
+            background-color: #161b22;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-timestamp {
+            color: #79c0ff;
+            font-size: 0.9em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .log-level {
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85em;
+            border-radius: 3px;
+            padding: 3px 6px;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .log-level.debug {
+            background-color: #30363d;
+            color: #8b949e;
+        }
+
+        .log-level.info {
+            background-color: #1f6feb;
+            color: #79c0ff;
+        }
+
+        .log-level.warning {
+            background-color: #9e6a03;
+            color: #f0883e;
+        }
+
+        .log-level.error {
+            background-color: #da3633;
+            color: #ff7b72;
+        }
+
+        .log-level.critical {
+            background-color: #8b2c2c;
+            color: #ff7b72;
+        }
+
+        .log-event {
+            color: #c9d1d9;
+            word-break: break-word;
+        }
+
+        .empty-state {
+            padding: 40px 20px;
+            text-align: center;
+            color: #8b949e;
+        }
+
+        .empty-state p {
+            font-style: italic;
+            margin: 10px 0;
+        }
+
+        .scroll-indicator {
+            position: absolute;
+            top: 0;
+            right: 0;
+            padding: 5px 10px;
+            font-size: 0.75em;
+            background-color: #161b22;
+            border-left: 1px solid #30363d;
+            border-bottom: 1px solid #30363d;
+        }
+
+        @media (max-width: 768px) {
+            .log-entry {
+                grid-template-columns: 1fr;
+            }
+
+            .log-timestamp::before {
+                content: "Time: ";
+                color: #8b949e;
+            }
+
+            .log-level::before {
+                content: "Level: ";
+                color: #8b949e;
+            }
+
+            .log-event::before {
+                content: "Event: ";
+                color: #8b949e;
+            }
+        }
+
+        .updating {
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav>
+            <a href="/">Home</a>
+            <a href="/tasks" hx-boost="true">Tasks</a>
+            <a href="/logs" hx-boost="true">Logs</a>
+        </nav>
+
+        <h1>Log Viewer</h1>
+
+        <div class="logs-viewer" id="logs-container" hx-trigger="every 5s" hx-get="/logs-content" hx-swap="innerHTML">
+            {% if has_logs %}
+                <div class="log-header">
+                    <h2>Recent Logs (Last 50 Entries)</h2>
+                    <span class="refresh-status">Auto-refreshing every 5s</span>
+                </div>
+                {% for entry in log_entries %}
+                    <div class="log-entry">
+                        <span class="log-timestamp">{{ entry.get('timestamp', '-') }}</span>
+                        <span class="log-level {{ entry.get('level', 'INFO').lower() }}">{{ entry.get('level', 'INFO') }}</span>
+                        <span class="log-event">{{ entry.get('event', '-') }}</span>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <p>No logs found</p>
+                    <p style="font-size: 0.85em; margin-top: 10px; color: #6e7681;">Logs will appear here as they are generated.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

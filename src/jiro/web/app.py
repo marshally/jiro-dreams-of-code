@@ -1,5 +1,6 @@
 """FastAPI web application for jiro-dreams-of-code."""
 
+import json
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -7,6 +8,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader
 
+from jiro.core.paths import get_logs_dir
 from jiro.db.database import get_database
 from jiro.db.repository import PromptRepository, SessionRepository, TaskExecutionRepository
 from jiro.trackers.beads import BeadsTracker
@@ -98,6 +100,43 @@ def get_tasks_grouped_by_epic(tasks: list[Task]) -> dict[str | None, list[Task]]
         grouped[epic_id].append(task)
 
     return grouped
+
+
+def _get_all_log_entries(logs_dir: Path) -> list[dict]:
+    """Read all log entries from JSONL files in chronological order.
+
+    Args:
+        logs_dir: Path to the logs directory.
+
+    Returns:
+        List of log entries sorted chronologically.
+    """
+    entries = []
+
+    # Get all JSONL files sorted by name (date)
+    if not logs_dir.exists():
+        return entries
+
+    log_files = sorted(logs_dir.glob("*.jsonl"))
+
+    for log_file in log_files:
+        try:
+            with open(log_file) as f:
+                for line in f:
+                    try:
+                        entry = json.loads(line)
+                        entries.append(entry)
+                    except json.JSONDecodeError:
+                        # Skip invalid JSON lines
+                        continue
+        except OSError:
+            # Skip files that can't be read
+            continue
+
+    # Sort by timestamp if available
+    entries.sort(key=lambda e: e.get("timestamp", ""), reverse=False)
+
+    return entries
 
 
 @app.get("/health", response_model=dict[str, str])
@@ -209,4 +248,39 @@ async def status_dashboard() -> str:
     return template.render(
         sessions=session_data,
         has_sessions=len(session_data) > 0,
+    )
+
+
+@app.get("/logs", response_class=HTMLResponse)
+async def logs_viewer() -> str:
+    """Render the logs viewer page.
+
+    Returns:
+        HTML content with recent log entries from JSONL files.
+    """
+    log_entries = []
+
+    try:
+        # Get logs directory
+        project_root = Path.cwd()
+        logs_dir = get_logs_dir(
+            project_root=project_root,
+            stealth=True,
+            project_name=project_root.name,
+        )
+
+        # Get all log entries
+        entries = _get_all_log_entries(logs_dir)
+
+        # Apply tail to get last 50 entries
+        log_entries = entries[-50:] if entries else []
+
+    except Exception:
+        # Fallback if logs not available
+        pass
+
+    template = template_env.get_template("logs.html")
+    return template.render(
+        log_entries=log_entries,
+        has_logs=len(log_entries) > 0,
     )
