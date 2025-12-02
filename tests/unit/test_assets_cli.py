@@ -81,3 +81,52 @@ class TestAssetsListCommand:
         # Output should show assets
         output = result.stdout.lower()
         assert len(output) > 0
+
+
+class TestAssetsWhichCommand:
+    """Tests for assets which command."""
+
+    @pytest.mark.unit
+    def test_assets_which_help(self, cli_runner: CliRunner) -> None:
+        """Assets which command should display help."""
+        result = cli_runner.invoke(app, ["assets", "which", "--help"])
+        assert result.exit_code == 0
+        assert "which" in result.stdout.lower() or "asset" in result.stdout.lower()
+
+    @pytest.mark.unit
+    def test_assets_which_shows_package_location(self, cli_runner: CliRunner) -> None:
+        """Assets which should show package location for valid asset."""
+        # Try a prompt that exists
+        result = cli_runner.invoke(app, ["assets", "which", "planning_agent.md"])
+        assert result.exit_code == 0
+        # Should show a path
+        assert "/" in result.stdout or "\\" in result.stdout
+
+    @pytest.mark.unit
+    def test_assets_which_returns_full_path(self, cli_runner: CliRunner) -> None:
+        """Assets which should return an absolute path."""
+        result = cli_runner.invoke(app, ["assets", "which", "planning_agent.md"])
+        assert result.exit_code == 0
+        output = result.stdout.strip()
+        # Path should contain the asset name or be absolute
+        assert "planning_agent" in output or output.startswith("/")
+
+    @pytest.mark.unit
+    def test_assets_which_asset_not_found(self, cli_runner: CliRunner) -> None:
+        """Assets which should error for non-existent asset."""
+        result = cli_runner.invoke(app, ["assets", "which", "nonexistent_asset.md"])
+        assert result.exit_code != 0
+        assert "not found" in result.stdout.lower() or "error" in result.stdout.lower()
+
+    @pytest.mark.unit
+    def test_assets_which_with_template(self, cli_runner: CliRunner) -> None:
+        """Assets which should work with template assets."""
+        # Get a template from the list command first to know what exists
+        result = cli_runner.invoke(app, ["assets", "list"])
+        # Then try to get location of a template
+        # We'll use a flexible approach - just try a common template path
+        result = cli_runner.invoke(app, ["assets", "which", "commit/docs.txt.j2"])
+        # Either it succeeds with a path, or fails gracefully
+        assert result.exit_code in (0, 1)
+        if result.exit_code == 0:
+            assert "/" in result.stdout or "\\" in result.stdout

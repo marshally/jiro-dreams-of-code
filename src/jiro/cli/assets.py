@@ -6,7 +6,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from jiro.assets.loader import list_assets
+from jiro.assets.loader import get_asset_path, list_assets
 
 app = typer.Typer(
     name="assets",
@@ -85,4 +85,33 @@ def list_all_assets() -> None:
 
     except Exception as e:  # noqa: B904
         console.print(f"[red]Error listing assets: {str(e)}[/red]")
+        raise typer.Exit(code=1) from e
+
+
+@app.command(name="which")
+def which_asset_location(name: str) -> None:
+    """
+    Show the package location for an asset.
+
+    Display the full path to where an asset will be loaded from.
+    For the steel thread, this shows the package location.
+
+    Args:
+        name: Name of the asset (e.g., "planning_agent.md" or "commit/docs.txt.j2")
+
+    Examples:
+        jiro assets which planning_agent.md
+        jiro assets which commit/docs.txt.j2
+    """
+    try:
+        # Get the path to the asset
+        asset_path = get_asset_path(name)
+        # Display the path
+        console.print(str(asset_path))
+
+    except FileNotFoundError as e:
+        console.print(f"[red]Error: {str(e)}[/red]")
+        raise typer.Exit(code=1) from e
+    except Exception as e:  # noqa: B904
+        console.print(f"[red]Error retrieving asset location: {str(e)}[/red]")
         raise typer.Exit(code=1) from e
