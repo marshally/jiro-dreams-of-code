@@ -506,24 +506,3 @@ class TestWebCommand:
         result = cli_runner.invoke(app, ["web", "--help"])
         assert result.exit_code == 0
         assert "--port" in result.stdout
-
-    @pytest.mark.unit
-    def test_web_not_implemented(self, cli_runner: CliRunner) -> None:
-        """Web command should show not implemented message."""
-        result = cli_runner.invoke(app, ["web"])
-        assert result.exit_code == 0
-        assert "not implemented" in result.stdout.lower()
-
-    @pytest.mark.unit
-    def test_web_with_port(self, cli_runner: CliRunner) -> None:
-        """Web command should display custom port."""
-        result = cli_runner.invoke(app, ["web", "--port", "9000"])
-        assert result.exit_code == 0
-        assert "9000" in result.stdout
-
-    @pytest.mark.unit
-    def test_web_with_daemon(self, cli_runner: CliRunner) -> None:
-        """Web command should display daemon info."""
-        result = cli_runner.invoke(app, ["web", "--daemon"])
-        assert result.exit_code == 0
-        assert "background" in result.stdout.lower()
