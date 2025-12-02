@@ -6,16 +6,24 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from jiro.agents.planning import ExecutionPlan, PlanningAgent, PlanStep
+from jiro.agents.review import ReviewAgent, ReviewResult
 from jiro.config.schema import CommandsConfig, Config
 from jiro.core.executor import (
     EnhancedTask,
+    PostflightResult,
     PreflightResult,
+    close_task_in_tracker,
     enhance_task_with_planning,
+    record_results,
+    review_commits,
     run_relevant_lint,
+    run_relevant_lint_post,
     run_relevant_tests,
+    run_relevant_tests_post,
+    run_task_postflight,
     run_task_preflight,
 )
-from jiro.trackers.interface import Task
+from jiro.trackers.interface import IssueTracker, Task
 
 
 class TestRunRelevantTests:
@@ -534,3 +542,411 @@ class TestPreflightResult:
         # Assert
         assert result.tests_passed is False
         assert len(result.errors) == 3
+
+
+class TestReviewCommits:
+    """Tests for review_commits function."""
+
+    @pytest.fixture
+    def sample_task(self):
+        """Create a sample task."""
+        return Task(
+            id="task-123",
+            title="Implement feature",
+            task_type="feature",
+            status="in_progress",
+            created_at=datetime.now(),
+            description="Feature description",
+        )
+
+    @pytest.fixture
+    def mock_review_agent(self):
+        """Create a mock ReviewAgent."""
+        agent = MagicMock(spec=ReviewAgent)
+        agent.review = AsyncMock()
+        return agent
+
+    @pytest.mark.asyncio
+    async def test_review_commits_success(self, sample_task, mock_review_agent):
+        """review_commits should return ReviewResult when review passes."""
+        # Arrange
+        commits = ["abc123", "def456"]
+        review_result = ReviewResult(
+            passed=True,
+            halt=False,
+            reason="All checks passed",
+            checks={"tests": "PASSED", "lint": "PASSED", "llm": "APPROVED"},
+        )
+        mock_review_agent.review.return_value = review_result
+
+        # Act
+        result = await review_commits(sample_task, commits, mock_review_agent)
+
+        # Assert
+        assert result.passed is True
+        assert result.halt is False
+        mock_review_agent.review.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_review_commits_failure(self, sample_task, mock_review_agent):
+        """review_commits should return failed ReviewResult when review fails."""
+        # Arrange
+        commits = ["abc123"]
+        review_result = ReviewResult(
+            passed=False,
+            halt=True,
+            reason="Tests failed",
+            checks={"tests": "FAILED"},
+        )
+        mock_review_agent.review.return_value = review_result
+
+        # Act
+        result = await review_commits(sample_task, commits, mock_review_agent)
+
+        # Assert
+        assert result.passed is False
+        assert result.halt is True
+
+    @pytest.mark.asyncio
+    async def test_review_commits_empty_commits(self, sample_task, mock_review_agent):
+        """review_commits should handle empty commits list gracefully."""
+        # Arrange
+        commits = []
+
+        # Act
+        # This should handle the empty case without crashing
+        result = await review_commits(sample_task, commits, mock_review_agent)
+
+        # Assert
+        # Either it should return early or call the agent for the last commit
+        assert result is not None
+
+
+class TestRunRelevantTestsPost:
+    """Tests for run_relevant_tests_post function."""
+
+    @pytest.fixture
+    def sample_task(self):
+        """Create a sample task."""
+        return Task(
+            id="task-123",
+            title="Test task",
+            task_type="feature",
+            status="in_progress",
+            created_at=datetime.now(),
+        )
+
+    @pytest.fixture
+    def config(self):
+        """Create a sample config."""
+        return Config(
+            commands=CommandsConfig(
+                test="pytest",
+                lint="ruff check",
+            )
+        )
+
+    @patch("jiro.core.executor.subprocess.run")
+    @patch("jiro.core.executor.find_relevant_test_files")
+    def test_run_relevant_tests_post_success(
+        self, mock_find_tests, mock_subprocess, sample_task, config
+    ):
+        """run_relevant_tests_post should return True when tests pass."""
+        # Arrange
+        mock_find_tests.return_value = ["tests/unit/test_file.py"]
+        mock_subprocess.return_value = MagicMock(returncode=0)
+
+        # Act
+        result = run_relevant_tests_post(sample_task, config)
+
+        # Assert
+        assert result is True
+
+    @patch("jiro.core.executor.subprocess.run")
+    @patch("jiro.core.executor.find_relevant_test_files")
+    def test_run_relevant_tests_post_failure(
+        self, mock_find_tests, mock_subprocess, sample_task, config
+    ):
+        """run_relevant_tests_post should return False when tests fail."""
+        # Arrange
+        mock_find_tests.return_value = ["tests/unit/test_file.py"]
+        mock_subprocess.return_value = MagicMock(returncode=1)
+
+        # Act
+        result = run_relevant_tests_post(sample_task, config)
+
+        # Assert
+        assert result is False
+
+
+class TestRunRelevantLintPost:
+    """Tests for run_relevant_lint_post function."""
+
+    @pytest.fixture
+    def sample_task(self):
+        """Create a sample task."""
+        return Task(
+            id="task-123",
+            title="Test task",
+            task_type="feature",
+            status="in_progress",
+            created_at=datetime.now(),
+        )
+
+    @pytest.fixture
+    def config(self):
+        """Create a sample config."""
+        return Config(
+            commands=CommandsConfig(
+                test="pytest",
+                lint="ruff check",
+            )
+        )
+
+    @patch("jiro.core.executor.subprocess.run")
+    @patch("jiro.core.executor.find_relevant_source_files")
+    def test_run_relevant_lint_post_success(
+        self, mock_find_files, mock_subprocess, sample_task, config
+    ):
+        """run_relevant_lint_post should return True when lint passes."""
+        # Arrange
+        mock_find_files.return_value = ["src/file.py"]
+        mock_subprocess.return_value = MagicMock(returncode=0)
+
+        # Act
+        result = run_relevant_lint_post(sample_task, config)
+
+        # Assert
+        assert result is True
+
+    @patch("jiro.core.executor.subprocess.run")
+    @patch("jiro.core.executor.find_relevant_source_files")
+    def test_run_relevant_lint_post_failure(
+        self, mock_find_files, mock_subprocess, sample_task, config
+    ):
+        """run_relevant_lint_post should return False when lint fails."""
+        # Arrange
+        mock_find_files.return_value = ["src/file.py"]
+        mock_subprocess.return_value = MagicMock(returncode=1)
+
+        # Act
+        result = run_relevant_lint_post(sample_task, config)
+
+        # Assert
+        assert result is False
+
+
+class TestRecordResults:
+    """Tests for record_results function."""
+
+    @pytest.fixture
+    def sample_task(self):
+        """Create a sample task."""
+        return Task(
+            id="task-123",
+            title="Test task",
+            task_type="feature",
+            status="in_progress",
+            created_at=datetime.now(),
+        )
+
+    @pytest.fixture
+    def sample_result(self):
+        """Create a sample postflight result."""
+        return PostflightResult(
+            review_passed=True,
+            tests_passed=True,
+            lint_passed=True,
+            task_closed=False,
+            results_recorded=False,
+        )
+
+    def test_record_results_success(self, sample_task, sample_result):
+        """record_results should record results without error."""
+        # Act - should not raise
+        record_results(sample_task, sample_result)
+
+        # Assert - just verify it doesn't crash
+
+
+class TestCloseTaskInTracker:
+    """Tests for close_task_in_tracker function."""
+
+    @pytest.fixture
+    def sample_task(self):
+        """Create a sample task."""
+        return Task(
+            id="task-123",
+            title="Test task",
+            task_type="feature",
+            status="in_progress",
+            created_at=datetime.now(),
+        )
+
+    @pytest.fixture
+    def mock_tracker(self):
+        """Create a mock tracker."""
+        tracker = MagicMock(spec=IssueTracker)
+        tracker.close_task = MagicMock()
+        return tracker
+
+    def test_close_task_in_tracker_success(self, sample_task, mock_tracker):
+        """close_task_in_tracker should call tracker.close_task."""
+        # Arrange
+        with patch("jiro.core.executor.get_tracker", return_value=mock_tracker):
+            # Act
+            close_task_in_tracker(sample_task)
+
+            # Assert
+            mock_tracker.close_task.assert_called_once_with(
+                sample_task.id, reason="Task completed successfully"
+            )
+
+
+class TestRunTaskPostflight:
+    """Tests for run_task_postflight orchestration function."""
+
+    @pytest.fixture
+    def sample_task(self):
+        """Create a sample task."""
+        return Task(
+            id="task-123",
+            title="Implement feature",
+            task_type="feature",
+            status="in_progress",
+            created_at=datetime.now(),
+        )
+
+    @pytest.fixture
+    def config(self):
+        """Create a sample config."""
+        return Config(
+            commands=CommandsConfig(
+                test="pytest",
+                lint="ruff check",
+            )
+        )
+
+    @pytest.fixture
+    def mock_review_agent(self):
+        """Create a mock ReviewAgent."""
+        agent = MagicMock(spec=ReviewAgent)
+        agent.review = AsyncMock()
+        return agent
+
+    @pytest.fixture
+    def mock_tracker(self):
+        """Create a mock tracker."""
+        tracker = MagicMock(spec=IssueTracker)
+        tracker.close_task = MagicMock()
+        return tracker
+
+    @pytest.mark.asyncio
+    async def test_run_task_postflight_success(
+        self, sample_task, config, mock_review_agent, mock_tracker
+    ):
+        """run_task_postflight should complete successfully when all checks pass."""
+        # Arrange
+        commits = ["abc123"]
+        review_result = ReviewResult(
+            passed=True,
+            halt=False,
+            reason="All checks passed",
+            checks={"tests": "PASSED", "lint": "PASSED", "llm": "APPROVED"},
+        )
+
+        with (
+            patch("jiro.core.executor.review_commits") as mock_review,
+            patch("jiro.core.executor.run_relevant_tests_post") as mock_tests,
+            patch("jiro.core.executor.run_relevant_lint_post") as mock_lint,
+            patch("jiro.core.executor.record_results"),
+            patch("jiro.core.executor.close_task_in_tracker"),
+            patch("jiro.core.executor.get_tracker", return_value=mock_tracker),
+        ):
+            # Make the async mock return the review result
+            mock_review.return_value = review_result
+            mock_tests.return_value = True
+            mock_lint.return_value = True
+
+            # Act
+            result = await run_task_postflight(
+                sample_task, commits, config, review_agent=mock_review_agent
+            )
+
+            # Assert
+            assert isinstance(result, PostflightResult)
+            assert result.review_passed is True
+            assert result.tests_passed is True
+            assert result.lint_passed is True
+
+    @pytest.mark.asyncio
+    async def test_run_task_postflight_review_fails(
+        self, sample_task, config, mock_review_agent, mock_tracker
+    ):
+        """run_task_postflight should fail gracefully when review fails."""
+        # Arrange
+        commits = ["abc123"]
+        review_result = ReviewResult(
+            passed=False,
+            halt=True,
+            reason="Tests failed",
+            checks={"tests": "FAILED"},
+        )
+
+        with (
+            patch("jiro.core.executor.review_commits") as mock_review,
+            patch("jiro.core.executor.run_relevant_tests_post") as mock_tests,
+            patch("jiro.core.executor.run_relevant_lint_post") as mock_lint,
+            patch("jiro.core.executor.get_tracker", return_value=mock_tracker),
+        ):
+            mock_review.return_value = review_result
+            mock_tests.return_value = False
+            mock_lint.return_value = True
+
+            # Act
+            result = await run_task_postflight(
+                sample_task, commits, config, review_agent=mock_review_agent
+            )
+
+            # Assert
+            assert isinstance(result, PostflightResult)
+            assert result.review_passed is False
+
+
+class TestPostflightResult:
+    """Tests for PostflightResult dataclass."""
+
+    def test_postflight_result_creation(self):
+        """PostflightResult should be created with all fields."""
+        # Act
+        result = PostflightResult(
+            review_passed=True,
+            tests_passed=True,
+            lint_passed=True,
+            task_closed=True,
+            results_recorded=True,
+        )
+
+        # Assert
+        assert result.review_passed is True
+        assert result.tests_passed is True
+        assert result.lint_passed is True
+        assert result.task_closed is True
+        assert result.results_recorded is True
+        assert result.error is None
+
+    def test_postflight_result_with_error(self):
+        """PostflightResult should handle errors."""
+        # Act
+        result = PostflightResult(
+            review_passed=False,
+            tests_passed=False,
+            lint_passed=False,
+            task_closed=False,
+            results_recorded=False,
+            error="Review failed",
+        )
+
+        # Assert
+        assert result.review_passed is False
+        assert result.error == "Review failed"
