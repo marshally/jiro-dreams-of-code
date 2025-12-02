@@ -415,3 +415,262 @@ class TestCreateDocsCommit:
 
             # Should not raise ValidationError
             assert result is not None
+
+    @pytest.mark.unit
+    def test_handles_files_without_extension(self, commit_repository: CommitRepository) -> None:
+        """Should reject files without extensions as non-documentation files."""
+        from jiro.core.commit import ValidationError, create_docs_commit
+
+        with patch("jiro.core.commit.subprocess.run") as mock_run:
+            # Mock git diff to return files without extensions
+            mock_run.return_value = MagicMock(
+                stdout="README\nLICENSE\n",
+                returncode=0,
+            )
+
+            with pytest.raises(ValidationError):
+                create_docs_commit(
+                    task_id="task-1",
+                    task_type="docs",
+                    reason="Add documentation",
+                    verification_command="test",
+                    verification_results="OK",
+                    time_taken_seconds=60,
+                    context_tokens_before=1000,
+                    context_tokens_after=1100,
+                    repository=commit_repository,
+                )
+
+    @pytest.mark.unit
+    def test_raises_error_when_getting_staged_files_fails(
+        self, commit_repository: CommitRepository
+    ) -> None:
+        """Should raise RuntimeError when git diff command fails."""
+        from jiro.core.commit import create_docs_commit
+
+        with patch("jiro.core.commit.subprocess.run") as mock_run:
+            # Mock git diff to fail
+            mock_run.return_value = MagicMock(
+                stdout="",
+                stderr="fatal: not a git repository",
+                returncode=1,
+            )
+
+            with pytest.raises(RuntimeError) as exc_info:
+                create_docs_commit(
+                    task_id="task-1",
+                    task_type="docs",
+                    reason="Add documentation",
+                    verification_command="test",
+                    verification_results="OK",
+                    time_taken_seconds=60,
+                    context_tokens_before=1000,
+                    context_tokens_after=1100,
+                    repository=commit_repository,
+                )
+
+            assert "Failed to get staged files" in str(exc_info.value)
+
+    @pytest.mark.unit
+    def test_raises_error_when_git_commit_fails(self, commit_repository: CommitRepository) -> None:
+        """Should raise RuntimeError when git commit command fails."""
+        from jiro.core.commit import create_docs_commit
+
+        with (
+            patch("jiro.core.commit.subprocess.run") as mock_run,
+            patch("jiro.core.commit.load_template") as mock_load_template,
+        ):
+            # Mock git operations
+            def run_side_effect(cmd, **kwargs):
+                if "--name-only" in cmd:
+                    return MagicMock(stdout="README.md\n", returncode=0)
+                elif "commit" in cmd:
+                    # Fail on commit
+                    return MagicMock(
+                        stdout="",
+                        stderr="nothing to commit",
+                        returncode=1,
+                    )
+                return MagicMock(stdout="", returncode=0)
+
+            mock_run.side_effect = run_side_effect
+
+            # Mock template
+            mock_template = MagicMock()
+            mock_template.render.return_value = "📝 docs(task-1): Add docs"
+            mock_load_template.return_value = mock_template
+
+            with pytest.raises(RuntimeError) as exc_info:
+                create_docs_commit(
+                    task_id="task-1",
+                    task_type="docs",
+                    reason="Add documentation",
+                    verification_command="test",
+                    verification_results="OK",
+                    time_taken_seconds=60,
+                    context_tokens_before=1000,
+                    context_tokens_after=1100,
+                    repository=commit_repository,
+                )
+
+            assert "Failed to create git commit" in str(exc_info.value)
+
+    @pytest.mark.unit
+    def test_raises_error_when_getting_commit_sha_fails(
+        self, commit_repository: CommitRepository
+    ) -> None:
+        """Should raise RuntimeError when rev-parse command fails."""
+        from jiro.core.commit import create_docs_commit
+
+        with (
+            patch("jiro.core.commit.subprocess.run") as mock_run,
+            patch("jiro.core.commit.load_template") as mock_load_template,
+        ):
+            # Mock git operations
+            def run_side_effect(cmd, **kwargs):
+                if "--name-only" in cmd:
+                    return MagicMock(stdout="README.md\n", returncode=0)
+                elif "commit" in cmd:
+                    return MagicMock(stdout="", returncode=0)
+                elif "rev-parse" in cmd:
+                    # Fail on rev-parse
+                    return MagicMock(
+                        stdout="",
+                        stderr="fatal: not a git repository",
+                        returncode=1,
+                    )
+                return MagicMock(stdout="", returncode=0)
+
+            mock_run.side_effect = run_side_effect
+
+            # Mock template
+            mock_template = MagicMock()
+            mock_template.render.return_value = "📝 docs(task-1): Add docs"
+            mock_load_template.return_value = mock_template
+
+            with pytest.raises(RuntimeError) as exc_info:
+                create_docs_commit(
+                    task_id="task-1",
+                    task_type="docs",
+                    reason="Add documentation",
+                    verification_command="test",
+                    verification_results="OK",
+                    time_taken_seconds=60,
+                    context_tokens_before=1000,
+                    context_tokens_after=1100,
+                    repository=commit_repository,
+                )
+
+            assert "Failed to get commit SHA" in str(exc_info.value)
+
+    @pytest.mark.unit
+    def test_empty_staged_files_is_allowed(self, commit_repository: CommitRepository) -> None:
+        """Should allow empty staged files list (edge case)."""
+        from jiro.core.commit import create_docs_commit
+
+        with (
+            patch("jiro.core.commit.subprocess.run") as mock_run,
+            patch("jiro.core.commit.load_template") as mock_load_template,
+        ):
+            # Mock git operations
+            def run_side_effect(cmd, **kwargs):
+                if "--name-only" in cmd:
+                    # Return empty list (no staged files)
+                    return MagicMock(stdout="", returncode=0)
+                elif "rev-parse" in cmd:
+                    return MagicMock(stdout="abc123\n", returncode=0)
+                return MagicMock(stdout="", returncode=0)
+
+            mock_run.side_effect = run_side_effect
+
+            # Mock template
+            mock_template = MagicMock()
+            mock_template.render.return_value = "📝 docs(task-1): Add docs"
+            mock_load_template.return_value = mock_template
+
+            result = create_docs_commit(
+                task_id="task-1",
+                task_type="docs",
+                reason="Add documentation",
+                verification_command="test",
+                verification_results="OK",
+                time_taken_seconds=60,
+                context_tokens_before=1000,
+                context_tokens_after=1100,
+                repository=commit_repository,
+            )
+
+            assert result is not None
+            assert result.commit_type == "docs"
+
+    @pytest.mark.unit
+    def test_case_insensitive_extension_handling(self, commit_repository: CommitRepository) -> None:
+        """Should handle file extensions case-insensitively."""
+        from jiro.core.commit import create_docs_commit
+
+        with (
+            patch("jiro.core.commit.subprocess.run") as mock_run,
+            patch("jiro.core.commit.load_template") as mock_load_template,
+        ):
+            # Mock git operations
+            def run_side_effect(cmd, **kwargs):
+                if "--name-only" in cmd:
+                    return MagicMock(
+                        stdout="README.MD\nDOCS/GUIDE.TXT\nfile.RST\n",
+                        returncode=0,
+                    )
+                elif "rev-parse" in cmd:
+                    return MagicMock(stdout="abc123\n", returncode=0)
+                return MagicMock(stdout="", returncode=0)
+
+            mock_run.side_effect = run_side_effect
+
+            # Mock template
+            mock_template = MagicMock()
+            mock_template.render.return_value = "📝 docs(task-1): Add docs"
+            mock_load_template.return_value = mock_template
+
+            result = create_docs_commit(
+                task_id="task-1",
+                task_type="docs",
+                reason="Add documentation",
+                verification_command="test",
+                verification_results="OK",
+                time_taken_seconds=60,
+                context_tokens_before=1000,
+                context_tokens_after=1100,
+                repository=commit_repository,
+            )
+
+            # Should not raise ValidationError
+            assert result is not None
+
+    @pytest.mark.unit
+    def test_rejects_mixed_valid_and_invalid_files(
+        self, commit_repository: CommitRepository
+    ) -> None:
+        """Should reject if any non-doc files are present alongside doc files."""
+        from jiro.core.commit import ValidationError, create_docs_commit
+
+        with patch("jiro.core.commit.subprocess.run") as mock_run:
+            # Mix of valid and invalid files
+            mock_run.return_value = MagicMock(
+                stdout="README.md\nsrc/main.py\nDOCS/guide.txt\n",
+                returncode=0,
+            )
+
+            with pytest.raises(ValidationError) as exc_info:
+                create_docs_commit(
+                    task_id="task-1",
+                    task_type="docs",
+                    reason="Add documentation",
+                    verification_command="test",
+                    verification_results="OK",
+                    time_taken_seconds=60,
+                    context_tokens_before=1000,
+                    context_tokens_after=1100,
+                    repository=commit_repository,
+                )
+
+            assert "non-documentation files" in str(exc_info.value)
+            assert "main.py" in str(exc_info.value)
