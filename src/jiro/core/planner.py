@@ -1,8 +1,11 @@
-"""Spec parser for feature specifications."""
+"""Spec parser and planner for feature specifications."""
 
+import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+
+from jiro.agents.client import AgentClient
 
 
 @dataclass
@@ -15,6 +18,214 @@ class Spec:
     acceptance_criteria: list[str]
     out_of_scope: list[str]
     technical_notes: str | None = None
+
+
+@dataclass
+class Epic:
+    """An epic representing a parallel workstream."""
+
+    id: str
+    name: str
+    description: str
+    tasks: list[str] = field(default_factory=list)
+
+
+@dataclass
+class Task:
+    """A task within an epic."""
+
+    id: str
+    title: str
+    description: str
+    epic_id: str
+    dependencies: list[str] = field(default_factory=list)
+
+
+@dataclass
+class PlanResult:
+    """Result of planning a spec into epics and tasks."""
+
+    epics: list[Epic] = field(default_factory=list)
+    tasks: list[Task] = field(default_factory=list)
+    dependencies: list[dict] = field(default_factory=list)
+
+
+class SpecPlanner:
+    """Plans a spec into epics, tasks, and dependencies using LLM decomposition."""
+
+    def __init__(self, client: AgentClient) -> None:
+        """Initialize SpecPlanner.
+
+        Args:
+            client: AgentClient for LLM-based decomposition.
+
+        Raises:
+            TypeError: If client is None.
+        """
+        if client is None:
+            raise TypeError("client cannot be None")
+        self.client = client
+
+    async def plan(self, spec: Spec) -> PlanResult:
+        """Plan a spec into epics and tasks.
+
+        Args:
+            spec: The specification to plan.
+
+        Returns:
+            PlanResult containing generated epics, tasks, and dependencies.
+        """
+        # Create the planning prompt
+        prompt = self._create_planning_prompt(spec)
+
+        # Execute the agent to get decomposition
+        result = await self.client.execute(prompt)
+
+        # Parse the response
+        return self._parse_plan_result(result.output, spec)
+
+    def _create_planning_prompt(self, spec: Spec) -> str:
+        """Create the prompt for spec planning.
+
+        Args:
+            spec: The specification to plan.
+
+        Returns:
+            A prompt string for the LLM.
+        """
+        requirements_str = "\n".join(f"  - {r}" for r in spec.requirements)
+        criteria_str = "\n".join(f"  - {c}" for c in spec.acceptance_criteria)
+        out_of_scope_str = "\n".join(f"  - {o}" for o in spec.out_of_scope)
+
+        prompt = f"""You are a task decomposition expert. Break down the following feature specification into parallel epics and detailed tasks.
+
+Feature: {spec.title}
+
+Overview:
+{spec.overview}
+
+Requirements:
+{requirements_str}
+
+Acceptance Criteria:
+{criteria_str}
+
+Out of Scope:
+{out_of_scope_str}
+
+{f"Technical Notes:{chr(10)}{spec.technical_notes}" if spec.technical_notes else ""}
+
+Generate a JSON response with this exact structure:
+{{
+  "epics": [
+    {{
+      "id": "epic-1",
+      "name": "Epic Name",
+      "description": "Epic description",
+      "tasks": ["task-1", "task-2"]
+    }}
+  ],
+  "tasks": [
+    {{
+      "id": "task-1",
+      "title": "Task Title",
+      "description": "Task description",
+      "epic_id": "epic-1",
+      "dependencies": ["task-0"]
+    }}
+  ],
+  "dependencies": [
+    {{"from": "task-1", "to": "task-0"}}
+  ]
+}}
+
+Requirements:
+1. Create 2-4 parallel epics representing different workstreams
+2. Each epic should have 2-4 tasks
+3. Analyze task dependencies intelligently
+4. Tasks in the same epic can often run in parallel
+5. Cross-epic dependencies should be minimized
+6. Return ONLY valid JSON, no markdown or extra text"""
+        return prompt
+
+    def _parse_plan_result(self, response: str, spec: Spec) -> PlanResult:
+        """Parse the LLM response into a PlanResult.
+
+        Args:
+            response: The raw response from the LLM.
+            spec: The original spec (for context).
+
+        Returns:
+            A PlanResult object.
+        """
+        # Handle empty response
+        if not response or not response.strip():
+            return PlanResult()
+
+        try:
+            # Extract JSON from response (in case there's extra text)
+            json_str = self._extract_json(response)
+            data = json.loads(json_str)
+
+            # Parse epics
+            epics = []
+            if "epics" in data:
+                for epic_data in data["epics"]:
+                    epic = Epic(
+                        id=epic_data.get("id", f"epic-{len(epics)}"),
+                        name=epic_data.get("name", ""),
+                        description=epic_data.get("description", ""),
+                        tasks=epic_data.get("tasks", []),
+                    )
+                    epics.append(epic)
+
+            # Parse tasks
+            tasks = []
+            if "tasks" in data:
+                for task_data in data["tasks"]:
+                    task = Task(
+                        id=task_data.get("id", f"task-{len(tasks)}"),
+                        title=task_data.get("title", ""),
+                        description=task_data.get("description", ""),
+                        epic_id=task_data.get("epic_id", ""),
+                        dependencies=task_data.get("dependencies", []),
+                    )
+                    tasks.append(task)
+
+            # Parse dependencies
+            dependencies = data.get("dependencies", [])
+
+            return PlanResult(epics=epics, tasks=tasks, dependencies=dependencies)
+
+        except json.JSONDecodeError:
+            # Return empty result if JSON parsing fails
+            return PlanResult()
+
+    def _extract_json(self, text: str) -> str:
+        """Extract JSON from text that may contain markdown or extra text.
+
+        Args:
+            text: The text to extract JSON from.
+
+        Returns:
+            The extracted JSON string.
+        """
+        # Try to find JSON block
+        start_idx = text.find("{")
+        if start_idx == -1:
+            return "{}"
+
+        # Find matching closing brace
+        brace_count = 0
+        for i in range(start_idx, len(text)):
+            if text[i] == "{":
+                brace_count += 1
+            elif text[i] == "}":
+                brace_count -= 1
+                if brace_count == 0:
+                    return text[start_idx : i + 1]
+
+        return text[start_idx:]
 
 
 def parse_spec(path: Path) -> Spec:
