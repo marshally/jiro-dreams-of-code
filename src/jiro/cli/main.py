@@ -12,6 +12,7 @@ from jiro import __version__
 from jiro.cli.assets import app as assets_app
 from jiro.cli.config import app as config_app
 from jiro.cli.doctor import fix_missing_config, fix_missing_directories, run_doctor
+from jiro.cli.init import app as init_app
 from jiro.cli.logs import app as logs_app
 from jiro.cli.mode import app as mode_app
 from jiro.cli.status import app as status_app
@@ -67,42 +68,6 @@ def main(
 
     # Initialize logging
     configure_logging(verbosity=log_level)
-
-
-@app.command()
-def init(
-    stealth: Annotated[
-        bool,
-        typer.Option(
-            "--stealth",
-            help="Store all files in ~/.jiro-dreams-of-code/$PROJECT_NAME/ instead of project root",
-        ),
-    ] = False,
-    interactive: Annotated[
-        bool,
-        typer.Option("--interactive", help="Prompt for test command, lint command, etc."),
-    ] = False,
-) -> None:
-    """
-    Initialize jiro in the current project.
-
-    Creates project configuration and beads database.
-    Must be run inside a git repository.
-
-    Examples:
-        jiro init
-        jiro init --stealth
-        jiro init --interactive
-    """
-    from jiro.cli.init import InitError, run_init
-
-    project_root = Path.cwd()
-
-    try:
-        run_init(project_root, stealth=stealth, interactive=interactive)
-    except InitError as e:
-        console.print(f"[red]Error: {e}[/red]")
-        raise typer.Exit(code=1) from e
 
 
 @app.command()
@@ -228,6 +193,9 @@ app.add_typer(status_app, name="status")
 
 # Wire config subcommand from config module
 app.add_typer(config_app, name="config")
+
+# Wire init subcommand from init module
+app.add_typer(init_app, name="init")
 
 
 @app.command()

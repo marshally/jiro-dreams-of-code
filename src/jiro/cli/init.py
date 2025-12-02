@@ -2,6 +2,7 @@
 
 import subprocess
 from pathlib import Path
+from typing import Annotated
 
 import typer
 import yaml
@@ -9,6 +10,12 @@ from rich.console import Console
 
 from jiro.config.schema import Config
 from jiro.core.paths import get_config_path, get_jiro_dir, get_logs_dir, get_specs_dir
+
+app = typer.Typer(
+    name="init",
+    help="Initialize jiro in a project",
+    no_args_is_help=False,
+)
 
 console = Console()
 
@@ -295,3 +302,42 @@ def run_init(
 
     console.print("\n[green]Initialization complete![/green]")
     return True
+
+
+@app.callback(invoke_without_command=True)
+def init_callback(
+    ctx: typer.Context,
+    stealth: Annotated[
+        bool,
+        typer.Option(
+            "--stealth",
+            help="Store all files in ~/.jiro-dreams-of-code/$PROJECT_NAME/ instead of project root",
+        ),
+    ] = False,
+    interactive: Annotated[
+        bool,
+        typer.Option("--interactive", help="Prompt for test command, lint command, etc."),
+    ] = False,
+) -> None:
+    """
+    Initialize jiro in the current project.
+
+    Creates project configuration and beads database.
+    Must be run inside a git repository.
+
+    Examples:
+        jiro init
+        jiro init --stealth
+        jiro init --interactive
+    """
+    # Only run if no subcommand was invoked
+    if ctx.invoked_subcommand is not None:
+        return
+
+    project_root = Path.cwd()
+
+    try:
+        run_init(project_root, stealth=stealth, interactive=interactive)
+    except InitError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(code=1) from e
