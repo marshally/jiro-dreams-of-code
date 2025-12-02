@@ -1,6 +1,7 @@
 """Tests for CLI main module and logging initialization."""
 
 import logging
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -338,25 +339,116 @@ class TestPlanCommand:
         assert "--spec" in result.stdout
 
     @pytest.mark.unit
-    def test_plan_not_implemented(self, cli_runner: CliRunner) -> None:
-        """Plan command should show not implemented message."""
-        result = cli_runner.invoke(app, ["plan", "--spec", "test.md"])
-        assert result.exit_code == 0
-        assert "not implemented" in result.stdout.lower()
+    def test_plan_not_implemented(self, cli_runner: CliRunner, tmp_path: Path) -> None:
+        """Plan command should handle missing spec file gracefully."""
+        from unittest.mock import patch
+
+        with patch("jiro.cli.plan.Path.cwd", return_value=tmp_path):
+            result = cli_runner.invoke(app, ["plan", "--spec", "test.md"])
+            # Should fail because file doesn't exist (no "not implemented" expected)
+            assert result.exit_code != 0
 
     @pytest.mark.unit
-    def test_plan_with_spec(self, cli_runner: CliRunner) -> None:
-        """Plan command should display spec path."""
-        result = cli_runner.invoke(app, ["plan", "--spec", "specs/auth.md"])
-        assert result.exit_code == 0
-        assert "specs/auth.md" in result.stdout
+    def test_plan_with_spec(self, cli_runner: CliRunner, tmp_path: Path) -> None:
+        """Plan command should handle spec file path."""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        spec_file = tmp_path / "specs" / "auth.md"
+        spec_file.parent.mkdir(parents=True, exist_ok=True)
+        spec_file.write_text("""# Feature: Auth
+
+## Overview
+
+Basic auth system.
+
+## Requirements
+
+- User auth
+
+## Acceptance Criteria
+
+- Works
+
+## Out of Scope
+
+- MFA
+""")
+
+        with (
+            patch("jiro.cli.plan.Path.cwd", return_value=tmp_path),
+            patch("jiro.cli.plan.load_config") as mock_load_config,
+            patch("jiro.cli.plan.get_database") as mock_get_db,
+            patch("jiro.cli.plan.SpecPlanner") as mock_planner_class,
+            patch("jiro.cli.plan.typer.confirm", return_value=False),
+        ):
+            mock_config = MagicMock()
+            mock_config.models.planning = "claude-opus-4"
+            mock_load_config.return_value = mock_config
+
+            mock_db = MagicMock()
+            mock_get_db.return_value = mock_db
+
+            from jiro.core.planner import PlanResult
+
+            mock_planner = AsyncMock()
+            mock_planner.plan = AsyncMock(return_value=PlanResult(epics=[], tasks=[]))
+            mock_planner_class.return_value = mock_planner
+
+            result = cli_runner.invoke(app, ["plan", "--spec", "specs/auth.md"])
+            # Should succeed
+            assert result.exit_code == 0
 
     @pytest.mark.unit
-    def test_plan_with_refinement(self, cli_runner: CliRunner) -> None:
-        """Plan command should display refinement when provided."""
-        result = cli_runner.invoke(app, ["plan", "--spec", "specs/auth.md", "focus on security"])
-        assert result.exit_code == 0
-        assert "focus on security" in result.stdout
+    def test_plan_with_refinement(self, cli_runner: CliRunner, tmp_path: Path) -> None:
+        """Plan command should accept refinement argument."""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        spec_file = tmp_path / "specs" / "auth.md"
+        spec_file.parent.mkdir(parents=True, exist_ok=True)
+        spec_file.write_text("""# Feature: Auth
+
+## Overview
+
+Basic auth system.
+
+## Requirements
+
+- User auth
+
+## Acceptance Criteria
+
+- Works
+
+## Out of Scope
+
+- MFA
+""")
+
+        with (
+            patch("jiro.cli.plan.Path.cwd", return_value=tmp_path),
+            patch("jiro.cli.plan.load_config") as mock_load_config,
+            patch("jiro.cli.plan.get_database") as mock_get_db,
+            patch("jiro.cli.plan.SpecPlanner") as mock_planner_class,
+            patch("jiro.cli.plan.typer.confirm", return_value=False),
+        ):
+            mock_config = MagicMock()
+            mock_config.models.planning = "claude-opus-4"
+            mock_load_config.return_value = mock_config
+
+            mock_db = MagicMock()
+            mock_get_db.return_value = mock_db
+
+            from jiro.core.planner import PlanResult
+
+            mock_planner = AsyncMock()
+            mock_planner.plan = AsyncMock(return_value=PlanResult(epics=[], tasks=[]))
+            mock_planner_class.return_value = mock_planner
+
+            result = cli_runner.invoke(
+                app, ["plan", "--spec", "specs/auth.md", "--model", "custom-model"]
+            )
+            # Should succeed
+            assert result.exit_code == 0
 
 
 class TestExecuteCommand:

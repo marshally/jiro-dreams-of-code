@@ -16,6 +16,7 @@ from jiro.cli.dream import app as dream_app
 from jiro.cli.init import app as init_app
 from jiro.cli.logs import app as logs_app
 from jiro.cli.mode import app as mode_app
+from jiro.cli.plan import app as plan_app
 from jiro.cli.status import app as status_app
 from jiro.cli.tasks import app as tasks_app
 from jiro.core.logging import configure_logging
@@ -136,32 +137,8 @@ def doctor(
 # Wire dream subcommand from dream module
 app.add_typer(dream_app, name="dream")
 
-
-@app.command()
-def plan(
-    spec: Annotated[str, typer.Option("--spec", help="Path to specification file")],
-    refinement: Annotated[str | None, typer.Argument(help="Optional refinement prompt")] = None,
-) -> None:
-    """
-    Parse spec and generate epics + tasks.
-
-    Analyzes dependencies between tasks and prompts for confirmation
-    before creating tasks in the issue tracker.
-
-    Examples:
-        jiro plan --spec specs/auth-system.md
-        jiro plan --spec specs/auth-system.md "focus on security"
-    """
-    console.print("[yellow]Not implemented yet[/yellow]")
-    console.print(f"\nSpec: {spec}")
-    if refinement:
-        console.print(f"Refinement: {refinement}")
-    console.print("\nThis command will:")
-    console.print("  - Parse specification")
-    console.print("  - Generate epics and tasks")
-    console.print("  - Analyze dependencies")
-    console.print("  - Prompt: Proceed? [yes/chat/edit/quit]")
-
+# Wire plan subcommand from plan module
+app.add_typer(plan_app, name="plan")
 
 # Wire tasks subcommand from tasks module
 app.add_typer(tasks_app, name="tasks")
