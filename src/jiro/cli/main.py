@@ -19,6 +19,7 @@ from jiro.cli.mode import app as mode_app
 from jiro.cli.plan import app as plan_app
 from jiro.cli.status import app as status_app
 from jiro.cli.tasks import app as tasks_app
+from jiro.cli.web import app as web_app
 from jiro.core.logging import configure_logging
 
 app = typer.Typer(
@@ -186,30 +187,8 @@ app.add_typer(mode_app, name="mode")
 # Wire logs subcommand from logs module
 app.add_typer(logs_app, name="logs")
 
-
-@app.command()
-def web(
-    daemon: Annotated[bool, typer.Option("--daemon", help="Run web UI in background")] = False,
-    port: Annotated[int, typer.Option("--port", help="Port to run on")] = 8888,
-) -> None:
-    """
-    Start web UI.
-
-    Launches FastAPI server with HTMX frontend for spec refinement,
-    task monitoring, and execution status.
-
-    Examples:
-        jiro web              # Run in foreground
-        jiro web --daemon     # Run in background
-        jiro web --port 9000  # Use custom port
-    """
-    console.print("[yellow]Not implemented yet[/yellow]")
-    console.print(f"\nWeb UI would start on http://localhost:{port}")
-    if daemon:
-        console.print("  - Running in background")
-    else:
-        console.print("  - Running in foreground")
-
+# Wire web subcommand from web module
+app.add_typer(web_app, name="web")
 
 # Wire assets subcommand from assets module
 app.add_typer(assets_app, name="assets")
