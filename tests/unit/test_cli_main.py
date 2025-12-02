@@ -2,7 +2,6 @@
 
 import logging
 from pathlib import Path
-from unittest import mock
 from unittest.mock import patch
 
 import pytest
@@ -470,59 +469,15 @@ class TestExecuteCommand:
         assert "--epic" in result.stdout
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.execute.SessionOrchestrator")
-    @mock.patch("jiro.cli.execute.load_config")
-    @mock.patch("jiro.cli.execute.get_database")
-    @mock.patch("jiro.cli.execute.get_database_path")
-    def test_execute_not_implemented(
-        self, mock_get_db_path, mock_get_db, mock_load_config, mock_orchestrator_class, cli_runner
-    ):
-        """Execute command should show starting session message."""
-        from pathlib import Path
-
-        from jiro.core.session import SessionResult
-
-        mock_orchestrator = mock.MagicMock()
-        mock_orchestrator.run.return_value = SessionResult(
-            session_id="test-123",
-            status="completed",
-            tasks_completed=0,
-            tasks_failed=0,
-        )
-        mock_orchestrator_class.return_value = mock_orchestrator
-        mock_get_db_path.return_value = Path("/tmp/test.db")
-        mock_get_db.return_value = mock.MagicMock()
-        mock_load_config.return_value = mock.MagicMock()
-
+    def test_execute_not_implemented(self, cli_runner: CliRunner) -> None:
+        """Execute command should show not implemented message."""
         result = cli_runner.invoke(app, ["execute"])
         assert result.exit_code == 0
-        assert "starting execution session" in result.stdout.lower()
+        assert "not implemented" in result.stdout.lower()
 
     @pytest.mark.unit
-    @mock.patch("jiro.cli.execute.SessionOrchestrator")
-    @mock.patch("jiro.cli.execute.load_config")
-    @mock.patch("jiro.cli.execute.get_database")
-    @mock.patch("jiro.cli.execute.get_database_path")
-    def test_execute_with_epic(
-        self, mock_get_db_path, mock_get_db, mock_load_config, mock_orchestrator_class, cli_runner
-    ):
+    def test_execute_with_epic(self, cli_runner: CliRunner) -> None:
         """Execute command should display epic when provided."""
-        from pathlib import Path
-
-        from jiro.core.session import SessionResult
-
-        mock_orchestrator = mock.MagicMock()
-        mock_orchestrator.run.return_value = SessionResult(
-            session_id="test-123",
-            status="completed",
-            tasks_completed=0,
-            tasks_failed=0,
-        )
-        mock_orchestrator_class.return_value = mock_orchestrator
-        mock_get_db_path.return_value = Path("/tmp/test.db")
-        mock_get_db.return_value = mock.MagicMock()
-        mock_load_config.return_value = mock.MagicMock()
-
         result = cli_runner.invoke(app, ["execute", "--epic", "JIRO-42"])
         assert result.exit_code == 0
         assert "JIRO-42" in result.stdout

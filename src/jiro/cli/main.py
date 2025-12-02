@@ -13,7 +13,6 @@ from jiro.cli.assets import app as assets_app
 from jiro.cli.config import app as config_app
 from jiro.cli.doctor import fix_missing_config, fix_missing_directories, run_doctor
 from jiro.cli.dream import app as dream_app
-from jiro.cli.execute import app as execute_app
 from jiro.cli.init import app as init_app
 from jiro.cli.logs import app as logs_app
 from jiro.cli.mode import app as mode_app
@@ -154,8 +153,32 @@ app.add_typer(config_app, name="config")
 # Wire init subcommand from init module
 app.add_typer(init_app, name="init")
 
-# Wire execute subcommand from execute module
-app.add_typer(execute_app, name="execute")
+
+@app.command()
+def execute(
+    epic: Annotated[
+        str | None, typer.Option("--epic", help="Limit execution to a specific epic")
+    ] = None,
+) -> None:
+    """
+    Execute tasks with preflight and postflight checks.
+
+    Runs session preflight, iteratively executes tasks, and runs
+    session postflight. Agents work with strict TDD discipline.
+
+    Examples:
+        jiro execute
+        jiro execute --epic JIRO-42
+    """
+    console.print("[yellow]Not implemented yet[/yellow]")
+    console.print("\nThis command will:")
+    console.print("  - Run session preflight checks")
+    console.print("  - Execute tasks iteratively")
+    console.print("  - Validate commits")
+    console.print("  - Run session postflight checks")
+    if epic:
+        console.print(f"  - Limited to epic: {epic}")
+
 
 # Wire mode subcommand from mode module
 app.add_typer(mode_app, name="mode")
