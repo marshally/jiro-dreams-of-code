@@ -3,6 +3,7 @@
 import subprocess
 from pathlib import Path
 
+import typer
 import yaml
 from rich.console import Console
 
@@ -101,10 +102,60 @@ def create_directory_structure(
     return jiro_dir
 
 
+def prompt_for_test_command(default: str = "pytest") -> str:
+    """Prompt user for test command.
+
+    Args:
+        default: The default test command.
+
+    Returns:
+        The test command provided by the user.
+    """
+    return typer.prompt("Test command", default=default)
+
+
+def prompt_for_lint_command(default: str = "ruff check") -> str:
+    """Prompt user for lint command.
+
+    Args:
+        default: The default lint command.
+
+    Returns:
+        The lint command provided by the user.
+    """
+    return typer.prompt("Lint command", default=default)
+
+
+def validate_command(command: str) -> bool:
+    """Validate that a command can be executed.
+
+    Args:
+        command: The command to validate.
+
+    Returns:
+        True if the command can be executed.
+    """
+    try:
+        # Try to run the command with --help or --version first
+        cmd_parts = command.split()
+        help_cmd = cmd_parts + ["--help"]
+        subprocess.run(
+            help_cmd,
+            capture_output=True,
+            timeout=5,
+            check=False,
+        )
+        return True
+    except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
+        return False
+
+
 def create_default_config(
     project_root: Path,
     project_name: str,
     stealth: bool = False,
+    test_command: str | None = None,
+    lint_command: str | None = None,
 ) -> Path:
     """Create the default configuration file.
 
@@ -112,6 +163,8 @@ def create_default_config(
         project_root: The project root directory.
         project_name: The project name.
         stealth: If True, use stealth mode paths.
+        test_command: Custom test command (from interactive mode).
+        lint_command: Custom lint command (from interactive mode).
 
     Returns:
         Path to the config file.
@@ -128,8 +181,8 @@ def create_default_config(
             "review": config.models.review,
         },
         "commands": {
-            "test": config.commands.test,
-            "lint": config.commands.lint,
+            "test": test_command or config.commands.test,
+            "lint": lint_command or config.commands.lint,
             "lint_fix": config.commands.lint_fix,
         },
         "conventions": {
@@ -212,8 +265,26 @@ def run_init(
     jiro_dir = create_directory_structure(project_root, stealth=stealth, project_name=project_name)
     console.print(f"[green]✓[/green] Created directory: {jiro_dir}")
 
-    # Create config file
-    config_path = create_default_config(project_root, project_name, stealth=stealth)
+    # Interactive mode: prompt for test and lint commands
+    test_command = None
+    lint_command = None
+
+    if interactive:
+        console.print("\n[cyan]Interactive Configuration[/cyan]")
+        test_command = prompt_for_test_command()
+        console.print(f"[dim]Test command: {test_command}[/dim]")
+
+        lint_command = prompt_for_lint_command()
+        console.print(f"[dim]Lint command: {lint_command}[/dim]")
+
+    # Create config file with prompted commands (if any)
+    config_path = create_default_config(
+        project_root,
+        project_name,
+        stealth=stealth,
+        test_command=test_command,
+        lint_command=lint_command,
+    )
     console.print(f"[green]✓[/green] Created config: {config_path}")
 
     # Initialize beads
@@ -221,11 +292,6 @@ def run_init(
         console.print("[green]✓[/green] Initialized beads database")
     else:
         console.print("[yellow]![/yellow] Beads database not initialized (manual setup required)")
-
-    # Interactive mode (for future implementation)
-    if interactive:
-        console.print("\n[yellow]Interactive mode is not yet implemented.[/yellow]")
-        console.print("[dim]In the future, this will prompt for test and lint commands.[/dim]")
 
     console.print("\n[green]Initialization complete![/green]")
     return True

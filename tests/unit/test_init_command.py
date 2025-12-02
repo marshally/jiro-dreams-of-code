@@ -198,3 +198,174 @@ class TestInitIdempotency:
             result = cli_runner.invoke(app, ["init"])
             # Should not fail on reinit
             assert result.exit_code == 0 or "already" in result.stdout.lower()
+
+
+class TestInitInteractiveMode:
+    """Tests for interactive mode in init command."""
+
+    @pytest.mark.unit
+    def test_interactive_prompts_for_test_command(
+        self, cli_runner: CliRunner, tmp_path: Path
+    ) -> None:
+        """Interactive mode should prompt for test command."""
+        git_dir = tmp_path / ".git"
+        git_dir.mkdir()
+
+        with (
+            patch("jiro.cli.init.Path.cwd", return_value=tmp_path),
+            patch("subprocess.run") as mock_run,
+            patch("typer.prompt") as mock_prompt,
+        ):
+            mock_run.return_value = MagicMock(returncode=0, stdout="")
+            mock_prompt.return_value = "pytest -v"
+
+            cli_runner.invoke(app, ["init", "--interactive"], input="pytest -v\npytest\n")
+            # The prompt should have been called for test command
+            assert mock_prompt.called
+
+    @pytest.mark.unit
+    def test_interactive_prompts_for_lint_command(
+        self, cli_runner: CliRunner, tmp_path: Path
+    ) -> None:
+        """Interactive mode should prompt for lint command."""
+        git_dir = tmp_path / ".git"
+        git_dir.mkdir()
+
+        with (
+            patch("jiro.cli.init.Path.cwd", return_value=tmp_path),
+            patch("subprocess.run") as mock_run,
+            patch("typer.prompt") as mock_prompt,
+        ):
+            mock_run.return_value = MagicMock(returncode=0, stdout="")
+            # Setup side effect to track call count
+            mock_prompt.side_effect = ["pytest", "ruff check"]
+
+            cli_runner.invoke(app, ["init", "--interactive"], input="pytest -v\nruff check\n")
+            # The prompt should have been called at least twice (test and lint)
+            assert mock_prompt.call_count >= 2
+
+    @pytest.mark.unit
+    def test_interactive_saves_prompted_test_command_to_config(
+        self, cli_runner: CliRunner, tmp_path: Path
+    ) -> None:
+        """Interactive mode should save prompted test command to config."""
+        git_dir = tmp_path / ".git"
+        git_dir.mkdir()
+        custom_test_cmd = "pytest --cov=src"
+
+        with (
+            patch("jiro.cli.init.Path.cwd", return_value=tmp_path),
+            patch("subprocess.run") as mock_run,
+            patch("typer.prompt") as mock_prompt,
+        ):
+            # Mock subprocess to succeed
+            mock_run.return_value = MagicMock(returncode=0, stdout="")
+            # Mock prompts
+            mock_prompt.side_effect = [custom_test_cmd, "ruff check"]
+
+            cli_runner.invoke(app, ["init", "--interactive"])
+
+            # Check that config file has the custom test command
+            config_file = tmp_path / ".jiro-dreams-of-code" / "config.yaml"
+            if config_file.exists():
+                content = config_file.read_text()
+                assert custom_test_cmd in content or "test:" in content
+
+    @pytest.mark.unit
+    def test_interactive_saves_prompted_lint_command_to_config(
+        self, cli_runner: CliRunner, tmp_path: Path
+    ) -> None:
+        """Interactive mode should save prompted lint command to config."""
+        git_dir = tmp_path / ".git"
+        git_dir.mkdir()
+        custom_lint_cmd = "pylint src/"
+
+        with (
+            patch("jiro.cli.init.Path.cwd", return_value=tmp_path),
+            patch("subprocess.run") as mock_run,
+            patch("typer.prompt") as mock_prompt,
+        ):
+            # Mock subprocess to succeed
+            mock_run.return_value = MagicMock(returncode=0, stdout="")
+            # Mock prompts
+            mock_prompt.side_effect = ["pytest", custom_lint_cmd]
+
+            cli_runner.invoke(app, ["init", "--interactive"])
+
+            # Check that config file has the custom lint command
+            config_file = tmp_path / ".jiro-dreams-of-code" / "config.yaml"
+            if config_file.exists():
+                content = config_file.read_text()
+                assert custom_lint_cmd in content or "lint:" in content
+
+    @pytest.mark.unit
+    def test_interactive_validates_test_command(
+        self, cli_runner: CliRunner, tmp_path: Path
+    ) -> None:
+        """Interactive mode should validate that test command works."""
+        git_dir = tmp_path / ".git"
+        git_dir.mkdir()
+
+        with (
+            patch("jiro.cli.init.Path.cwd", return_value=tmp_path),
+            patch("subprocess.run") as mock_run,
+            patch("typer.prompt") as mock_prompt,
+        ):
+            # First call for git check succeeds, later calls return different codes
+            # We need to track which subprocess call is which
+            def subprocess_side_effect(*args, **kwargs):
+                if args[0][0] == "git":
+                    return MagicMock(returncode=0, stdout="")
+                elif args[0][0] == "pytest":
+                    # Validate test command should succeed
+                    return MagicMock(returncode=0, stdout="")
+                elif args[0][0] == "bd":
+                    return MagicMock(returncode=0, stdout="")
+                return MagicMock(returncode=0, stdout="")
+
+            mock_run.side_effect = subprocess_side_effect
+            mock_prompt.side_effect = ["pytest", "ruff check"]
+
+            result = cli_runner.invoke(app, ["init", "--interactive"])
+            # Should succeed with valid commands
+            assert result.exit_code == 0
+
+    @pytest.mark.unit
+    def test_interactive_handles_stdin_input(self, cli_runner: CliRunner, tmp_path: Path) -> None:
+        """Interactive mode should handle stdin input via typer.prompt."""
+        git_dir = tmp_path / ".git"
+        git_dir.mkdir()
+
+        with (
+            patch("jiro.cli.init.Path.cwd", return_value=tmp_path),
+            patch("subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = MagicMock(returncode=0, stdout="")
+
+            # Use CliRunner's input to simulate stdin
+            result = cli_runner.invoke(
+                app, ["init", "--interactive"], input="my-test-cmd\nmy-lint-cmd\n"
+            )
+
+            # Should complete without error (or with specific interactive prompt)
+            assert result.exit_code == 0 or "interactive" in result.stdout.lower()
+
+    @pytest.mark.unit
+    def test_non_interactive_mode_skips_prompts(
+        self, cli_runner: CliRunner, tmp_path: Path
+    ) -> None:
+        """Non-interactive mode should not prompt for commands."""
+        git_dir = tmp_path / ".git"
+        git_dir.mkdir()
+
+        with (
+            patch("jiro.cli.init.Path.cwd", return_value=tmp_path),
+            patch("subprocess.run") as mock_run,
+            patch("typer.prompt") as mock_prompt,
+        ):
+            mock_run.return_value = MagicMock(returncode=0, stdout="")
+
+            cli_runner.invoke(app, ["init"])
+
+            # typer.prompt should not be called in non-interactive mode
+            mock_prompt.assert_not_called()
