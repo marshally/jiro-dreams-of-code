@@ -224,3 +224,204 @@ class TestDoctorCommand:
         assert result.exit_code == 1
         mock_fix_dirs.assert_called_once()
         mock_fix_config.assert_called_once()
+
+
+class TestInitCommand:
+    """Tests for init CLI command."""
+
+    @pytest.mark.unit
+    def test_init_help(self, cli_runner: CliRunner) -> None:
+        """Init command should display help."""
+        result = cli_runner.invoke(app, ["init", "--help"])
+        assert result.exit_code == 0
+        assert "init" in result.stdout.lower()
+
+    @pytest.mark.unit
+    def test_init_stealth_option(self, cli_runner: CliRunner) -> None:
+        """Init command should accept --stealth option."""
+        result = cli_runner.invoke(app, ["init", "--help"])
+        assert result.exit_code == 0
+        assert "--stealth" in result.stdout
+
+    @pytest.mark.unit
+    def test_init_interactive_option(self, cli_runner: CliRunner) -> None:
+        """Init command should accept --interactive option."""
+        result = cli_runner.invoke(app, ["init", "--help"])
+        assert result.exit_code == 0
+        assert "--interactive" in result.stdout
+
+    @pytest.mark.unit
+    def test_init_not_implemented(self, cli_runner: CliRunner) -> None:
+        """Init command should show not implemented message."""
+        result = cli_runner.invoke(app, ["init"])
+        assert result.exit_code == 0
+        assert "not implemented" in result.stdout.lower()
+
+    @pytest.mark.unit
+    def test_init_with_stealth_flag(self, cli_runner: CliRunner) -> None:
+        """Init command should accept --stealth flag."""
+        result = cli_runner.invoke(app, ["init", "--stealth"])
+        assert result.exit_code == 0
+
+    @pytest.mark.unit
+    def test_init_with_interactive_flag(self, cli_runner: CliRunner) -> None:
+        """Init command should show interactive prompting info."""
+        result = cli_runner.invoke(app, ["init", "--interactive"])
+        assert result.exit_code == 0
+        assert "prompt" in result.stdout.lower()
+
+
+class TestDreamCommand:
+    """Tests for dream CLI command."""
+
+    @pytest.mark.unit
+    def test_dream_help(self, cli_runner: CliRunner) -> None:
+        """Dream command should display help."""
+        result = cli_runner.invoke(app, ["dream", "--help"])
+        assert result.exit_code == 0
+        assert "dream" in result.stdout.lower()
+
+    @pytest.mark.unit
+    def test_dream_model_option(self, cli_runner: CliRunner) -> None:
+        """Dream command should accept --model option."""
+        result = cli_runner.invoke(app, ["dream", "--help"])
+        assert result.exit_code == 0
+        assert "--model" in result.stdout
+
+    @pytest.mark.unit
+    def test_dream_not_implemented(self, cli_runner: CliRunner) -> None:
+        """Dream command should show not implemented message."""
+        result = cli_runner.invoke(app, ["dream", "test prompt"])
+        assert result.exit_code == 0
+        assert "not implemented" in result.stdout.lower()
+
+    @pytest.mark.unit
+    def test_dream_with_prompt(self, cli_runner: CliRunner) -> None:
+        """Dream command should accept prompt argument."""
+        result = cli_runner.invoke(app, ["dream", "build a feature"])
+        assert result.exit_code == 0
+        assert "build a feature" in result.stdout
+
+    @pytest.mark.unit
+    def test_dream_with_model(self, cli_runner: CliRunner) -> None:
+        """Dream command should display model when provided."""
+        result = cli_runner.invoke(app, ["dream", "--model", "claude-opus-4", "test"])
+        assert result.exit_code == 0
+        assert "claude-opus-4" in result.stdout
+
+
+class TestPlanCommand:
+    """Tests for plan CLI command."""
+
+    @pytest.mark.unit
+    def test_plan_help(self, cli_runner: CliRunner) -> None:
+        """Plan command should display help."""
+        result = cli_runner.invoke(app, ["plan", "--help"])
+        assert result.exit_code == 0
+        assert "plan" in result.stdout.lower()
+
+    @pytest.mark.unit
+    def test_plan_spec_option(self, cli_runner: CliRunner) -> None:
+        """Plan command should require --spec option."""
+        result = cli_runner.invoke(app, ["plan", "--help"])
+        assert result.exit_code == 0
+        assert "--spec" in result.stdout
+
+    @pytest.mark.unit
+    def test_plan_not_implemented(self, cli_runner: CliRunner) -> None:
+        """Plan command should show not implemented message."""
+        result = cli_runner.invoke(app, ["plan", "--spec", "test.md"])
+        assert result.exit_code == 0
+        assert "not implemented" in result.stdout.lower()
+
+    @pytest.mark.unit
+    def test_plan_with_spec(self, cli_runner: CliRunner) -> None:
+        """Plan command should display spec path."""
+        result = cli_runner.invoke(app, ["plan", "--spec", "specs/auth.md"])
+        assert result.exit_code == 0
+        assert "specs/auth.md" in result.stdout
+
+    @pytest.mark.unit
+    def test_plan_with_refinement(self, cli_runner: CliRunner) -> None:
+        """Plan command should display refinement when provided."""
+        result = cli_runner.invoke(app, ["plan", "--spec", "specs/auth.md", "focus on security"])
+        assert result.exit_code == 0
+        assert "focus on security" in result.stdout
+
+
+class TestExecuteCommand:
+    """Tests for execute CLI command."""
+
+    @pytest.mark.unit
+    def test_execute_help(self, cli_runner: CliRunner) -> None:
+        """Execute command should display help."""
+        result = cli_runner.invoke(app, ["execute", "--help"])
+        assert result.exit_code == 0
+        assert "execute" in result.stdout.lower()
+
+    @pytest.mark.unit
+    def test_execute_epic_option(self, cli_runner: CliRunner) -> None:
+        """Execute command should accept --epic option."""
+        result = cli_runner.invoke(app, ["execute", "--help"])
+        assert result.exit_code == 0
+        assert "--epic" in result.stdout
+
+    @pytest.mark.unit
+    def test_execute_not_implemented(self, cli_runner: CliRunner) -> None:
+        """Execute command should show not implemented message."""
+        result = cli_runner.invoke(app, ["execute"])
+        assert result.exit_code == 0
+        assert "not implemented" in result.stdout.lower()
+
+    @pytest.mark.unit
+    def test_execute_with_epic(self, cli_runner: CliRunner) -> None:
+        """Execute command should display epic when provided."""
+        result = cli_runner.invoke(app, ["execute", "--epic", "JIRO-42"])
+        assert result.exit_code == 0
+        assert "JIRO-42" in result.stdout
+
+
+class TestWebCommand:
+    """Tests for web CLI command."""
+
+    @pytest.mark.unit
+    def test_web_help(self, cli_runner: CliRunner) -> None:
+        """Web command should display help."""
+        result = cli_runner.invoke(app, ["web", "--help"])
+        assert result.exit_code == 0
+        assert "web" in result.stdout.lower()
+
+    @pytest.mark.unit
+    def test_web_daemon_option(self, cli_runner: CliRunner) -> None:
+        """Web command should accept --daemon option."""
+        result = cli_runner.invoke(app, ["web", "--help"])
+        assert result.exit_code == 0
+        assert "--daemon" in result.stdout
+
+    @pytest.mark.unit
+    def test_web_port_option(self, cli_runner: CliRunner) -> None:
+        """Web command should accept --port option."""
+        result = cli_runner.invoke(app, ["web", "--help"])
+        assert result.exit_code == 0
+        assert "--port" in result.stdout
+
+    @pytest.mark.unit
+    def test_web_not_implemented(self, cli_runner: CliRunner) -> None:
+        """Web command should show not implemented message."""
+        result = cli_runner.invoke(app, ["web"])
+        assert result.exit_code == 0
+        assert "not implemented" in result.stdout.lower()
+
+    @pytest.mark.unit
+    def test_web_with_port(self, cli_runner: CliRunner) -> None:
+        """Web command should display custom port."""
+        result = cli_runner.invoke(app, ["web", "--port", "9000"])
+        assert result.exit_code == 0
+        assert "9000" in result.stdout
+
+    @pytest.mark.unit
+    def test_web_with_daemon(self, cli_runner: CliRunner) -> None:
+        """Web command should display daemon info."""
+        result = cli_runner.invoke(app, ["web", "--daemon"])
+        assert result.exit_code == 0
+        assert "background" in result.stdout.lower()
