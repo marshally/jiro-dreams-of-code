@@ -1,11 +1,16 @@
 """Session preflight checks for jiro workflow."""
 
 import subprocess
+import uuid
 from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
 
 import structlog
 
 from jiro.config.schema import Config
+from jiro.db.models import Session, SessionStatus
+from jiro.db.repository import SessionRepository, TaskExecutionRepository
 
 
 @dataclass
@@ -475,3 +480,280 @@ def run_postflight(config: Config) -> PostflightResult:
     )
 
     return result
+
+
+@dataclass
+class SessionResult:
+    """Result of running a full session.
+
+    Attributes:
+        session_id: ID of the session that ran.
+        status: Final status of the session ('completed', 'failed', 'halted').
+        tasks_completed: Number of tasks successfully completed.
+        tasks_failed: Number of tasks that failed.
+        error: Error message if the session failed, None otherwise.
+    """
+
+    session_id: str
+    status: SessionStatus
+    tasks_completed: int
+    tasks_failed: int
+    error: str | None = None
+
+
+class SessionOrchestrator:
+    """Orchestrates the full session lifecycle.
+
+    Manages the complete workflow: session creation, preflight checks,
+    task execution in dependency order, postflight checks, and status tracking.
+    """
+
+    def __init__(
+        self,
+        config: Config,
+        session_repo: SessionRepository,
+        task_repo: TaskExecutionRepository,
+    ) -> None:
+        """Initialize with dependencies.
+
+        Args:
+            config: Configuration object for checks and commands.
+            session_repo: Repository for session persistence.
+            task_repo: Repository for task execution persistence.
+        """
+        self.config = config
+        self.session_repo = session_repo
+        self.task_repo = task_repo
+        self.logger = structlog.get_logger()
+
+    def run(self, epic_id: str | None = None) -> SessionResult:
+        """Execute a full session.
+
+        Orchestrates the complete lifecycle:
+        1. Create session record (status='running')
+        2. Run preflight checks
+           - If fails: update session status='failed', return
+        3. Get tasks (filtered by epic_id if provided)
+        4. Execute tasks in dependency order
+           - For each task: create TaskExecution, run task, update status
+           - On task failure: HALT, update session status='halted'
+        5. Run postflight checks
+           - If fails: update session status='failed'
+        6. Update session status='completed'
+        7. Return SessionResult
+
+        Args:
+            epic_id: Optional epic ID to filter tasks.
+
+        Returns:
+            SessionResult with final status and statistics.
+        """
+        # Step 1: Create session record
+        session_id = str(uuid.uuid4().hex)
+        branch_name = self._get_current_branch()
+
+        session = Session(
+            id=session_id,
+            branch_name=branch_name,
+            status="running",  # type: ignore
+            started_at=datetime.now(),
+            epic_id=epic_id,
+        )
+        self.session_repo.create(session)
+        self.logger.info("session_created", session_id=session_id, branch=branch_name)
+
+        try:
+            # Step 2: Run preflight checks
+            preflight_result = self.run_preflight(self.config)
+            if not preflight_result.passed:
+                self.logger.warning(
+                    "preflight_failed",
+                    session_id=session_id,
+                    errors=preflight_result.errors,
+                )
+                session.status = "failed"  # type: ignore
+                session.ended_at = datetime.now()
+                self.session_repo.update(session)
+
+                return SessionResult(
+                    session_id=session_id,
+                    status="failed",  # type: ignore
+                    tasks_completed=0,
+                    tasks_failed=0,
+                    error=f"Preflight checks failed: {'; '.join(preflight_result.errors)}",
+                )
+
+            # Record preflight passed timestamp
+            session.preflight_passed_at = datetime.now()
+            self.session_repo.update(session)
+            self.logger.info("preflight_passed", session_id=session_id)
+
+            # Step 3: Get tasks
+            tasks = self.get_tasks(epic_id=epic_id)
+            self.logger.info(
+                "tasks_retrieved",
+                session_id=session_id,
+                task_count=len(tasks),
+            )
+
+            # Step 4: Execute tasks
+            tasks_completed = 0
+            tasks_failed = 0
+
+            for task in tasks:
+                try:
+                    self.execute_task(task, session_id)
+                    tasks_completed += 1
+                except Exception as e:
+                    tasks_failed += 1
+                    error_msg = str(e)
+                    self.logger.error(
+                        "task_execution_failed",
+                        session_id=session_id,
+                        task_id=task.id,
+                        error=error_msg,
+                    )
+
+                    # HALT on task failure
+                    session.status = "halted"  # type: ignore
+                    session.halt_reason = error_msg
+                    session.ended_at = datetime.now()
+                    self.session_repo.update(session)
+
+                    return SessionResult(
+                        session_id=session_id,
+                        status="halted",  # type: ignore
+                        tasks_completed=tasks_completed,
+                        tasks_failed=tasks_failed,
+                        error=f"Task {task.id} failed: {error_msg}",
+                    )
+
+            # Step 5: Run postflight checks
+            postflight_result = self.run_postflight(self.config)
+            if not postflight_result.passed:
+                self.logger.warning(
+                    "postflight_failed",
+                    session_id=session_id,
+                    errors=postflight_result.errors,
+                )
+                session.status = "failed"  # type: ignore
+                session.ended_at = datetime.now()
+                self.session_repo.update(session)
+
+                return SessionResult(
+                    session_id=session_id,
+                    status="failed",  # type: ignore
+                    tasks_completed=tasks_completed,
+                    tasks_failed=tasks_failed,
+                    error=f"Postflight checks failed: {'; '.join(postflight_result.errors)}",
+                )
+
+            # Step 6: Update session to completed
+            session.status = "completed"  # type: ignore
+            session.ended_at = datetime.now()
+            self.session_repo.update(session)
+            self.logger.info(
+                "session_completed",
+                session_id=session_id,
+                tasks_completed=tasks_completed,
+            )
+
+            # Step 7: Return result
+            return SessionResult(
+                session_id=session_id,
+                status="completed",  # type: ignore
+                tasks_completed=tasks_completed,
+                tasks_failed=tasks_failed,
+                error=None,
+            )
+
+        except Exception as e:
+            # Catch unexpected errors
+            self.logger.error(
+                "session_error",
+                session_id=session_id,
+                error=str(e),
+            )
+            session.status = "failed"  # type: ignore
+            session.ended_at = datetime.now()
+            self.session_repo.update(session)
+
+            return SessionResult(
+                session_id=session_id,
+                status="failed",  # type: ignore
+                tasks_completed=0,
+                tasks_failed=0,
+                error=str(e),
+            )
+
+    def _get_current_branch(self) -> str:
+        """Get the current git branch name.
+
+        Returns:
+            The current branch name, or 'unknown' if unable to determine.
+        """
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if result.returncode == 0:
+                return result.stdout.strip()
+        except Exception:
+            pass
+        return "unknown"
+
+    def run_preflight(self, config: Config) -> PreflightResult:
+        """Run preflight checks.
+
+        Args:
+            config: Configuration object.
+
+        Returns:
+            PreflightResult with check details.
+        """
+        return run_preflight(config)
+
+    def run_postflight(self, config: Config) -> PostflightResult:
+        """Run postflight checks.
+
+        Args:
+            config: Configuration object.
+
+        Returns:
+            PostflightResult with check details.
+        """
+        return run_postflight(config)
+
+    def get_tasks(self, epic_id: str | None = None) -> list[Any]:
+        """Get tasks to execute.
+
+        Args:
+            epic_id: Optional epic ID to filter tasks.
+
+        Returns:
+            List of tasks to execute.
+        """
+        # This will be implemented to fetch from issue tracker
+        # For now, return empty list for basic tests
+        return []
+
+    def execute_task(self, task: Any, session_id: str) -> None:
+        """Execute a single task.
+
+        Args:
+            task: Task to execute.
+            session_id: ID of the current session.
+
+        Raises:
+            Exception: If task execution fails.
+        """
+        # This will be implemented to execute the task
+        # For now, just log the execution
+        self.logger.info(
+            "task_execution_start",
+            task_id=task.id,
+            session_id=session_id,
+        )
