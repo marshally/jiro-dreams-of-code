@@ -239,3 +239,329 @@ These are technical notes.
         assert result.acceptance_criteria
         assert result.out_of_scope
         # technical_notes is optional
+
+    @pytest.mark.asyncio
+    async def test_dream_initialization_requires_client(self):
+        """DreamingAgent.__init__ should require client."""
+        # Act & Assert
+        with pytest.raises(TypeError):
+            DreamingAgent(None)
+
+    @pytest.mark.asyncio
+    async def test_dream_raises_error_without_title(self, mock_client):
+        """dream() should raise error if output lacks title."""
+        # Arrange
+        mock_output = """## Overview
+
+A feature overview.
+
+## Requirements
+
+- Requirement 1
+
+## Acceptance Criteria
+
+- [ ] Criterion 1
+
+## Out of Scope
+
+- Item
+"""
+        mock_client.execute.return_value = AgentResult(
+            success=True,
+            output=mock_output,
+            tokens_before=100,
+            tokens_after=300,
+            error=None,
+        )
+
+        agent = DreamingAgent(mock_client)
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="valid title"):
+            await agent.dream("Feature without title")
+
+    @pytest.mark.asyncio
+    async def test_dream_raises_error_without_overview(self, mock_client):
+        """dream() should raise error if output lacks Overview section."""
+        # Arrange
+        mock_output = """# Feature: Test Feature
+
+## Requirements
+
+- Requirement 1
+
+## Acceptance Criteria
+
+- [ ] Criterion 1
+
+## Out of Scope
+
+- Item
+"""
+        mock_client.execute.return_value = AgentResult(
+            success=True,
+            output=mock_output,
+            tokens_before=100,
+            tokens_after=300,
+            error=None,
+        )
+
+        agent = DreamingAgent(mock_client)
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="Overview section"):
+            await agent.dream("Feature without overview")
+
+    @pytest.mark.asyncio
+    async def test_dream_raises_error_without_requirements(self, mock_client):
+        """dream() should raise error if output lacks Requirements section."""
+        # Arrange
+        mock_output = """# Feature: Test Feature
+
+## Overview
+
+A test overview.
+
+## Acceptance Criteria
+
+- [ ] Criterion 1
+
+## Out of Scope
+
+- Item
+"""
+        mock_client.execute.return_value = AgentResult(
+            success=True,
+            output=mock_output,
+            tokens_before=100,
+            tokens_after=300,
+            error=None,
+        )
+
+        agent = DreamingAgent(mock_client)
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="Requirements section"):
+            await agent.dream("Feature without requirements")
+
+    @pytest.mark.asyncio
+    async def test_dream_raises_error_without_acceptance_criteria(self, mock_client):
+        """dream() should raise error if output lacks Acceptance Criteria section."""
+        # Arrange
+        mock_output = """# Feature: Test Feature
+
+## Overview
+
+A test overview.
+
+## Requirements
+
+- Requirement 1
+
+## Out of Scope
+
+- Item
+"""
+        mock_client.execute.return_value = AgentResult(
+            success=True,
+            output=mock_output,
+            tokens_before=100,
+            tokens_after=300,
+            error=None,
+        )
+
+        agent = DreamingAgent(mock_client)
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="Acceptance Criteria section"):
+            await agent.dream("Feature without acceptance criteria")
+
+    @pytest.mark.asyncio
+    async def test_dream_raises_error_without_out_of_scope(self, mock_client):
+        """dream() should raise error if output lacks Out of Scope section."""
+        # Arrange
+        mock_output = """# Feature: Test Feature
+
+## Overview
+
+A test overview.
+
+## Requirements
+
+- Requirement 1
+
+## Acceptance Criteria
+
+- [ ] Criterion 1
+"""
+        mock_client.execute.return_value = AgentResult(
+            success=True,
+            output=mock_output,
+            tokens_before=100,
+            tokens_after=300,
+            error=None,
+        )
+
+        agent = DreamingAgent(mock_client)
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="Out of Scope section"):
+            await agent.dream("Feature without out of scope")
+
+    @pytest.mark.asyncio
+    async def test_dream_with_optional_technical_notes_missing(self, mock_client):
+        """dream() should work when technical notes are missing (optional)."""
+        # Arrange
+        mock_output = """# Feature: Test Feature
+
+## Overview
+
+A test overview.
+
+## Requirements
+
+- Requirement 1
+
+## Acceptance Criteria
+
+- [ ] Criterion 1
+
+## Out of Scope
+
+- Item
+"""
+        mock_client.execute.return_value = AgentResult(
+            success=True,
+            output=mock_output,
+            tokens_before=100,
+            tokens_after=300,
+            error=None,
+        )
+
+        agent = DreamingAgent(mock_client)
+
+        # Act
+        result = await agent.dream("Feature with optional technical notes")
+
+        # Assert
+        assert result.technical_notes is None
+        assert result.title == "Test Feature"
+
+    @pytest.mark.asyncio
+    async def test_refine_calls_build_refinement_prompt(self, mock_client):
+        """refine() should use _build_refinement_prompt to create prompt."""
+        # Arrange
+        initial_spec = Spec(
+            title="Initial Feature",
+            overview="This is the initial overview.",
+            requirements=["Req 1"],
+            acceptance_criteria=["Criterion 1"],
+            out_of_scope=["Out of scope 1"],
+        )
+
+        refined_output = """# Feature: Refined Feature
+
+## Overview
+
+Refined overview.
+
+## Requirements
+
+- Requirement 1
+
+## Acceptance Criteria
+
+- [ ] Criterion 1
+
+## Out of Scope
+
+- Item
+"""
+        mock_client.execute.return_value = AgentResult(
+            success=True,
+            output=refined_output,
+            tokens_before=100,
+            tokens_after=300,
+            error=None,
+        )
+
+        agent = DreamingAgent(mock_client)
+
+        # Act
+        await agent.refine(initial_spec, "Make it better")
+
+        # Assert
+        # Verify that execute was called with a prompt containing refinement context
+        assert mock_client.execute.called
+        call_args = mock_client.execute.call_args[0][0]
+        assert "Initial Feature" in call_args or "Refined Feature" in call_args
+
+    @pytest.mark.unit
+    def test_format_list(self, mock_client):
+        """_format_list() should format items as markdown bullet points."""
+        # Arrange
+        agent = DreamingAgent(mock_client)
+        items = ["Item 1", "Item 2", "Item 3"]
+
+        # Act
+        result = agent._format_list(items)
+
+        # Assert
+        assert "- Item 1" in result
+        assert "- Item 2" in result
+        assert "- Item 3" in result
+        assert result.count("-") == 3
+
+    @pytest.mark.unit
+    def test_build_refinement_prompt_with_technical_notes(self, mock_client):
+        """_build_refinement_prompt() should include technical notes when present."""
+        # Arrange
+        agent = DreamingAgent(mock_client)
+        spec = Spec(
+            title="Feature with Notes",
+            overview="An overview",
+            requirements=["Req 1"],
+            acceptance_criteria=["Criterion 1"],
+            out_of_scope=["Out of scope"],
+            technical_notes="Some technical implementation details",
+        )
+
+        # Act
+        prompt = agent._build_refinement_prompt(spec, "Add more details")
+
+        # Assert
+        assert "Feature with Notes" in prompt
+        assert "Overview" in prompt
+        assert "Requirements" in prompt
+        assert "Acceptance Criteria" in prompt
+        assert "Out of Scope" in prompt
+        assert "Technical Notes" in prompt
+        assert "Some technical implementation details" in prompt
+        assert "Add more details" in prompt
+
+    @pytest.mark.unit
+    def test_build_refinement_prompt_without_technical_notes(self, mock_client):
+        """_build_refinement_prompt() should work without technical notes."""
+        # Arrange
+        agent = DreamingAgent(mock_client)
+        spec = Spec(
+            title="Feature without Notes",
+            overview="An overview",
+            requirements=["Req 1"],
+            acceptance_criteria=["Criterion 1"],
+            out_of_scope=["Out of scope"],
+        )
+
+        # Act
+        prompt = agent._build_refinement_prompt(spec, "Add more details")
+
+        # Assert
+        assert "Feature without Notes" in prompt
+        assert "Overview" in prompt
+        assert "Requirements" in prompt
+        assert "Acceptance Criteria" in prompt
+        assert "Out of Scope" in prompt
+        # Should not include a dedicated Technical Notes section (without the spec.technical_notes value)
+        # The prompt mentions "Technical Notes if applicable" but doesn't include it in the structure
+        assert "## Technical Notes\n\n" not in prompt

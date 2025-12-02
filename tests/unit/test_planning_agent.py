@@ -10,6 +10,23 @@ from jiro.agents.planning import ExecutionPlan, PlanningAgent, PlanStep
 from jiro.trackers.interface import Task
 
 
+class TestPlanningAgentInitialization:
+    """Tests for PlanningAgent initialization."""
+
+    @pytest.mark.unit
+    def test_initialization_requires_client(self):
+        """PlanningAgent.__init__ should require client."""
+        with pytest.raises(TypeError):
+            PlanningAgent(None)
+
+    @pytest.mark.unit
+    def test_initialization_success(self):
+        """PlanningAgent should initialize with client."""
+        client = MagicMock()
+        agent = PlanningAgent(client)
+        assert agent.client == client
+
+
 class TestPlanningAgent:
     """Tests for the PlanningAgent class."""
 
@@ -341,6 +358,218 @@ verification:
         call_args = mock_client.execute.call_args[0][0]
         assert "task-123" in call_args
         assert "Implement user authentication" in call_args
+
+    @pytest.mark.unit
+    def test_build_planning_prompt(self, mock_client, sample_task):
+        """_build_planning_prompt() should create prompt with task context."""
+        # Arrange
+        agent = PlanningAgent(mock_client)
+
+        # Act
+        prompt = agent._build_planning_prompt(sample_task)
+
+        # Assert
+        assert "task-123" in prompt
+        assert "Implement user authentication" in prompt
+        assert "feature" in prompt
+        assert "JWT-based authentication" in prompt
+        assert "YAML" in prompt
+
+    @pytest.mark.unit
+    def test_extract_files_from_step_with_dict_items(self, mock_client):
+        """_extract_files_from_step() should extract paths from dict items."""
+        # Arrange
+        agent = PlanningAgent(mock_client)
+        step_data = {
+            "files": [
+                {"path": "src/models/user.py"},
+                {"path": "tests/unit/test_user.py"},
+            ]
+        }
+
+        # Act
+        result = agent._extract_files_from_step(step_data)
+
+        # Assert
+        assert result == ["src/models/user.py", "tests/unit/test_user.py"]
+
+    @pytest.mark.unit
+    def test_extract_files_from_step_with_string_items(self, mock_client):
+        """_extract_files_from_step() should extract string paths directly."""
+        # Arrange
+        agent = PlanningAgent(mock_client)
+        step_data = {"files": ["src/models/user.py", "tests/unit/test_user.py"]}
+
+        # Act
+        result = agent._extract_files_from_step(step_data)
+
+        # Assert
+        assert result == ["src/models/user.py", "tests/unit/test_user.py"]
+
+    @pytest.mark.unit
+    def test_extract_files_from_step_with_mixed_items(self, mock_client):
+        """_extract_files_from_step() should handle mixed dict and string items."""
+        # Arrange
+        agent = PlanningAgent(mock_client)
+        step_data = {
+            "files": [
+                {"path": "src/models/user.py"},
+                "tests/unit/test_user.py",
+            ]
+        }
+
+        # Act
+        result = agent._extract_files_from_step(step_data)
+
+        # Assert
+        assert result == ["src/models/user.py", "tests/unit/test_user.py"]
+
+    @pytest.mark.unit
+    def test_extract_files_from_step_with_empty_files(self, mock_client):
+        """_extract_files_from_step() should return empty list for empty files."""
+        # Arrange
+        agent = PlanningAgent(mock_client)
+        step_data = {"files": []}
+
+        # Act
+        result = agent._extract_files_from_step(step_data)
+
+        # Assert
+        assert result == []
+
+    @pytest.mark.unit
+    def test_extract_files_from_step_with_no_files_key(self, mock_client):
+        """_extract_files_from_step() should handle missing files key."""
+        # Arrange
+        agent = PlanningAgent(mock_client)
+        step_data = {}
+
+        # Act
+        result = agent._extract_files_from_step(step_data)
+
+        # Assert
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_parse_plan_from_output_with_yaml_block(self, mock_client, sample_task):
+        """_parse_plan_from_output() should extract YAML from markdown block."""
+        # Arrange
+        agent = PlanningAgent(mock_client)
+        output = """Here's your plan:
+
+```yaml
+task_id: task-123
+title: Test Task
+summary: Test summary
+
+steps:
+  - id: 1
+    description: Create file
+    type: create
+    files:
+      - path: src/test.py
+    changes:
+      - Test change
+    verification:
+      command: pytest
+      expected: Pass
+    dependencies: []
+
+verification:
+  final_command: pytest tests/
+  acceptance_check: Pass
+```
+
+That's your plan."""
+
+        # Act
+        result = agent._parse_plan_from_output(output, "task-123")
+
+        # Assert
+        assert result["task_id"] == "task-123"
+        assert len(result["steps"]) == 1
+        assert result["verification_command"] == "pytest tests/"
+
+    @pytest.mark.asyncio
+    async def test_parse_plan_from_output_without_yaml_block(self, mock_client):
+        """_parse_plan_from_output() should handle raw YAML without markdown block."""
+        # Arrange
+        agent = PlanningAgent(mock_client)
+        output = """task_id: task-456
+title: Raw Plan
+summary: No markdown block
+
+steps:
+  - id: 1
+    description: Create file
+    type: create
+    files:
+      - path: src/file.py
+    changes:
+      - Change
+    verification:
+      command: pytest
+      expected: Pass
+    dependencies: []
+
+verification:
+  final_command: pytest
+  acceptance_check: Pass"""
+
+        # Act
+        result = agent._parse_plan_from_output(output, "task-456")
+
+        # Assert
+        assert result["task_id"] == "task-456"
+        assert len(result["steps"]) == 1
+
+    @pytest.mark.asyncio
+    async def test_parse_plan_from_output_invalid_yaml(self, mock_client):
+        """_parse_plan_from_output() should raise error for invalid YAML."""
+        # Arrange
+        agent = PlanningAgent(mock_client)
+        invalid_output = """```yaml
+task_id: task-123
+  invalid: yaml: formatting
+```"""
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="Failed to parse YAML"):
+            agent._parse_plan_from_output(invalid_output, "task-123")
+
+    @pytest.mark.asyncio
+    async def test_parse_plan_from_output_empty_plan(self, mock_client):
+        """_parse_plan_from_output() should raise error for empty plan."""
+        # Arrange
+        agent = PlanningAgent(mock_client)
+        # Empty YAML will parse to None or empty string, triggering the error
+        output = """```yaml
+```"""
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="valid execution plan"):
+            agent._parse_plan_from_output(output, "task-123")
+
+    @pytest.mark.asyncio
+    async def test_parse_plan_from_output_no_steps(self, mock_client):
+        """_parse_plan_from_output() should raise error when plan has no steps."""
+        # Arrange
+        agent = PlanningAgent(mock_client)
+        output = """```yaml
+task_id: task-123
+title: No Steps Plan
+summary: Empty steps
+
+steps: []
+
+verification:
+  final_command: pytest
+  acceptance_check: Pass
+```"""
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="any execution steps"):
+            agent._parse_plan_from_output(output, "task-123")
 
     @pytest.mark.asyncio
     async def test_plan_with_multiple_steps(self, mock_client, sample_task):

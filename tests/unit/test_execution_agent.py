@@ -12,6 +12,23 @@ from jiro.agents.execution import (
 from jiro.agents.planning import ExecutionPlan, PlanStep
 
 
+class TestExecutionAgentInitialization:
+    """Tests for ExecutionAgent initialization."""
+
+    @pytest.mark.unit
+    def test_initialization_requires_client(self):
+        """ExecutionAgent.__init__ should require client."""
+        with pytest.raises(TypeError):
+            ExecutionAgent(None)
+
+    @pytest.mark.unit
+    def test_initialization_success(self):
+        """ExecutionAgent should initialize with client."""
+        client = MagicMock()
+        agent = ExecutionAgent(client)
+        assert agent.client == client
+
+
 class TestExecutionAgent:
     """Tests for the ExecutionAgent class."""
 

@@ -1,5 +1,6 @@
 """Tests for ReviewAgent."""
 
+import subprocess
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -319,3 +320,291 @@ class TestSuccessPath:
             assert hasattr(result, "reason")
             assert hasattr(result, "checks")
             assert isinstance(result.checks, dict)
+
+
+class TestDeterministicCheckMethods:
+    """Tests for deterministic check helper methods."""
+
+    @pytest.fixture
+    def mock_client(self):
+        """Create a mock AgentClient."""
+        client = MagicMock()
+        client.execute = AsyncMock()
+        return client
+
+    @pytest.fixture
+    def sample_config(self):
+        """Create a sample config."""
+        return Config()
+
+    @pytest.mark.asyncio
+    async def test_run_tests_success(self, mock_client, sample_config):
+        """_run_tests() should return True when tests pass."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+
+        with patch("jiro.agents.review.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+
+            # Act
+            result = agent._run_tests()
+
+            # Assert
+            assert result is True
+
+    @pytest.mark.asyncio
+    async def test_run_tests_failure(self, mock_client, sample_config):
+        """_run_tests() should return False when tests fail."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+
+        with patch("jiro.agents.review.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=1)
+
+            # Act
+            result = agent._run_tests()
+
+            # Assert
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_run_tests_timeout(self, mock_client, sample_config):
+        """_run_tests() should return False on timeout."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+
+        with patch("jiro.agents.review.subprocess.run") as mock_run:
+            mock_run.side_effect = subprocess.TimeoutExpired("cmd", 300)
+
+            # Act
+            result = agent._run_tests()
+
+            # Assert
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_run_tests_exception(self, mock_client, sample_config):
+        """_run_tests() should return False on general exception."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+
+        with patch("jiro.agents.review.subprocess.run") as mock_run:
+            mock_run.side_effect = Exception("Command not found")
+
+            # Act
+            result = agent._run_tests()
+
+            # Assert
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_run_lint_success(self, mock_client, sample_config):
+        """_run_lint() should return True when lint passes."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+
+        with patch("jiro.agents.review.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+
+            # Act
+            result = agent._run_lint()
+
+            # Assert
+            assert result is True
+
+    @pytest.mark.asyncio
+    async def test_run_lint_failure(self, mock_client, sample_config):
+        """_run_lint() should return False when lint fails."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+
+        with patch("jiro.agents.review.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=1)
+
+            # Act
+            result = agent._run_lint()
+
+            # Assert
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_run_lint_timeout(self, mock_client, sample_config):
+        """_run_lint() should return False on timeout."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+
+        with patch("jiro.agents.review.subprocess.run") as mock_run:
+            mock_run.side_effect = subprocess.TimeoutExpired("cmd", 60)
+
+            # Act
+            result = agent._run_lint()
+
+            # Assert
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_run_lint_exception(self, mock_client, sample_config):
+        """_run_lint() should return False on general exception."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+
+        with patch("jiro.agents.review.subprocess.run") as mock_run:
+            mock_run.side_effect = Exception("Command not found")
+
+            # Act
+            result = agent._run_lint()
+
+            # Assert
+            assert result is False
+
+    @pytest.mark.unit
+    def test_parse_llm_response_approved(self, mock_client, sample_config):
+        """_parse_llm_response() should return True for APPROVED."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+
+        # Act
+        result = agent._parse_llm_response("APPROVED: Everything looks good")
+
+        # Assert
+        assert result is True
+
+    @pytest.mark.unit
+    def test_parse_llm_response_rejected(self, mock_client, sample_config):
+        """_parse_llm_response() should return False for REJECTED."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+
+        # Act
+        result = agent._parse_llm_response("REJECTED: Missing error handling")
+
+        # Assert
+        assert result is False
+
+    @pytest.mark.unit
+    def test_parse_llm_response_case_insensitive(self, mock_client, sample_config):
+        """_parse_llm_response() should be case insensitive."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+
+        # Act
+        result1 = agent._parse_llm_response("approved: code is fine")
+        result2 = agent._parse_llm_response("rejected: needs work")
+
+        # Assert
+        assert result1 is True
+        assert result2 is False
+
+    @pytest.mark.unit
+    def test_parse_llm_response_default(self, mock_client, sample_config):
+        """_parse_llm_response() should default to False for unclear response."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+
+        # Act
+        result = agent._parse_llm_response("Maybe this is fine?")
+
+        # Assert
+        assert result is False
+
+    @pytest.mark.unit
+    def test_build_review_prompt(self, mock_client, sample_config):
+        """_build_review_prompt() should build valid prompt with task context."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+        task = Task(
+            id="task-123",
+            title="Test feature",
+            task_type="feature",
+            status="open",
+            created_at=datetime.now(),
+            description="Test description",
+        )
+
+        # Act
+        prompt = agent._build_review_prompt("abc123", task)
+
+        # Assert
+        assert "task-123" in prompt
+        assert "Test feature" in prompt
+        assert "feature" in prompt
+        assert "Test description" in prompt
+        assert "abc123" in prompt
+        assert "APPROVED" in prompt
+        assert "REJECTED" in prompt
+
+    @pytest.mark.unit
+    def test_run_deterministic_checks_both_pass(self, mock_client, sample_config):
+        """_run_deterministic_checks() should return True when both tests and lint pass."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+
+        with patch("jiro.agents.review.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+
+            # Act
+            passed, results = agent._run_deterministic_checks()
+
+            # Assert
+            assert passed is True
+            assert results["tests"] == "PASSED"
+            assert results["lint"] == "PASSED"
+
+    @pytest.mark.unit
+    def test_run_deterministic_checks_tests_fail(self, mock_client, sample_config):
+        """_run_deterministic_checks() should return False when tests fail."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+
+        with patch("jiro.agents.review.subprocess.run") as mock_run:
+            # First call (tests) returns non-zero, second call (lint) returns 0
+            mock_run.side_effect = [
+                MagicMock(returncode=1),  # tests fail
+                MagicMock(returncode=0),  # lint passes
+            ]
+
+            # Act
+            passed, results = agent._run_deterministic_checks()
+
+            # Assert
+            assert passed is False
+            assert results["tests"] == "FAILED"
+            assert results["lint"] == "PASSED"
+
+    @pytest.mark.unit
+    def test_run_deterministic_checks_lint_fail(self, mock_client, sample_config):
+        """_run_deterministic_checks() should return False when lint fails."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+
+        with patch("jiro.agents.review.subprocess.run") as mock_run:
+            # First call (tests) returns 0, second call (lint) returns non-zero
+            mock_run.side_effect = [
+                MagicMock(returncode=0),  # tests pass
+                MagicMock(returncode=1),  # lint fails
+            ]
+
+            # Act
+            passed, results = agent._run_deterministic_checks()
+
+            # Assert
+            assert passed is False
+            assert results["tests"] == "PASSED"
+            assert results["lint"] == "FAILED"
+
+    @pytest.mark.unit
+    def test_run_deterministic_checks_both_fail(self, mock_client, sample_config):
+        """_run_deterministic_checks() should return False when both fail."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+
+        with patch("jiro.agents.review.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=1)
+
+            # Act
+            passed, results = agent._run_deterministic_checks()
+
+            # Assert
+            assert passed is False
+            assert results["tests"] == "FAILED"
+            assert results["lint"] == "FAILED"

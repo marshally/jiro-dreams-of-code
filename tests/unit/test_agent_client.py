@@ -294,3 +294,34 @@ class TestAgentClientTokenTracking:
             assert len(rows) > 0
             assert rows[0]["model"] == agent_config.model
             assert rows[0]["agent_type"] in ["dreaming", "planning", "execution", "review"]
+
+
+class TestAgentClientStorageErrors:
+    """Tests for repository storage error handling."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.unit
+    async def test_execute_handles_storage_errors(
+        self,
+        agent_config: AgentConfig,
+        prompt_repository: PromptRepository,
+    ) -> None:
+        """Should handle errors when storing results in repository."""
+        with (
+            patch("jiro.agents.client.query", new_callable=AsyncMock) as mock_query,
+            patch("jiro.agents.client.logger") as mock_logger,
+        ):
+            mock_query.return_value = "Response"
+
+            # Mock repository.create to raise an exception
+            client = AgentClient(agent_config, prompt_repository)
+            client.repository.create = lambda x: (_ for _ in ()).throw(Exception("Storage error"))
+
+            # Should not raise, but log the error
+            result = await client.execute("Test prompt")
+
+            # Verify error was logged
+            assert mock_logger.error.called
+            # Verify that the agent still returns a valid result
+            assert result.success is True
+            assert result.output is not None
