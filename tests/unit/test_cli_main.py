@@ -251,11 +251,11 @@ class TestInitCommand:
         assert "--interactive" in result.stdout
 
     @pytest.mark.unit
-    def test_init_not_implemented(self, cli_runner: CliRunner) -> None:
-        """Init command should show not implemented message."""
+    def test_init_runs_successfully(self, cli_runner: CliRunner) -> None:
+        """Init command should run successfully in git repo."""
         result = cli_runner.invoke(app, ["init"])
         assert result.exit_code == 0
-        assert "not implemented" in result.stdout.lower()
+        assert "initializing" in result.stdout.lower() or "complete" in result.stdout.lower()
 
     @pytest.mark.unit
     def test_init_with_stealth_flag(self, cli_runner: CliRunner) -> None:

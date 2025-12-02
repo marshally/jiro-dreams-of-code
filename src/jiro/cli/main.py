@@ -94,14 +94,15 @@ def init(
         jiro init --stealth
         jiro init --interactive
     """
-    console.print("[yellow]Not implemented yet[/yellow]")
-    console.print("\nThis command will:")
-    console.print("  - Verify git repository")
-    console.print("  - Create .jiro-dreams-of-code/ directory (or stealth equivalent)")
-    console.print("  - Initialize beads database")
-    console.print("  - Create default configuration")
-    if interactive:
-        console.print("  - Prompt for test and lint commands")
+    from jiro.cli.init import InitError, run_init
+
+    project_root = Path.cwd()
+
+    try:
+        run_init(project_root, stealth=stealth, interactive=interactive)
+    except InitError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(code=1) from e
 
 
 @app.command()
