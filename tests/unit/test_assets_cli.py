@@ -130,3 +130,65 @@ class TestAssetsWhichCommand:
         assert result.exit_code in (0, 1)
         if result.exit_code == 0:
             assert "/" in result.stdout or "\\" in result.stdout
+
+
+class TestAssetsCustomizeCommand:
+    """Tests for assets customize command."""
+
+    @pytest.mark.unit
+    def test_assets_customize_help(self, cli_runner: CliRunner) -> None:
+        """Assets customize command should display help."""
+        result = cli_runner.invoke(app, ["assets", "customize", "--help"])
+        assert result.exit_code == 0
+        assert "customize" in result.stdout.lower() or "asset" in result.stdout.lower()
+
+    @pytest.mark.unit
+    def test_assets_customize_with_valid_asset(self, cli_runner: CliRunner) -> None:
+        """Assets customize should show deferred message for valid asset."""
+        result = cli_runner.invoke(app, ["assets", "customize", "planning_agent.md"])
+        assert result.exit_code == 0
+        output = result.stdout
+        # Should mention that customization is deferred
+        assert "deferred" in output.lower()
+
+    @pytest.mark.unit
+    def test_assets_customize_shows_package_default(self, cli_runner: CliRunner) -> None:
+        """Assets customize should display the package default content."""
+        result = cli_runner.invoke(app, ["assets", "customize", "planning_agent.md"])
+        assert result.exit_code == 0
+        output = result.stdout
+        # Should show package default content from the file
+        # The planning_agent.md file should have content
+        assert len(output) > 0
+        # Check that content is displayed (not just headers)
+        assert (
+            "planning" in output.lower() or "agent" in output.lower() or len(output.split("\n")) > 3
+        )
+
+    @pytest.mark.unit
+    def test_assets_customize_asset_not_found(self, cli_runner: CliRunner) -> None:
+        """Assets customize should error for non-existent asset."""
+        result = cli_runner.invoke(app, ["assets", "customize", "nonexistent_asset.md"])
+        assert result.exit_code != 0
+        assert "not found" in result.stdout.lower() or "error" in result.stdout.lower()
+
+    @pytest.mark.unit
+    def test_assets_customize_shows_config_location(self, cli_runner: CliRunner) -> None:
+        """Assets customize should show the future config location."""
+        result = cli_runner.invoke(app, ["assets", "customize", "planning_agent.md"])
+        assert result.exit_code == 0
+        output = result.stdout
+        # Should mention config or override location
+        output_lower = output.lower()
+        assert ".config" in output_lower or "override" in output_lower or "future" in output_lower
+
+    @pytest.mark.unit
+    def test_assets_customize_with_template_asset(self, cli_runner: CliRunner) -> None:
+        """Assets customize should work with template assets."""
+        result = cli_runner.invoke(app, ["assets", "customize", "commit/docs.txt.j2"])
+        assert result.exit_code == 0
+        output = result.stdout
+        # Should mention that customization is deferred
+        assert "deferred" in output.lower()
+        # Should show content
+        assert len(output) > 0

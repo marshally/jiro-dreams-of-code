@@ -115,3 +115,49 @@ def which_asset_location(name: str) -> None:
     except Exception as e:  # noqa: B904
         console.print(f"[red]Error retrieving asset location: {str(e)}[/red]")
         raise typer.Exit(code=1) from e
+
+
+@app.command(name="customize")
+def customize_asset(name: str) -> None:
+    """
+    Customize an asset (deferred to future release).
+
+    Shows the current package default for an asset.
+    Customization support will be added in a future release,
+    allowing you to override assets in ~/.config/jiro/assets/.
+
+    Args:
+        name: Name of the asset (e.g., "planning_agent.md" or "commit/docs.txt.j2")
+
+    Examples:
+        jiro assets customize planning_agent.md
+        jiro assets customize commit/docs.txt.j2
+    """
+    try:
+        # Get the path to the asset
+        asset_path = get_asset_path(name)
+
+        # Display deferred message with warning
+        console.print(
+            "\n[yellow]⚠️  Asset customization is deferred to a future release.[/yellow]\n"
+        )
+
+        # Read and display the package default content
+        content = asset_path.read_text()
+        console.print(f"[bold]Current package default for '{name}':[/bold]")
+        console.print("-" * 60)
+        console.print(content)
+        console.print("-" * 60)
+
+        # Show where overrides will go in the future
+        console.print(
+            "\n[cyan]To customize this asset in the future, override files will be placed in:[/cyan]"
+        )
+        console.print("[bold]~/.config/jiro/assets/[/bold]\n")
+
+    except FileNotFoundError as e:
+        console.print(f"[red]Error: {str(e)}[/red]")
+        raise typer.Exit(code=1) from e
+    except Exception as e:  # noqa: B904
+        console.print(f"[red]Error customizing asset: {str(e)}[/red]")
+        raise typer.Exit(code=1) from e
