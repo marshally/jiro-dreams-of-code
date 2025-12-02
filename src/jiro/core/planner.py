@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from jiro.agents.client import AgentClient
+from jiro.trackers.interface import IssueTracker
+from jiro.trackers.interface import Task as TrackerTask
 
 
 @dataclass
@@ -329,3 +331,59 @@ def _extract_list_section(content: str, section_name: str) -> list[str]:
             items.append(item)
 
     return items
+
+
+def create_tasks(plan: PlanResult, tracker: IssueTracker) -> list[TrackerTask]:
+    """Create tasks from a plan in the issue tracker.
+
+    Creates epics first, then creates tasks linked to those epics with dependencies.
+
+    Args:
+        plan: The PlanResult containing epics, tasks, and dependencies.
+        tracker: The IssueTracker implementation to use.
+
+    Returns:
+        List of created TrackerTask objects.
+    """
+    created_tasks: list[TrackerTask] = []
+    # Map from plan IDs to created tracker IDs
+    plan_id_to_tracker_id: dict[str, str] = {}
+
+    # Create all epics first
+    for epic in plan.epics:
+        created_epic = tracker.create_task(
+            title=epic.name,
+            description=epic.description,
+            task_type="epic",
+        )
+        plan_id_to_tracker_id[epic.id] = created_epic.id
+        created_tasks.append(created_epic)
+
+    # Create all tasks, linking to their parent epics
+    for task in plan.tasks:
+        # Get the tracker ID for the parent epic
+        epic_tracker_id = plan_id_to_tracker_id.get(task.epic_id)
+
+        created_task = tracker.create_task(
+            title=task.title,
+            description=task.description,
+            task_type="task",
+            epic_id=epic_tracker_id,
+        )
+        plan_id_to_tracker_id[task.id] = created_task.id
+        created_tasks.append(created_task)
+
+    # Set up dependencies between tasks
+    for dep in plan.dependencies:
+        from_id = dep.get("from")
+        to_id = dep.get("to")
+
+        if from_id and to_id:
+            # Convert plan IDs to tracker IDs
+            from_tracker_id = plan_id_to_tracker_id.get(from_id)
+            to_tracker_id = plan_id_to_tracker_id.get(to_id)
+
+            if from_tracker_id and to_tracker_id:
+                tracker.add_dependency(from_tracker_id, to_tracker_id)
+
+    return created_tasks

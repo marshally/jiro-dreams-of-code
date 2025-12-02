@@ -1,7 +1,7 @@
 """Tests for SpecPlanner - spec planning agent for task decomposition."""
 
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from sqlite_utils import Database
@@ -453,3 +453,175 @@ class TestDataClasses:
         assert len(result.tasks) == 1
         assert result.epics[0].name == "Core"
         assert result.tasks[0].title == "JWT"
+
+
+class TestCreateTasks:
+    """Tests for create_tasks function."""
+
+    @pytest.fixture
+    def mock_tracker(self):
+        """Provide a mocked IssueTracker."""
+        tracker = MagicMock()
+        # Simulate ID generation for created tasks
+        tracker.create_task = MagicMock(side_effect=lambda **kwargs: self._make_task(kwargs))
+        return tracker
+
+    def _make_task(self, kwargs):
+        """Helper to create a Task from kwargs."""
+        from datetime import datetime
+
+        from jiro.trackers.interface import Task
+
+        task_id = f"tracker-task-{id(kwargs)}"
+        return Task(
+            id=task_id,
+            title=kwargs.get("title", ""),
+            task_type=kwargs.get("task_type", "task"),
+            status="open",
+            created_at=datetime.now(),
+            description=kwargs.get("description"),
+            epic_id=kwargs.get("epic_id"),
+            priority=kwargs.get("priority"),
+            labels=kwargs.get("labels"),
+        )
+
+    @pytest.mark.unit
+    def test_creates_epics_from_plan(self, mock_tracker) -> None:
+        """Should create epics in the tracker from the plan."""
+        from jiro.core.planner import create_tasks
+
+        plan = PlanResult(
+            epics=[
+                Epic(id="epic-1", name="Auth Core", description="Core auth", tasks=["task-1"]),
+                Epic(id="epic-2", name="OAuth", description="OAuth2", tasks=["task-2"]),
+            ],
+            tasks=[],
+            dependencies=[],
+        )
+
+        # Setup mock to track created epics
+        mock_tracker.create_task = MagicMock(return_value=MagicMock(id="created-epic-1"))
+
+        create_tasks(plan, mock_tracker)
+
+        # Should have called create_task twice for epics
+        assert mock_tracker.create_task.call_count >= 2
+        calls = mock_tracker.create_task.call_args_list
+        # Check that create_task was called with task_type="epic"
+        epic_calls = [c for c in calls if c[1].get("task_type") == "epic"]
+        assert len(epic_calls) >= 2
+
+    @pytest.mark.unit
+    def test_creates_tasks_in_epics(self, mock_tracker) -> None:
+        """Should create tasks linked to their parent epics."""
+        from jiro.core.planner import create_tasks
+
+        plan = PlanResult(
+            epics=[Epic(id="epic-1", name="Auth Core", description="Core auth", tasks=["task-1"])],
+            tasks=[
+                Task(
+                    id="task-1",
+                    title="Setup JWT",
+                    description="Configure JWT",
+                    epic_id="epic-1",
+                    dependencies=[],
+                )
+            ],
+            dependencies=[],
+        )
+
+        mock_tracker.create_task = MagicMock(return_value=MagicMock(id="created-task-1"))
+
+        create_tasks(plan, mock_tracker)
+
+        # Should create at least 2 tasks (1 epic + 1 task)
+        assert mock_tracker.create_task.call_count >= 2
+        calls = mock_tracker.create_task.call_args_list
+        # Check that create_task was called with task type "task"
+        task_calls = [c for c in calls if c[1].get("task_type") == "task"]
+        assert len(task_calls) >= 1
+
+    @pytest.mark.unit
+    def test_links_task_dependencies(self, mock_tracker) -> None:
+        """Should set up dependencies between tasks."""
+        from jiro.core.planner import create_tasks
+
+        plan = PlanResult(
+            epics=[Epic(id="epic-1", name="Auth", description="Auth", tasks=["task-1", "task-2"])],
+            tasks=[
+                Task(
+                    id="task-1",
+                    title="Setup JWT",
+                    description="Configure JWT",
+                    epic_id="epic-1",
+                    dependencies=[],
+                ),
+                Task(
+                    id="task-2",
+                    title="Implement login",
+                    description="Login endpoint",
+                    epic_id="epic-1",
+                    dependencies=["task-1"],
+                ),
+            ],
+            dependencies=[{"from": "task-2", "to": "task-1"}],
+        )
+
+        mock_tracker.create_task = MagicMock(return_value=MagicMock(id="new-id"))
+        mock_tracker.add_dependency = MagicMock()
+
+        create_tasks(plan, mock_tracker)
+
+        # Should have called add_dependency for the dependency link
+        assert mock_tracker.add_dependency.called
+
+    @pytest.mark.unit
+    def test_returns_created_tasks(self, mock_tracker) -> None:
+        """Should return a list of created tasks."""
+        from datetime import datetime
+
+        from jiro.core.planner import create_tasks
+        from jiro.trackers.interface import Task as TrackerTask
+
+        plan = PlanResult(
+            epics=[Epic(id="epic-1", name="Auth", description="Auth", tasks=["task-1"])],
+            tasks=[
+                Task(
+                    id="task-1",
+                    title="Setup JWT",
+                    description="Configure JWT",
+                    epic_id="epic-1",
+                    dependencies=[],
+                )
+            ],
+            dependencies=[],
+        )
+
+        created_task = TrackerTask(
+            id="tracker-1",
+            title="Setup JWT",
+            task_type="task",
+            status="open",
+            created_at=datetime.now(),
+            description="Configure JWT",
+            epic_id="epic-1",
+        )
+        mock_tracker.create_task = MagicMock(return_value=created_task)
+
+        result = create_tasks(plan, mock_tracker)
+
+        assert isinstance(result, list)
+        assert len(result) > 0
+        assert result[0].id == "tracker-1"
+
+    @pytest.mark.unit
+    def test_creates_empty_plan(self, mock_tracker) -> None:
+        """Should handle empty plans gracefully."""
+        from jiro.core.planner import create_tasks
+
+        plan = PlanResult(epics=[], tasks=[], dependencies=[])
+
+        result = create_tasks(plan, mock_tracker)
+
+        assert isinstance(result, list)
+        assert len(result) == 0
