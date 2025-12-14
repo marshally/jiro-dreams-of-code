@@ -7,6 +7,7 @@ from jiro.steps.discovery import (
     get_module_path,
     to_pascal_case,
 )
+from jiro.steps.execution_step import ExecutionStep
 from jiro.steps.types import PlanStep, StepType, VerificationError
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "discover_command",
     "discover_verification",
     "discover_commit",
+    "ExecutionStep",
 ]
