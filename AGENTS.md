@@ -94,6 +94,44 @@ What did we decide to do?
 - Tradeoffs we're accepting
 ```
 
+## Design Principles
+
+### YAGNI (You Aren't Gonna Need It)
+
+Prefer simpler solutions until complexity is proven necessary:
+
+- **Rule of 3** - Don't extract abstractions until you've seen the pattern at least 3 times
+- **Start flat** - Begin with simple structures; add hierarchy only when needed
+- **Defer decisions** - If unsure, choose the simpler option now; refactor later if needed
+
+Examples from this codebase:
+
+- Factory pattern over explicit subclasses for `ExecutionStep`
+- Single `VerificationError` exception over a class hierarchy
+- Minimal `PlanStep` dataclass (just `step_type` and `planning_context`)
+
+### One-at-a-Time Questioning
+
+When designing complex systems, ask focused questions sequentially:
+
+- **One question per message** - Don't overwhelm with multiple decisions at once
+- **Build on answers** - Each question should build on the previous answer
+- **Target 95% confidence** - Keep asking until the design is clear enough to implement
+- **Present options** - Give 2-4 concrete choices rather than open-ended questions
+
+This approach produces better designs because each decision is made with full context from previous decisions.
+
+### Incremental Documentation
+
+Document as you design, not after:
+
+1. **Design doc first** - Write the design document before creating implementation tasks
+1. **Reference the doc** - Implementation tasks should link back to specific sections
+1. **ADRs for decisions** - Record significant architectural decisions as ADRs
+1. **Update on implementation** - If implementation diverges from design, update the doc
+
+This ensures knowledge is captured while it's fresh and creates a clear trail from requirements to implementation.
+
 ## Issue Tracking
 
 This project uses [Beads](https://github.com/beads-project/beads) for issue tracking. Use `bd` commands to manage work items rather than markdown TODOs.
