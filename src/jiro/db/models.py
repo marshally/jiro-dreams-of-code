@@ -1,13 +1,15 @@
 """Database models for jiro."""
 
-from dataclasses import dataclass
+import json
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 SessionStatus = Literal["running", "completed", "failed", "halted"]
 AgentType = Literal["dreaming", "planning", "execution", "review"]
 TaskPhase = Literal["preflight", "executing", "postflight"]
 TaskStatus = Literal["running", "success", "failed", "halted"]
+CommitStatus = Literal["pending", "committed"]
 CommitType = Literal[
     "docs",
     "tdd_red",
@@ -202,14 +204,26 @@ class Commit:
     """Represents a git commit created during task execution.
 
     Records every commit with verification details and context token tracking.
+
+    The status field tracks the commit lifecycle:
+    - 'pending': Commit record created, but git commit not yet executed
+    - 'committed': Git commit succeeded, sha is populated
+
+    The sha field is nullable because:
+    - Set to None when status='pending' (before git commit)
+    - Populated when status='committed' (after git commit succeeds)
+
+    The metadata field stores step-specific structured data as JSON.
     """
 
     id: str
     task_id: str
-    sha: str
     commit_type: CommitType
     message: str
     created_at: datetime
+    status: CommitStatus = "pending"
+    sha: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
     session_id: str | None = None
     verification_command: str | None = None
     verification_results: str | None = None
@@ -227,13 +241,24 @@ class Commit:
         Returns:
             Commit instance.
         """
+        # Handle metadata JSON deserialization
+        metadata_raw = row.get("metadata")
+        if metadata_raw is None:
+            metadata = {}
+        elif isinstance(metadata_raw, str):
+            metadata = json.loads(metadata_raw)
+        else:
+            metadata = metadata_raw
+
         return cls(
             id=row["id"],
             task_id=row["task_id"],
-            sha=row["sha"],
             commit_type=row["commit_type"],
             message=row["message"],
             created_at=datetime.fromisoformat(row["created_at"]),
+            status=row.get("status", "committed"),  # Default for backward compatibility
+            sha=row.get("sha"),
+            metadata=metadata,
             session_id=row.get("session_id"),
             verification_command=row.get("verification_command"),
             verification_results=row.get("verification_results"),
@@ -251,10 +276,12 @@ class Commit:
         return {
             "id": self.id,
             "task_id": self.task_id,
-            "sha": self.sha,
             "commit_type": self.commit_type,
             "message": self.message,
             "created_at": self.created_at.isoformat(),
+            "status": self.status,
+            "sha": self.sha,
+            "metadata": json.dumps(self.metadata),
             "session_id": self.session_id,
             "verification_command": self.verification_command,
             "verification_results": self.verification_results,

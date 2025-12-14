@@ -79,15 +79,22 @@ Records every commit created during execution with full audit trail.
 | `id` | TEXT | PRIMARY KEY | UUID for the commit record |
 | `task_id` | TEXT | NOT NULL | Task ID from beads |
 | `session_id` | TEXT | REFERENCES sessions(id) | Parent session |
-| `sha` | TEXT | NOT NULL | Git commit SHA |
 | `commit_type` | TEXT | NOT NULL | Commit type (see below) |
 | `message` | TEXT | NOT NULL | Full commit message |
+| `status` | TEXT | NOT NULL | `pending`, `committed` |
+| `sha` | TEXT | | Git commit SHA (NULL until committed) |
+| `metadata` | TEXT | NOT NULL | JSON structured data for step-specific info |
 | `verification_command` | TEXT | | Command used to verify |
 | `verification_results` | TEXT | | Output of verification command |
 | `time_taken_seconds` | INTEGER | | Seconds spent on this commit |
 | `context_tokens_before` | INTEGER | | Tokens before this work |
 | `context_tokens_after` | INTEGER | | Tokens after this work |
 | `created_at` | TEXT | NOT NULL | ISO 8601 timestamp |
+
+**Status values:**
+
+- `pending` - Commit record created, verification passed, git commit not yet executed
+- `committed` - Git commit succeeded, sha is populated
 
 **Commit type values:**
 
@@ -151,9 +158,11 @@ CREATE TABLE IF NOT EXISTS commits (
     id TEXT PRIMARY KEY,
     task_id TEXT NOT NULL,
     session_id TEXT REFERENCES sessions(id),
-    sha TEXT NOT NULL,
     commit_type TEXT NOT NULL,
     message TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('pending', 'committed')),
+    sha TEXT,
+    metadata TEXT NOT NULL DEFAULT '{}',
     verification_command TEXT,
     verification_results TEXT,
     time_taken_seconds INTEGER,
@@ -177,15 +186,17 @@ ______________________________________________________________________
 ## Python Models
 
 ```python
+import json
 from dataclasses import dataclass, asdict, field
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 
 SessionStatus = Literal["running", "completed", "failed", "halted"]
 AgentType = Literal["dreaming", "planning", "execution", "review"]
 TaskPhase = Literal["preflight", "executing", "postflight"]
 TaskStatus = Literal["running", "success", "failed", "halted"]
+CommitStatus = Literal["pending", "committed"]
 CommitType = Literal[
     "docs",
     "tdd_red",
@@ -321,10 +332,12 @@ class TaskExecution:
 class Commit:
     id: str
     task_id: str
-    sha: str
     commit_type: CommitType
     message: str
     created_at: datetime
+    status: CommitStatus = "pending"
+    sha: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
     session_id: str | None = None
     verification_command: str | None = None
     verification_results: str | None = None
@@ -334,13 +347,24 @@ class Commit:
 
     @classmethod
     def from_row(cls, row: dict) -> "Commit":
+        # Handle metadata JSON deserialization
+        metadata_raw = row.get("metadata")
+        if metadata_raw is None:
+            metadata = {}
+        elif isinstance(metadata_raw, str):
+            metadata = json.loads(metadata_raw)
+        else:
+            metadata = metadata_raw
+
         return cls(
             id=row["id"],
             task_id=row["task_id"],
-            sha=row["sha"],
             commit_type=row["commit_type"],
             message=row["message"],
             created_at=datetime.fromisoformat(row["created_at"]),
+            status=row.get("status", "committed"),  # Default for backward compatibility
+            sha=row.get("sha"),
+            metadata=metadata,
             session_id=row.get("session_id"),
             verification_command=row.get("verification_command"),
             verification_results=row.get("verification_results"),
@@ -353,10 +377,12 @@ class Commit:
         return {
             "id": self.id,
             "task_id": self.task_id,
-            "sha": self.sha,
             "commit_type": self.commit_type,
             "message": self.message,
             "created_at": self.created_at.isoformat(),
+            "status": self.status,
+            "sha": self.sha,
+            "metadata": json.dumps(self.metadata),
             "session_id": self.session_id,
             "verification_command": self.verification_command,
             "verification_results": self.verification_results,
@@ -442,9 +468,11 @@ def ensure_schema(db: Database) -> None:
             "id": str,
             "task_id": str,
             "session_id": str,
-            "sha": str,
             "commit_type": str,
             "message": str,
+            "status": str,
+            "sha": str,
+            "metadata": str,
             "verification_command": str,
             "verification_results": str,
             "time_taken_seconds": int,

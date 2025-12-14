@@ -7,6 +7,7 @@ import pytest
 from jiro.db.models import (
     AgentType,
     Commit,
+    CommitStatus,
     CommitType,
     Prompt,
     Session,
@@ -442,29 +443,33 @@ class TestCommit:
         commit = Commit(
             id="commit-123",
             task_id="task-456",
-            sha="abc123def456",
             commit_type="docs",
             message="Add documentation for feature X",
             created_at=datetime(2024, 1, 15, 10, 30, 0),
         )
         assert commit.id == "commit-123"
         assert commit.task_id == "task-456"
-        assert commit.sha == "abc123def456"
         assert commit.commit_type == "docs"
         assert commit.message == "Add documentation for feature X"
         assert commit.created_at == datetime(2024, 1, 15, 10, 30, 0)
 
     @pytest.mark.unit
     def test_optional_fields_default_to_none(self) -> None:
-        """Optional fields should default to None."""
+        """Optional fields should default to None or default values."""
         commit = Commit(
             id="commit-123",
             task_id="task-456",
-            sha="abc123",
             commit_type="tdd_red",
             message="Add failing test",
             created_at=datetime.now(),
         )
+        # status defaults to "pending"
+        assert commit.status == "pending"
+        # sha defaults to None (not committed yet)
+        assert commit.sha is None
+        # metadata defaults to empty dict
+        assert commit.metadata == {}
+        # Other optional fields default to None
         assert commit.session_id is None
         assert commit.verification_command is None
         assert commit.verification_results is None
@@ -478,10 +483,12 @@ class TestCommit:
         row = {
             "id": "commit-123",
             "task_id": "task-456",
-            "sha": "abc123def456",
             "commit_type": "tdd_green",
             "message": "Implement feature",
             "created_at": "2024-01-15T10:30:00",
+            "status": "committed",
+            "sha": "abc123def456",
+            "metadata": '{"test_file": "test_foo.py", "test_name": "test_bar"}',
             "session_id": "sess-789",
             "verification_command": "pytest tests/",
             "verification_results": "All tests passed",
@@ -492,10 +499,12 @@ class TestCommit:
         commit = Commit.from_row(row)
         assert commit.id == "commit-123"
         assert commit.task_id == "task-456"
-        assert commit.sha == "abc123def456"
         assert commit.commit_type == "tdd_green"
         assert commit.message == "Implement feature"
         assert commit.created_at == datetime(2024, 1, 15, 10, 30, 0)
+        assert commit.status == "committed"
+        assert commit.sha == "abc123def456"
+        assert commit.metadata == {"test_file": "test_foo.py", "test_name": "test_bar"}
         assert commit.session_id == "sess-789"
         assert commit.verification_command == "pytest tests/"
         assert commit.verification_results == "All tests passed"
@@ -504,15 +513,52 @@ class TestCommit:
         assert commit.context_tokens_after == 7500
 
     @pytest.mark.unit
+    def test_from_row_pending_status(self) -> None:
+        """from_row should handle pending commits with null sha."""
+        row = {
+            "id": "commit-123",
+            "task_id": "task-456",
+            "commit_type": "tdd_red",
+            "message": "Add failing test",
+            "created_at": "2024-01-15T10:30:00",
+            "status": "pending",
+            "sha": None,
+            "metadata": "{}",
+        }
+        commit = Commit.from_row(row)
+        assert commit.status == "pending"
+        assert commit.sha is None
+        assert commit.metadata == {}
+
+    @pytest.mark.unit
+    def test_from_row_backward_compatibility(self) -> None:
+        """from_row should default status to 'committed' for old rows."""
+        row = {
+            "id": "commit-123",
+            "task_id": "task-456",
+            "sha": "abc123def456",
+            "commit_type": "docs",
+            "message": "Legacy commit",
+            "created_at": "2024-01-15T10:30:00",
+            # No status or metadata fields (legacy row)
+        }
+        commit = Commit.from_row(row)
+        assert commit.status == "committed"
+        assert commit.sha == "abc123def456"
+        assert commit.metadata == {}
+
+    @pytest.mark.unit
     def test_to_row(self) -> None:
         """to_row should serialize to database row."""
         commit = Commit(
             id="commit-123",
             task_id="task-456",
-            sha="abc123def456",
             commit_type="tdd_refactor",
             message="Refactor code",
             created_at=datetime(2024, 1, 15, 10, 30, 0),
+            status="committed",
+            sha="abc123def456",
+            metadata={"refactor_type": "extract_method"},
             session_id="sess-789",
             verification_command="pytest",
             verification_results="OK",
@@ -523,10 +569,12 @@ class TestCommit:
         row = commit.to_row()
         assert row["id"] == "commit-123"
         assert row["task_id"] == "task-456"
-        assert row["sha"] == "abc123def456"
         assert row["commit_type"] == "tdd_refactor"
         assert row["message"] == "Refactor code"
         assert row["created_at"] == "2024-01-15T10:30:00"
+        assert row["status"] == "committed"
+        assert row["sha"] == "abc123def456"
+        assert row["metadata"] == '{"refactor_type": "extract_method"}'
         assert row["session_id"] == "sess-789"
         assert row["verification_command"] == "pytest"
         assert row["verification_results"] == "OK"
@@ -535,15 +583,35 @@ class TestCommit:
         assert row["context_tokens_after"] == 3500
 
     @pytest.mark.unit
+    def test_to_row_pending(self) -> None:
+        """to_row should handle pending commits with null sha."""
+        commit = Commit(
+            id="commit-123",
+            task_id="task-456",
+            commit_type="tdd_red",
+            message="Add failing test",
+            created_at=datetime(2024, 1, 15, 10, 30, 0),
+            status="pending",
+            sha=None,
+            metadata={},
+        )
+        row = commit.to_row()
+        assert row["status"] == "pending"
+        assert row["sha"] is None
+        assert row["metadata"] == "{}"
+
+    @pytest.mark.unit
     def test_roundtrip(self) -> None:
         """to_row then from_row should produce equivalent object."""
         original = Commit(
             id="commit-123",
             task_id="task-456",
-            sha="abc123def456789",
             commit_type="lint_fix",
             message="Fix linting errors",
             created_at=datetime(2024, 1, 15, 10, 30, 0),
+            status="committed",
+            sha="abc123def456789",
+            metadata={"lint_rule": "E501", "file": "src/foo.py"},
             session_id="sess-789",
             verification_command="ruff check .",
             verification_results="No errors",
@@ -555,16 +623,56 @@ class TestCommit:
         restored = Commit.from_row(row)
         assert restored.id == original.id
         assert restored.task_id == original.task_id
-        assert restored.sha == original.sha
         assert restored.commit_type == original.commit_type
         assert restored.message == original.message
         assert restored.created_at == original.created_at
+        assert restored.status == original.status
+        assert restored.sha == original.sha
+        assert restored.metadata == original.metadata
         assert restored.session_id == original.session_id
         assert restored.verification_command == original.verification_command
         assert restored.verification_results == original.verification_results
         assert restored.time_taken_seconds == original.time_taken_seconds
         assert restored.context_tokens_before == original.context_tokens_before
         assert restored.context_tokens_after == original.context_tokens_after
+
+    @pytest.mark.unit
+    def test_roundtrip_pending(self) -> None:
+        """Pending commits should roundtrip correctly."""
+        original = Commit(
+            id="commit-123",
+            task_id="task-456",
+            commit_type="tdd_red",
+            message="Add failing test",
+            created_at=datetime(2024, 1, 15, 10, 30, 0),
+            status="pending",
+            sha=None,
+            metadata={"test_name": "test_foo"},
+        )
+        row = original.to_row()
+        restored = Commit.from_row(row)
+        assert restored.status == original.status
+        assert restored.sha == original.sha
+        assert restored.metadata == original.metadata
+
+
+class TestCommitStatus:
+    """Tests for CommitStatus type alias."""
+
+    @pytest.mark.unit
+    def test_valid_statuses(self) -> None:
+        """CommitStatus should allow valid values."""
+        valid: list[CommitStatus] = ["pending", "committed"]
+        for status in valid:
+            commit = Commit(
+                id="test",
+                task_id="task-1",
+                commit_type="docs",
+                message="test",
+                created_at=datetime.now(),
+                status=status,
+            )
+            assert commit.status == status
 
 
 class TestCommitType:
@@ -588,7 +696,6 @@ class TestCommitType:
             commit = Commit(
                 id="test",
                 task_id="task-1",
-                sha="abc",
                 commit_type=commit_type,
                 message="test",
                 created_at=datetime.now(),
