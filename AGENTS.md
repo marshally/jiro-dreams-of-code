@@ -97,3 +97,41 @@ What did we decide to do?
 ## Issue Tracking
 
 This project uses [Beads](https://github.com/beads-project/beads) for issue tracking. Use `bd` commands to manage work items rather than markdown TODOs.
+
+## Beads Commit Isolation
+
+**CRITICAL**: `.beads/` files must ALWAYS be committed separately from code changes.
+
+### Handling the Pre-commit Hook Error
+
+When you see this error:
+
+```
+ERROR - .beads/ files must be committed separately from other files.
+```
+
+Follow this recovery procedure:
+
+1. **Unstage beads files**: `git restore --staged .beads/`
+1. **Commit your code changes first**
+1. **Then commit beads changes separately**:
+   ```bash
+   git add .beads/
+   git commit -m "chore(beads): update task status"
+   ```
+
+### Proactive Workflow
+
+To avoid the error entirely, always follow this order:
+
+1. After `bd update` or other beads commands, immediately commit beads changes:
+   ```bash
+   git add .beads/
+   git commit -m "chore(beads): claim task [task-id]"
+   ```
+1. Then do your code work and commit code separately
+1. After `bd close`, commit beads changes again:
+   ```bash
+   git add .beads/
+   git commit -m "chore(beads): close task [task-id]"
+   ```
