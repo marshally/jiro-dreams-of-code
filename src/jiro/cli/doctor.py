@@ -74,13 +74,13 @@ def check_python_version() -> CheckResult:
 
 
 def check_claude_sdk() -> CheckResult:
-    """Check if Anthropic Claude SDK is installed and importable.
+    """Check if Claude Agent SDK is installed and importable.
 
     Returns:
-        CheckResult indicating if anthropic SDK is available.
+        CheckResult indicating if claude_agent_sdk is available.
     """
     try:
-        import anthropic  # noqa: F401
+        import claude_agent_sdk  # noqa: F401
 
         return CheckResult(
             name="claude_sdk",
@@ -90,13 +90,13 @@ def check_claude_sdk() -> CheckResult:
         return CheckResult(
             name="claude_sdk",
             passed=False,
-            error=f"Anthropic SDK not installed: {str(e)}",
+            error=f"Claude Agent SDK not installed: {str(e)}",
         )
     except Exception as e:
         return CheckResult(
             name="claude_sdk",
             passed=False,
-            error=f"Error checking Anthropic SDK: {str(e)}",
+            error=f"Error checking Claude Agent SDK: {str(e)}",
         )
 
 

@@ -54,9 +54,9 @@ class TestCheckClaudeSDK:
 
     @pytest.mark.unit
     def test_claude_sdk_installed(self) -> None:
-        """Should pass if anthropic SDK is importable."""
+        """Should pass if claude_agent_sdk is importable."""
         # Mock successful import
-        with patch.dict("sys.modules", {"anthropic": MagicMock()}):
+        with patch.dict("sys.modules", {"claude_agent_sdk": MagicMock()}):
             result = check_claude_sdk()
             assert isinstance(result, CheckResult)
             assert result.name == "claude_sdk"
@@ -65,12 +65,14 @@ class TestCheckClaudeSDK:
 
     @pytest.mark.unit
     def test_claude_sdk_missing(self) -> None:
-        """Should fail if anthropic SDK cannot be imported."""
-        with patch("builtins.__import__", side_effect=ImportError("No module named 'anthropic'")):
+        """Should fail if claude_agent_sdk cannot be imported."""
+        with patch(
+            "builtins.__import__", side_effect=ImportError("No module named 'claude_agent_sdk'")
+        ):
             result = check_claude_sdk()
             assert result.passed is False
             assert result.error is not None
-            assert "anthropic" in result.error.lower()
+            assert "claude" in result.error.lower()
 
 
 class TestCheckAPIKey:
