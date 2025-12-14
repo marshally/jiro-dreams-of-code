@@ -162,7 +162,8 @@ def check_git() -> CheckResult:
 
 
 def check_test_command(config) -> CheckResult:
-    """Check if the configured test command works.
+    """Check if the configured test command is available.
+    running the full test suite (which could take a long time).
 
     Args:
         config: Configuration object with test command.
@@ -172,6 +173,8 @@ def check_test_command(config) -> CheckResult:
     """
     try:
         test_command = config.commands.test
+
+        # Check if the test runner is available with --version
         result = subprocess.run(
             test_command,
             shell=True,
