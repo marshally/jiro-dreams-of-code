@@ -12,7 +12,7 @@ from jiro.trackers.interface import Task
 class TestTasksEndpoint:
     """Tests for GET /tasks endpoint."""
 
-    @pytest.mark.unit
+    @pytest.mark.integration
     def test_tasks_endpoint_exists(self) -> None:
         """Should have a /tasks endpoint."""
         from jiro.web.app import app
@@ -21,7 +21,7 @@ class TestTasksEndpoint:
         response = client.get("/tasks")
         assert response.status_code == 200
 
-    @pytest.mark.unit
+    @pytest.mark.integration
     def test_tasks_endpoint_returns_html(self) -> None:
         """Should return HTML response."""
         from jiro.web.app import app
@@ -30,7 +30,7 @@ class TestTasksEndpoint:
         response = client.get("/tasks")
         assert "text/html" in response.headers.get("content-type", "")
 
-    @pytest.mark.unit
+    @pytest.mark.integration
     def test_tasks_endpoint_renders_template(self) -> None:
         """Should render tasks.html template."""
         from jiro.web.app import app
@@ -41,7 +41,7 @@ class TestTasksEndpoint:
         # Should contain HTML markup
         assert b"<" in response.content and b">" in response.content
 
-    @pytest.mark.unit
+    @pytest.mark.integration
     def test_tasks_list_empty(self) -> None:
         """Should handle empty task list gracefully."""
         from jiro.web.app import app
@@ -143,7 +143,7 @@ class TestTasksEndpoint:
         assert len(grouped["epic-2"]) == 1
         assert len(grouped[None]) == 1
 
-    @pytest.mark.unit
+    @pytest.mark.integration
     def test_tasks_endpoint_with_tracker(self) -> None:
         """Should fetch tasks from tracker."""
         from unittest.mock import patch
@@ -176,7 +176,7 @@ class TestTasksEndpoint:
             # Should still return 200
             assert response.status_code == 200
 
-    @pytest.mark.unit
+    @pytest.mark.integration
     def test_tasks_endpoint_has_htmx_attributes(self) -> None:
         """Should include HTMX attributes for dynamic updates."""
         from jiro.web.app import app

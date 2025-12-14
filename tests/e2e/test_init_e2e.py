@@ -15,6 +15,7 @@ from jiro.core.paths import (
 )
 
 
+@pytest.mark.e2e
 class TestInitCommandE2E:
     """E2E tests for the init command."""
 
