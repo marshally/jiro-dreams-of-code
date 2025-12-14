@@ -163,25 +163,28 @@ def check_git() -> CheckResult:
 
 def check_test_command(config) -> CheckResult:
     """Check if the configured test command is available.
+
+    Verifies the test runner is installed by checking --version, rather than
     running the full test suite (which could take a long time).
 
     Args:
         config: Configuration object with test command.
 
     Returns:
-        CheckResult indicating if test command is functional.
+        CheckResult indicating if test command is available.
     """
     try:
+        # Extract the base command (e.g., "pytest" from "pytest tests/")
         test_command = config.commands.test
+        base_command = test_command.split()[0]
 
         # Check if the test runner is available with --version
         result = subprocess.run(
-            test_command,
-            shell=True,
+            [base_command, "--version"],
             capture_output=True,
             text=True,
             check=False,
-            timeout=30,
+            timeout=10,
         )
 
         if result.returncode == 0:
@@ -193,7 +196,7 @@ def check_test_command(config) -> CheckResult:
             return CheckResult(
                 name="test_command",
                 passed=False,
-                error=f"Test command failed with exit code {result.returncode}",
+                error=f"Test command '{base_command}' not available or failed",
             )
     except subprocess.TimeoutExpired:
         return CheckResult(
@@ -201,11 +204,17 @@ def check_test_command(config) -> CheckResult:
             passed=False,
             error="Test command timed out",
         )
+    except FileNotFoundError:
+        return CheckResult(
+            name="test_command",
+            passed=False,
+            error=f"Test command '{base_command}' not found",
+        )
     except Exception as e:
         return CheckResult(
             name="test_command",
             passed=False,
-            error=f"Error running test command: {str(e)}",
+            error=f"Error checking test command: {str(e)}",
         )
 
 
