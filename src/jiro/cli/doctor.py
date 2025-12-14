@@ -219,23 +219,29 @@ def check_test_command(config) -> CheckResult:
 
 
 def check_lint_command(config) -> CheckResult:
-    """Check if the configured lint command works.
+    """Check if the configured lint command is available.
+
+    Verifies the linter is installed by checking --version, rather than
+    running lint on the entire codebase (which could take a long time).
 
     Args:
         config: Configuration object with lint command.
 
     Returns:
-        CheckResult indicating if lint command is functional.
+        CheckResult indicating if lint command is available.
     """
     try:
+        # Extract the base command (e.g., "ruff" from "ruff check")
         lint_command = config.commands.lint
+        base_command = lint_command.split()[0]
+
+        # Check if the linter is available with --version
         result = subprocess.run(
-            lint_command,
-            shell=True,
+            [base_command, "--version"],
             capture_output=True,
             text=True,
             check=False,
-            timeout=30,
+            timeout=10,
         )
 
         if result.returncode == 0:
@@ -247,7 +253,7 @@ def check_lint_command(config) -> CheckResult:
             return CheckResult(
                 name="lint_command",
                 passed=False,
-                error=f"Lint command failed with exit code {result.returncode}",
+                error=f"Lint command '{base_command}' not available or failed",
             )
     except subprocess.TimeoutExpired:
         return CheckResult(
@@ -255,11 +261,17 @@ def check_lint_command(config) -> CheckResult:
             passed=False,
             error="Lint command timed out",
         )
+    except FileNotFoundError:
+        return CheckResult(
+            name="lint_command",
+            passed=False,
+            error=f"Lint command '{base_command}' not found",
+        )
     except Exception as e:
         return CheckResult(
             name="lint_command",
             passed=False,
-            error=f"Error running lint command: {str(e)}",
+            error=f"Error checking lint command: {str(e)}",
         )
 
 
