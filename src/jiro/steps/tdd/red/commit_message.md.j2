@@ -1,0 +1,18 @@
+🔴 Add failing test for {{ test_name }}
+
+Task: {{ task_id }}
+Type: tdd_red
+Test: {{ test_specifier }}
+
+Test Output:
+```
+{{ test_output | indent(2) }}
+```
+
+Verification: {{ verification_command }}
+Verification time: {{ "%.2f"|format(verification_time) }}s
+
+Subagent: {{ subagent_type }}
+Tokens: {{ tokens_in }} → {{ tokens_out }}
+Subagent time: {{ "%.2f"|format(subagent_time) }}s
+E2E time: {{ "%.2f"|format(e2e_time) }}s

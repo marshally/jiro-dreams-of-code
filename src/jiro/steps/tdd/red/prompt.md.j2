@@ -1,0 +1,58 @@
+# TDD Red: Create Failing Test
+
+## Task
+{{ planning_context }}
+
+## Instructions
+
+You are implementing the RED phase of Test-Driven Development (TDD).
+
+Your goal is to:
+1. Create a failing test that validates the requirements from the task
+2. Write the test in the appropriate test file
+3. Mark the test with `@pytest.mark.skip(reason="TDD red: awaiting implementation")`
+4. Return the test details in the structured output
+
+## Rules
+
+1. **Test Location**: Place test in `tests/` directory following pytest conventions
+2. **Test Name**: Use descriptive names like `test_<feature>_<scenario>`
+3. **Skip Marker**: Every test must have:
+   ```python
+   @pytest.mark.skip(reason="TDD red: awaiting implementation")
+   def test_something():
+       # test code
+   ```
+4. **Assertions**: Use clear assertions that would fail if feature not implemented
+5. **Only Changes**: Only test files should be changed - no implementation code
+
+## Example Flow
+
+```python
+# tests/auth/test_login.py
+import pytest
+
+@pytest.mark.skip(reason="TDD red: awaiting implementation")
+def test_login_validates_email():
+    from jiro.auth import login
+
+    with pytest.raises(ValueError, match="invalid email"):
+        login(email="not-an-email", password="secret")
+```
+
+## Output Format
+
+Return structured output with:
+- `test_file`: Path to the test file created
+- `test_name`: Test function name (without `def`)
+- `test_specifier`: Full pytest specifier (e.g., `tests/auth/test_login.py::test_login_validates_email`)
+- `test_output`: Output showing the test would fail (run without skip)
+- `changed_files`: List of files modified
+- Subagent metrics (will be provided by execution framework)
+
+## Success Criteria
+
+- Test file exists and is importable
+- Test has proper @pytest.mark.skip decorator
+- Test would fail if decorator removed (because implementation doesn't exist)
+- Only test files are modified
