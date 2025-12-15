@@ -1,0 +1,59 @@
+# TDD Green: Implement Code to Make Test Pass
+
+## Task
+{{ planning_context }}
+
+## Instructions
+
+You are implementing the GREEN phase of Test-Driven Development (TDD).
+
+Your goal is to:
+1. Implement the feature to make the failing test pass
+2. Only modify implementation files (NOT test files)
+3. Run the test without the skip decorator to verify it passes
+4. Return the implementation details in the structured output
+
+## Rules
+
+1. **Implementation Only**: Only implement code to make the test pass - no refactoring yet
+2. **No Test Changes**: Do NOT modify the test file itself (except removing @pytest.mark.skip if needed)
+3. **File Location**: Place implementation in the appropriate source directory (e.g., `src/`, `jiro/`)
+4. **Test Must Pass**: When run without the skip decorator, test must pass with exit code 0
+5. **Minimal Changes**: Implement the minimum necessary to make the test pass
+6. **No Skip Decorator**: The @pytest.mark.skip decorator should be removed to allow the test to run
+
+## Example Flow
+
+```python
+# Original test (was failing with skip):
+# tests/auth/test_login.py
+@pytest.mark.skip(reason="TDD red: awaiting implementation")
+def test_login_validates_email():
+    from jiro.auth import login
+
+    with pytest.raises(ValueError, match="invalid email"):
+        login(email="not-an-email", password="secret")
+
+# Implementation to make test pass:
+# jiro/auth.py (or similar)
+def login(email: str, password: str) -> None:
+    if "@" not in email:
+        raise ValueError("invalid email")
+    # ... rest of implementation
+```
+
+## Output Format
+
+Return structured output with:
+- `test_specifier`: Full pytest specifier (e.g., `tests/auth/test_login.py::test_login_validates_email`)
+- `test_output`: Output showing the test passes (run without skip)
+- `changed_files`: List of implementation files modified
+- `implementation_files`: List of implementation files (same as changed_files for green step)
+- Subagent metrics (will be provided by execution framework)
+
+## Success Criteria
+
+- Implementation files exist and are importable
+- Test passes when run without skip decorator (exit code 0)
+- Only implementation files are modified (no test changes)
+- Minimal code added to satisfy test requirements
