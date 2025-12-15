@@ -1,6 +1,10 @@
 """Dream command implementation for spec generation."""
 
 import asyncio
+import io
+import sys
+from collections.abc import Generator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Annotated
 
@@ -17,13 +21,27 @@ from jiro.core.planner import Spec
 from jiro.db.database import ensure_schema, get_database
 from jiro.db.repository import PromptRepository
 
+
+@contextmanager
+def _suppress_structlog_output() -> Generator[None, None, None]:
+    """Context manager to suppress structlog JSON output to stdout."""
+    # Capture stdout to suppress JSON log output
+    old_stdout = sys.stdout
+    sys.stdout = io.StringIO()
+    try:
+        yield
+    finally:
+        sys.stdout = old_stdout
+
+
 app = typer.Typer(
     name="dream",
     help="Generate specifications from natural language",
     no_args_is_help=False,
 )
 
-console = Console()
+# Use stderr for Rich output so we can suppress stdout (JSON logs) independently
+console = Console(stderr=True)
 
 
 def _save_spec_to_file(spec: Spec, specs_dir: Path) -> Path:
@@ -117,12 +135,14 @@ def _display_spec(spec: Spec) -> None:
 async def _run_interactive_dream(
     model: str | None = None,
     project_root: Path | None = None,
+    debug: bool = False,
 ) -> None:
     """Run interactive dream mode with question-by-question interview.
 
     Args:
         model: Optional model override.
         project_root: The project root directory.
+        debug: If True, show JSON log output.
     """
     if project_root is None:
         project_root = Path.cwd()
@@ -168,8 +188,12 @@ async def _run_interactive_dream(
         console.print(Markdown(message))
         console.print()
 
-    # Run interview
-    result = await agent.interview(get_input, display_message)
+    # Run interview (suppress JSON logs unless debug mode)
+    if debug:
+        result = await agent.interview(get_input, display_message)
+    else:
+        with _suppress_structlog_output():
+            result = await agent.interview(get_input, display_message)
 
     # Display generated spec
     console.print("\n")
@@ -198,7 +222,11 @@ async def _run_interactive_dream(
                 break
 
             console.print("[cyan]Refining specification...[/cyan]")
-            spec = await agent.refine(spec, feedback)
+            if debug:
+                spec = await agent.refine(spec, feedback)
+            else:
+                with _suppress_structlog_output():
+                    spec = await agent.refine(spec, feedback)
             _display_spec(spec)
 
     except KeyboardInterrupt:
@@ -213,6 +241,7 @@ async def _run_dream(
     prompt: str,
     model: str | None = None,
     project_root: Path | None = None,
+    debug: bool = False,
 ) -> None:
     """Run the dream command asynchronously.
 
@@ -220,6 +249,7 @@ async def _run_dream(
         prompt: The feature request prompt.
         model: Optional model override.
         project_root: The project root directory.
+        debug: If True, show JSON log output.
     """
     if project_root is None:
         project_root = Path.cwd()
@@ -251,9 +281,13 @@ async def _run_dream(
     client = AgentClient(agent_config, repository)
     agent = DreamingAgent(client)
 
-    # Generate initial spec
+    # Generate initial spec (suppress JSON logs unless debug mode)
     console.print("[cyan]Generating initial specification...[/cyan]")
-    spec = await agent.dream(prompt)
+    if debug:
+        spec = await agent.dream(prompt)
+    else:
+        with _suppress_structlog_output():
+            spec = await agent.dream(prompt)
 
     # Display the spec
     _display_spec(spec)
@@ -283,7 +317,11 @@ async def _run_dream(
 
             # Refine the spec based on feedback
             console.print("[cyan]Refining specification...[/cyan]")
-            spec = await agent.refine(spec, feedback)
+            if debug:
+                spec = await agent.refine(spec, feedback)
+            else:
+                with _suppress_structlog_output():
+                    spec = await agent.refine(spec, feedback)
 
             # Display updated spec
             _display_spec(spec)
@@ -305,6 +343,7 @@ def dream_callback(
     model: Annotated[
         str | None, typer.Option("--model", help="Override the model for this operation")
     ] = None,
+    debug: Annotated[bool, typer.Option("--debug", help="Show detailed JSON logs")] = False,
 ) -> None:
     """
     Generate a specification from natural language.
@@ -319,6 +358,7 @@ def dream_callback(
         jiro dream                                          # Interactive mode
         jiro dream "build a user authentication system"     # Direct mode
         jiro dream "add GraphQL API support" --model claude-opus-4
+        jiro dream --debug                                  # Show JSON logs
     """
     # Only run if no subcommand was invoked
     if ctx.invoked_subcommand is not None:
@@ -329,10 +369,10 @@ def dream_callback(
     try:
         if prompt is None:
             # Interactive mode - agent asks questions
-            asyncio.run(_run_interactive_dream(model, project_root))
+            asyncio.run(_run_interactive_dream(model, project_root, debug))
         else:
             # Direct mode - generate spec from prompt
-            asyncio.run(_run_dream(prompt, model, project_root))
+            asyncio.run(_run_dream(prompt, model, project_root, debug))
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
         raise typer.Exit(code=1) from e
