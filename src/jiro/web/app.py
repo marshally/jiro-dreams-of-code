@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
@@ -13,6 +14,9 @@ from jiro.db.database import get_database
 from jiro.db.repository import PromptRepository, SessionRepository, TaskExecutionRepository
 from jiro.trackers.beads import BeadsTracker
 from jiro.trackers.interface import Task, TaskStatus
+
+if TYPE_CHECKING:
+    from sqlite_utils import Database
 
 # Initialize FastAPI app
 app = FastAPI(title="jiro-dreams-of-code", version="0.1.0")
@@ -45,7 +49,7 @@ def get_tracker() -> BeadsTracker:
     return BeadsTracker(project_root)
 
 
-def get_database_connection():
+def get_database_connection() -> "Database | None":
     """Get the database connection for the current project.
 
     Returns:
@@ -111,7 +115,7 @@ def _get_all_log_entries(logs_dir: Path) -> list[dict]:
     Returns:
         List of log entries sorted chronologically.
     """
-    entries = []
+    entries: list[dict[str, Any]] = []
 
     # Get all JSONL files sorted by name (date)
     if not logs_dir.exists():
@@ -150,7 +154,7 @@ async def index() -> str:
     """Render the home page template."""
     try:
         template = template_env.get_template("index.html")
-        return template.render()
+        return str(template.render())
     except Exception:
         # Fallback if template doesn't exist
         return "<html><body><h1>Welcome to jiro-dreams-of-code</h1></body></html>"
@@ -178,9 +182,11 @@ async def tasks_list() -> str:
         }
 
     template = template_env.get_template("tasks.html")
-    return template.render(
-        grouped_tasks=grouped_tasks,
-        all_tasks=all_tasks if "all_tasks" in locals() else [],
+    return str(
+        template.render(
+            grouped_tasks=grouped_tasks,
+            all_tasks=all_tasks if "all_tasks" in locals() else [],
+        )
     )
 
 
@@ -245,9 +251,11 @@ async def status_dashboard() -> str:
         pass
 
     template = template_env.get_template("status.html")
-    return template.render(
-        sessions=session_data,
-        has_sessions=len(session_data) > 0,
+    return str(
+        template.render(
+            sessions=session_data,
+            has_sessions=len(session_data) > 0,
+        )
     )
 
 
@@ -280,7 +288,9 @@ async def logs_viewer() -> str:
         pass
 
     template = template_env.get_template("logs.html")
-    return template.render(
-        log_entries=log_entries,
-        has_logs=len(log_entries) > 0,
+    return str(
+        template.render(
+            log_entries=log_entries,
+            has_logs=len(log_entries) > 0,
+        )
     )
