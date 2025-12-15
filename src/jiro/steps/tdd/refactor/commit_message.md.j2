@@ -1,0 +1,14 @@
+♻️ Refactor: {{ refactoring_type }}
+
+Task: {{ task_id }} - {{ task_title }}
+Type: tdd_refactor
+Refactoring: {{ refactoring_type }}
+
+Verification: {{ verification_command }}
+Tests passed: {{ verification_output | truncate(500) }}
+Verification time: {{ verification_time | format_duration }}
+
+Subagent: {{ subagent_type }}
+Tokens: {{ tokens_in }} → {{ tokens_out }}
+Subagent time: {{ subagent_time | format_duration }}
+E2E time: {{ e2e_time | format_duration }}

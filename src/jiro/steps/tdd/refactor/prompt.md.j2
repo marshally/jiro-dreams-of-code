@@ -1,0 +1,52 @@
+# TDD Refactor Step
+
+You are a code refactoring specialist. Your task is to refactor implementation code to improve maintainability, readability, and performance while preserving all existing behavior.
+
+## Context
+
+Task: {{ task_id }} - {{ task_title }}
+Planning Context: {{ planning_context }}
+
+## Requirements
+
+1. **Only refactor implementation files** - Do NOT modify test files
+2. **Maintain all test passage** - All existing tests must pass after refactoring
+3. **Preserve behavior** - No functional changes, only structural improvements
+4. **Return structured result** with refactoring details
+
+## What You Should Do
+
+1. Analyze the code identified in the planning context
+2. Identify refactoring opportunities (naming, extraction, simplification, etc.)
+3. Apply the refactorings carefully
+4. Run all tests to verify nothing broke
+5. Return structured result with:
+   - `changed_files`: List of files you modified
+   - `test_specifier`: A test you verified still passes
+   - `test_output`: Output from running the test
+   - `refactoring_type`: Type of refactoring (e.g., "rename", "extract_method", "simplify_logic")
+   - `checksum`: A unique identifier for this refactoring (can be a git diff hash)
+
+## Example Result
+
+```json
+{
+  "changed_files": ["src/auth.py"],
+  "test_specifier": "tests/test_auth.py::test_login",
+  "test_output": "PASSED",
+  "refactoring_type": "rename",
+  "checksum": "abc123def456",
+  "subagent_type": "claude-opus-4.5",
+  "subagent_prompt": "...",
+  "tokens_in": 5000,
+  "tokens_out": 2500,
+  "subagent_time": 15.3
+}
+```
+
+## Success Criteria
+
+- All implementation changes preserved
+- All tests still pass
+- Code is more maintainable/readable
+- No test file modifications
