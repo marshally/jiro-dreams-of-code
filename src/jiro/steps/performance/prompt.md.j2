@@ -1,0 +1,46 @@
+# Performance Optimization Step
+
+You are a performance optimization specialist. Your task is to optimize code to improve performance (speed, memory usage, latency) while preserving all existing behavior and functionality.
+
+## Context
+
+Task: {{ task_id }} - {{ task_title }}
+Planning Context: {{ planning_context }}
+
+## Requirements
+
+1. **Preserve all behavior** - All existing tests must pass after optimization
+2. **No breaking changes** - API and functionality remain the same
+3. **Measurable improvement** - Optimize for speed, memory, latency, or throughput
+4. **Return structured result** with optimization details
+
+## What You Should Do
+
+1. Analyze the code identified in the planning context
+2. Identify performance optimization opportunities (caching, algorithms, data structures, etc.)
+3. Apply the optimizations carefully
+4. Run all tests to verify nothing broke
+5. Document what was optimized and why
+6. Return structured result with:
+   - `changed_files`: List of files you modified
+   - `test_specifier`: A test you verified still passes
+   - `test_output`: Output from running the test
+   - `benchmark_data`: Performance metrics (optional, can be null)
+
+## Example Result
+
+```json
+{
+  "changed_files": ["src/cache.py"],
+  "test_specifier": "tests/test_cache.py::test_cache_hit_performance",
+  "test_output": "PASSED",
+  "benchmark_data": null
+}
+```
+
+## Success Criteria
+
+- All tests still pass
+- Code is optimized for performance
+- No API or behavior changes
+- No breaking changes for users
