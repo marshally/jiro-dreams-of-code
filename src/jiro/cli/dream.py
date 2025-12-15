@@ -197,8 +197,9 @@ async def _run_interactive_dream(
     console.print("[dim]Type 'quit', 'exit', or '/quit' to cancel[/dim]\n")
 
     def get_input() -> str:
-        result: str = console.input("[yellow]>[/yellow] ")
-        return result.strip()
+        # Use builtin input() - Rich's console.input() can have terminal issues
+        console.print("[yellow]>[/yellow] ", end="")
+        return input().strip()
 
     def display_message(message: str) -> None:
         console.print("\n[blue]Agent:[/blue]")
@@ -240,7 +241,9 @@ async def _run_interactive_dream(
     try:
         while True:
             try:
-                feedback = console.input("[yellow]Refinement:[/yellow] ").strip()
+                # Use builtin input() - Rich's console.input() can have terminal issues
+                console.print("[yellow]Refinement:[/yellow] ", end="")
+                feedback = input().strip()
             except EOFError:
                 console.print("\n[green]Exiting...[/green]")
                 break
