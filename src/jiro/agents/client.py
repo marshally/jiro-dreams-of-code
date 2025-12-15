@@ -1,5 +1,6 @@
 """AgentClient wrapper for Claude Agent SDK."""
 
+import os
 import uuid
 from datetime import datetime
 
@@ -17,6 +18,11 @@ from jiro.db.models import Prompt
 from jiro.db.repository import PromptRepository
 
 logger = structlog.get_logger()
+
+
+def _log_stderr(message: str) -> None:
+    """Log stderr output from Claude CLI."""
+    logger.warning("claude_cli_stderr", message=message.strip())
 
 
 class AgentClient:
@@ -71,6 +77,8 @@ class AgentClient:
             options = ClaudeAgentOptions(
                 model=self.config.model,
                 system_prompt=self.config.system_prompt,
+                cwd=os.getcwd(),
+                stderr=_log_stderr,
             )
 
             # Execute using Claude Agent SDK and collect text output
