@@ -108,7 +108,8 @@ class TestDreamFlowIntegration:
 
             # Should complete successfully
             assert result.exit_code in [0, 1]  # 0 success, 1 with error handling
-            assert "User Authentication System" in result.stdout
+            # Rich output goes to stderr, use output which combines both
+            assert "User Authentication System" in result.output
 
     @pytest.mark.integration
     def test_dream_spec_generation_and_display(
@@ -148,7 +149,8 @@ class TestDreamFlowIntegration:
                 )
 
             # Check that all spec components are in output
-            output = result.stdout
+            # Rich output goes to stderr, use output which combines both
+            output = result.output
             assert "User Authentication System" in output
             assert "Overview" in output
             assert "Requirements" in output
@@ -286,7 +288,8 @@ class TestDreamFlowIntegration:
             assert result.exit_code == 0
 
             # Refined spec should be displayed
-            output = result.stdout
+            # Rich output goes to stderr, use output which combines both
+            output = result.output
             assert "Advanced User Authentication System" in output
             assert "Biometric" in output
 
@@ -374,7 +377,8 @@ class TestDreamFlowIntegration:
             assert result.exit_code == 0
 
             # Final spec should be displayed
-            output = result.stdout
+            # Rich output goes to stderr, use output which combines both
+            output = result.output
             assert "Enterprise User Authentication System" in output
 
     @pytest.mark.integration
