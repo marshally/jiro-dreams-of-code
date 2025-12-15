@@ -57,7 +57,7 @@ repos:
         always_run: true
         stages: [pre-commit]
 
-  # Type checking - runs on push
+  # Type checking - runs on commit and push
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.13.0
     hooks:
@@ -65,7 +65,7 @@ repos:
         additional_dependencies: [types-pyyaml, types-setuptools]
         args: [--config-file=pyproject.toml]
         exclude: ^tests/
-        stages: [pre-push]
+        stages: [pre-commit, pre-push]
 
   # Unit + Integration tests (slower) - runs on push
   - repo: local

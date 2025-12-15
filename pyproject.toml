@@ -104,6 +104,18 @@ module = [
     "typer.*",
     "rich",
     "rich.*",
+    "sqlite_utils",
+    "sqlite_utils.*",
+    "uvicorn",
+    "uvicorn.*",
+    "jinja2",
+    "jinja2.*",
+    "structlog",
+    "structlog.*",
+    "fastapi",
+    "fastapi.*",
+    "claude_agent_sdk",
+    "claude_agent_sdk.*",
 ]
 ignore_missing_imports = true
 
