@@ -1,0 +1,15 @@
+⚙️ Update configuration ({{ config_files_changed }} file{{ 's' if config_files_changed != 1 else '' }})
+
+Task: {{ task_id }} - {{ task_title }}
+Type: config
+Files: {{ changed_files | join(', ') }}
+Config types: {{ config_types | join(', ') }}
+
+Verification: {{ verification_command }}
+{{ verification_output | indent(2) }}
+Verification time: {{ verification_time | format_duration }}
+
+Subagent: {{ subagent_type }}
+Tokens: {{ tokens_in }} → {{ tokens_out }}
+Subagent time: {{ subagent_time | format_duration }}
+E2E time: {{ e2e_time | format_duration }}

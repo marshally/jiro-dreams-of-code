@@ -1,0 +1,18 @@
+# Config Step: {{ task_title }}
+
+## Context
+{{ planning_context }}
+
+## Task
+Modify configuration files as needed to complete this task.
+
+## Rules
+1. **Only modify config files** - .yaml, .yml, .toml, .json, .ini, .cfg, .conf, .env, .properties, .xml, and special config files like Dockerfile, Makefile, pyproject.toml, setup.cfg, etc.
+2. **No code changes** - Do not modify Python files, JavaScript files, or any other implementation code
+3. **Valid format** - Ensure all configuration files are in valid format after modification
+4. **One atomic change** - All changes should be related to the same configuration purpose
+
+## Expected Outcome
+- Modified config files in changed_files list
+- Config file types identified
+- All changes are config-only
