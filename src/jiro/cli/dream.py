@@ -12,6 +12,7 @@ import typer
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
+from rich.status import Status
 
 from jiro.agents.client import AgentClient
 from jiro.agents.dreaming import DreamingAgent
@@ -32,6 +33,23 @@ def _suppress_structlog_output() -> Generator[None, None, None]:
         yield
     finally:
         sys.stdout = old_stdout
+
+
+# Thinking indicator messages (similar to Claude Code)
+THINKING_MESSAGES = [
+    "Contemplating…",
+    "Dreaming…",
+    "Pondering…",
+    "Envisioning…",
+    "Imagining…",
+]
+
+
+def _get_thinking_message() -> str:
+    """Get a random thinking message."""
+    import random
+
+    return random.choice(THINKING_MESSAGES)
 
 
 app = typer.Typer(
@@ -188,12 +206,30 @@ async def _run_interactive_dream(
         console.print(Markdown(message))
         console.print()
 
+    # Create status indicator for thinking
+    status = Status(
+        f"[cyan]✽ {_get_thinking_message()}[/cyan]",
+        spinner="dots",
+        console=console,
+    )
+
+    def on_thinking_start() -> None:
+        status.update(f"[cyan]✽ {_get_thinking_message()}[/cyan]")
+        status.start()
+
+    def on_thinking_end() -> None:
+        status.stop()
+
     # Run interview (suppress JSON logs unless debug mode)
     if debug:
-        result = await agent.interview(get_input, display_message)
+        result = await agent.interview(
+            get_input, display_message, on_thinking_start, on_thinking_end
+        )
     else:
         with _suppress_structlog_output():
-            result = await agent.interview(get_input, display_message)
+            result = await agent.interview(
+                get_input, display_message, on_thinking_start, on_thinking_end
+            )
 
     # Display generated spec
     console.print("\n")
@@ -221,12 +257,12 @@ async def _run_interactive_dream(
                     console.print("[green]Exiting refinement mode[/green]")
                 break
 
-            console.print("[cyan]Refining specification...[/cyan]")
-            if debug:
-                spec = await agent.refine(spec, feedback)
-            else:
-                with _suppress_structlog_output():
+            with console.status(f"[cyan]✽ {_get_thinking_message()}[/cyan]", spinner="dots"):
+                if debug:
                     spec = await agent.refine(spec, feedback)
+                else:
+                    with _suppress_structlog_output():
+                        spec = await agent.refine(spec, feedback)
             _display_spec(spec)
 
     except KeyboardInterrupt:
@@ -282,12 +318,12 @@ async def _run_dream(
     agent = DreamingAgent(client)
 
     # Generate initial spec (suppress JSON logs unless debug mode)
-    console.print("[cyan]Generating initial specification...[/cyan]")
-    if debug:
-        spec = await agent.dream(prompt)
-    else:
-        with _suppress_structlog_output():
+    with console.status(f"[cyan]✽ {_get_thinking_message()}[/cyan]", spinner="dots"):
+        if debug:
             spec = await agent.dream(prompt)
+        else:
+            with _suppress_structlog_output():
+                spec = await agent.dream(prompt)
 
     # Display the spec
     _display_spec(spec)
@@ -316,12 +352,12 @@ async def _run_dream(
                 break
 
             # Refine the spec based on feedback
-            console.print("[cyan]Refining specification...[/cyan]")
-            if debug:
-                spec = await agent.refine(spec, feedback)
-            else:
-                with _suppress_structlog_output():
+            with console.status(f"[cyan]✽ {_get_thinking_message()}[/cyan]", spinner="dots"):
+                if debug:
                     spec = await agent.refine(spec, feedback)
+                else:
+                    with _suppress_structlog_output():
+                        spec = await agent.refine(spec, feedback)
 
             # Display updated spec
             _display_spec(spec)

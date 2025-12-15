@@ -270,6 +270,8 @@ Generate an improved specification in the same Markdown format, addressing the f
         self,
         get_user_input: Callable[[], str],
         display_message: Callable[[str], None] | None = None,
+        on_thinking_start: Callable[[], None] | None = None,
+        on_thinking_end: Callable[[], None] | None = None,
     ) -> InterviewResult:
         """Conduct interactive interview to gather requirements.
 
@@ -281,6 +283,8 @@ Generate an improved specification in the same Markdown format, addressing the f
                 This allows for testing and different input sources.
             display_message: Optional callable to display agent messages.
                 If not provided, messages are only logged.
+            on_thinking_start: Optional callback called when agent starts processing.
+            on_thinking_end: Optional callback called when agent finishes processing.
 
         Returns:
             InterviewResult containing the generated Spec and conversation history.
@@ -295,7 +299,11 @@ Generate an improved specification in the same Markdown format, addressing the f
         first_prompt = (
             "Start the interview by asking the user what they want to build. Ask only ONE question."
         )
+        if on_thinking_start:
+            on_thinking_start()
         result = await self.client.execute(first_prompt)
+        if on_thinking_end:
+            on_thinking_end()
 
         if not result.success:
             raise ValueError(f"Failed to start interview: {result.error}")
@@ -330,7 +338,11 @@ Generate an improved specification in the same Markdown format, addressing the f
 
             # Get next agent response
             prompt = self._build_interview_prompt(conversation)
+            if on_thinking_start:
+                on_thinking_start()
             result = await self.client.execute(prompt)
+            if on_thinking_end:
+                on_thinking_end()
 
             if not result.success:
                 raise ValueError(f"Interview failed: {result.error}")
@@ -343,7 +355,11 @@ Generate an improved specification in the same Markdown format, addressing the f
                     "interview_ready_to_generate",
                     question_count=question_count,
                 )
+                if on_thinking_start:
+                    on_thinking_start()
                 spec = await self._generate_spec_from_interview(conversation)
+                if on_thinking_end:
+                    on_thinking_end()
                 return InterviewResult(spec=spec, conversation=conversation)
 
             conversation.append(InterviewMessage(role="assistant", content=agent_message))
@@ -363,7 +379,11 @@ Generate an improved specification in the same Markdown format, addressing the f
             "interview_max_questions_reached",
             max_questions=MAX_INTERVIEW_QUESTIONS,
         )
+        if on_thinking_start:
+            on_thinking_start()
         spec = await self._generate_spec_from_interview(conversation)
+        if on_thinking_end:
+            on_thinking_end()
         return InterviewResult(spec=spec, conversation=conversation)
 
     def _build_interview_prompt(self, conversation: list[InterviewMessage]) -> str:
