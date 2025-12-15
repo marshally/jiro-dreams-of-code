@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 
 from jiro.commits.base import CommitResult
 from jiro.steps.discovery import discover_command, discover_commit, discover_verification
+from jiro.steps.logging import StepLogger
 from jiro.steps.types import PlanStep, StepType
 
 if TYPE_CHECKING:
@@ -122,18 +123,59 @@ class ExecutionStep:
             VerificationError: If verification fails
         """
         start = time.monotonic()
+        logger = StepLogger(self.step_type)
 
-        # 1. Execute (spawns subagent, does work)
-        result = self.command.execute(step=plan_step, task=task)
+        try:
+            logger.log_step_start()
 
-        # 2. Verify (raises exception on failure → HALT)
-        verification = self.verify.verify(result=result)
+            # 1. Execute (spawns subagent, does work)
+            logger.log_command_start()
+            command_start = time.monotonic()
+            try:
+                result = self.command.execute(step=plan_step, task=task)
+                command_duration = time.monotonic() - command_start
+                logger.log_command_success(command_duration, result)
+            except Exception as e:
+                command_duration = time.monotonic() - command_start
+                logger.log_command_error(command_duration, e)
+                raise
 
-        # 3. Commit (stores in DB, renders template, git commit)
-        commit_result = self.commit.create(
-            result=result,
-            verification=verification,
-            e2e_time=time.monotonic() - start,
-        )
+            # 2. Verify (raises exception on failure → HALT)
+            logger.log_verify_start()
+            verify_start = time.monotonic()
+            try:
+                verification = self.verify.verify(result=result)
+                verify_duration = time.monotonic() - verify_start
+                logger.log_verify_success(verify_duration, verification)
+            except Exception as e:
+                verify_duration = time.monotonic() - verify_start
+                logger.log_verify_error(verify_duration, e)
+                raise
 
-        return commit_result
+            # 3. Commit (stores in DB, renders template, git commit)
+            logger.log_commit_start()
+            commit_start = time.monotonic()
+            try:
+                commit_result = self.commit.create(
+                    result=result,
+                    verification=verification,
+                    e2e_time=time.monotonic() - start,
+                )
+                commit_duration = time.monotonic() - commit_start
+                logger.log_commit_success(commit_duration, commit_result)
+
+                # Log step completion
+                total_duration = time.monotonic() - start
+                logger.log_step_complete(total_duration, commit_result.sha)
+
+                return commit_result
+            except Exception as e:
+                commit_duration = time.monotonic() - commit_start
+                logger.log_commit_error(commit_duration, e)
+                raise
+
+        except Exception as e:
+            # Log step error
+            total_duration = time.monotonic() - start
+            logger.log_step_error(total_duration, e)
+            raise
