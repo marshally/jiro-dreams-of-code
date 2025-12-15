@@ -2,7 +2,7 @@
 
 import subprocess
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, cast
 
 import typer
 import yaml
@@ -118,7 +118,7 @@ def prompt_for_test_command(default: str = "pytest") -> str:
     Returns:
         The test command provided by the user.
     """
-    return typer.prompt("Test command", default=default)
+    return cast(str, typer.prompt("Test command", default=default))
 
 
 def prompt_for_lint_command(default: str = "ruff check") -> str:
@@ -130,7 +130,7 @@ def prompt_for_lint_command(default: str = "ruff check") -> str:
     Returns:
         The lint command provided by the user.
     """
-    return typer.prompt("Lint command", default=default)
+    return cast(str, typer.prompt("Lint command", default=default))
 
 
 def validate_command(command: str) -> bool:
