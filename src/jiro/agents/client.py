@@ -5,6 +5,12 @@ from datetime import datetime
 
 import structlog
 from claude_agent_sdk import query
+from claude_agent_sdk.types import (
+    AssistantMessage,
+    ClaudeAgentOptions,
+    ResultMessage,
+    TextBlock,
+)
 
 from jiro.agents.base import AgentConfig, AgentResult
 from jiro.db.models import Prompt
@@ -61,12 +67,24 @@ class AgentClient:
             # Track tokens before execution
             tokens_before = self._estimate_tokens(prompt)
 
-            # Execute using Claude Agent SDK
-            output = await query(
-                prompt=prompt,
+            # Configure options for Claude Agent SDK
+            options = ClaudeAgentOptions(
                 model=self.config.model,
-                system=self.config.system_prompt,
+                system_prompt=self.config.system_prompt,
             )
+
+            # Execute using Claude Agent SDK and collect text output
+            output_parts: list[str] = []
+            async for message in query(prompt=prompt, options=options):
+                if isinstance(message, AssistantMessage):
+                    for block in message.content:
+                        if isinstance(block, TextBlock):
+                            output_parts.append(block.text)
+                elif isinstance(message, ResultMessage) and message.result:
+                    # ResultMessage indicates completion with result text
+                    output_parts.append(message.result)
+
+            output = "".join(output_parts)
 
             # Track tokens after execution
             tokens_after = tokens_before + self._estimate_tokens(output)

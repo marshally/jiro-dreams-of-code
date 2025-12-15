@@ -1,15 +1,33 @@
 """Tests for AgentClient wrapper for Claude Agent SDK."""
 
+from collections.abc import AsyncIterator
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
+from claude_agent_sdk.types import AssistantMessage, ResultMessage, TextBlock
 from sqlite_utils import Database
 
 from jiro.agents.base import AgentConfig, AgentResult
 from jiro.agents.client import AgentClient
 from jiro.db.database import ensure_schema, get_database
 from jiro.db.repository import PromptRepository
+
+
+async def mock_query_generator(text: str) -> AsyncIterator[AssistantMessage | ResultMessage]:
+    """Create a mock async generator that yields messages like the real query function."""
+    yield AssistantMessage(
+        content=[TextBlock(text=text)],
+        model="claude-opus-4",
+    )
+    yield ResultMessage(
+        subtype="result",
+        duration_ms=100,
+        duration_api_ms=80,
+        is_error=False,
+        num_turns=1,
+        session_id="test-session",
+    )
 
 
 @pytest.fixture
@@ -76,8 +94,8 @@ class TestAgentClientExecute:
         prompt_repository: PromptRepository,
     ) -> None:
         """Should return an AgentResult."""
-        with patch("jiro.agents.client.query", new_callable=AsyncMock) as mock_query:
-            mock_query.return_value = "Test response"
+        with patch("jiro.agents.client.query") as mock_query:
+            mock_query.return_value = mock_query_generator("Test response")
 
             client = AgentClient(agent_config, prompt_repository)
             result = await client.execute("Test prompt")
@@ -94,8 +112,8 @@ class TestAgentClientExecute:
         prompt_repository: PromptRepository,
     ) -> None:
         """Should track token usage before and after execution."""
-        with patch("jiro.agents.client.query", new_callable=AsyncMock) as mock_query:
-            mock_query.return_value = "Test response"
+        with patch("jiro.agents.client.query") as mock_query:
+            mock_query.return_value = mock_query_generator("Test response")
 
             client = AgentClient(agent_config, prompt_repository)
             result = await client.execute("Test prompt")
@@ -112,8 +130,8 @@ class TestAgentClientExecute:
         db_with_schema: Database,
     ) -> None:
         """Should store result in prompts table via repository."""
-        with patch("jiro.agents.client.query", new_callable=AsyncMock) as mock_query:
-            mock_query.return_value = "Test response"
+        with patch("jiro.agents.client.query") as mock_query:
+            mock_query.return_value = mock_query_generator("Test response")
 
             client = AgentClient(agent_config, prompt_repository)
             await client.execute("Test prompt")
@@ -133,8 +151,8 @@ class TestAgentClientExecute:
         """Should capture the agent's output."""
         expected_output = "This is the agent response"
 
-        with patch("jiro.agents.client.query", new_callable=AsyncMock) as mock_query:
-            mock_query.return_value = expected_output
+        with patch("jiro.agents.client.query") as mock_query:
+            mock_query.return_value = mock_query_generator(expected_output)
 
             client = AgentClient(agent_config, prompt_repository)
             result = await client.execute("Test prompt")
@@ -150,10 +168,10 @@ class TestAgentClientExecute:
     ) -> None:
         """Should log the execution with structlog."""
         with (
-            patch("jiro.agents.client.query", new_callable=AsyncMock) as mock_query,
+            patch("jiro.agents.client.query") as mock_query,
             patch("jiro.agents.client.logger") as mock_logger,
         ):
-            mock_query.return_value = "Test response"
+            mock_query.return_value = mock_query_generator("Test response")
 
             client = AgentClient(agent_config, prompt_repository)
             await client.execute("Test prompt")
@@ -173,7 +191,7 @@ class TestAgentClientErrorHandling:
         prompt_repository: PromptRepository,
     ) -> None:
         """Should handle errors from the Agent SDK."""
-        with patch("jiro.agents.client.query", new_callable=AsyncMock) as mock_query:
+        with patch("jiro.agents.client.query") as mock_query:
             # Simulate an error
             mock_query.side_effect = RuntimeError("SDK Error")
 
@@ -192,7 +210,7 @@ class TestAgentClientErrorHandling:
         prompt_repository: PromptRepository,
     ) -> None:
         """Should set success=False when an error occurs."""
-        with patch("jiro.agents.client.query", new_callable=AsyncMock) as mock_query:
+        with patch("jiro.agents.client.query") as mock_query:
             mock_query.side_effect = ValueError("Invalid input")
 
             client = AgentClient(agent_config, prompt_repository)
@@ -209,7 +227,7 @@ class TestAgentClientErrorHandling:
         db_with_schema: Database,
     ) -> None:
         """Should store error details when execution fails."""
-        with patch("jiro.agents.client.query", new_callable=AsyncMock) as mock_query:
+        with patch("jiro.agents.client.query") as mock_query:
             error_message = "Test error message"
             mock_query.side_effect = Exception(error_message)
 
@@ -226,7 +244,7 @@ class TestAgentClientErrorHandling:
         prompt_repository: PromptRepository,
     ) -> None:
         """Should handle network-related errors gracefully."""
-        with patch("jiro.agents.client.query", new_callable=AsyncMock) as mock_query:
+        with patch("jiro.agents.client.query") as mock_query:
             mock_query.side_effect = ConnectionError("Network error")
 
             client = AgentClient(agent_config, prompt_repository)
@@ -247,8 +265,8 @@ class TestAgentClientTokenTracking:
         prompt_repository: PromptRepository,
     ) -> None:
         """Tokens should increase after execution."""
-        with patch("jiro.agents.client.query", new_callable=AsyncMock) as mock_query:
-            mock_query.return_value = "Response"
+        with patch("jiro.agents.client.query") as mock_query:
+            mock_query.return_value = mock_query_generator("Response")
 
             client = AgentClient(agent_config, prompt_repository)
             result = await client.execute("Test prompt")
@@ -264,8 +282,8 @@ class TestAgentClientTokenTracking:
         db_with_schema: Database,
     ) -> None:
         """Token counts should be stored in the prompts table."""
-        with patch("jiro.agents.client.query", new_callable=AsyncMock) as mock_query:
-            mock_query.return_value = "Response"
+        with patch("jiro.agents.client.query") as mock_query:
+            mock_query.return_value = mock_query_generator("Response")
 
             client = AgentClient(agent_config, prompt_repository)
             await client.execute("Test prompt")
@@ -284,8 +302,8 @@ class TestAgentClientTokenTracking:
         db_with_schema: Database,
     ) -> None:
         """Should store prompt metadata including agent type and model."""
-        with patch("jiro.agents.client.query", new_callable=AsyncMock) as mock_query:
-            mock_query.return_value = "Response"
+        with patch("jiro.agents.client.query") as mock_query:
+            mock_query.return_value = mock_query_generator("Response")
 
             client = AgentClient(agent_config, prompt_repository)
             await client.execute("Test prompt")
@@ -308,10 +326,10 @@ class TestAgentClientStorageErrors:
     ) -> None:
         """Should handle errors when storing results in repository."""
         with (
-            patch("jiro.agents.client.query", new_callable=AsyncMock) as mock_query,
+            patch("jiro.agents.client.query") as mock_query,
             patch("jiro.agents.client.logger") as mock_logger,
         ):
-            mock_query.return_value = "Response"
+            mock_query.return_value = mock_query_generator("Response")
 
             # Mock repository.create to raise an exception
             client = AgentClient(agent_config, prompt_repository)
