@@ -9,7 +9,6 @@ from claude_agent_sdk import query
 from claude_agent_sdk.types import (
     AssistantMessage,
     ClaudeAgentOptions,
-    ResultMessage,
     TextBlock,
 )
 
@@ -82,15 +81,15 @@ class AgentClient:
             )
 
             # Execute using Claude Agent SDK and collect text output
+            # Only collect from AssistantMessage - ResultMessage.result duplicates this content
             output_parts: list[str] = []
             async for message in query(prompt=prompt, options=options):
                 if isinstance(message, AssistantMessage):
                     for block in message.content:
                         if isinstance(block, TextBlock):
                             output_parts.append(block.text)
-                elif isinstance(message, ResultMessage) and message.result:
-                    # ResultMessage indicates completion with result text
-                    output_parts.append(message.result)
+                # Note: ResultMessage indicates completion but its .result field
+                # contains the same text as AssistantMessage, so we skip it
 
             output = "".join(output_parts)
 
