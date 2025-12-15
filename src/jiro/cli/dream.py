@@ -13,6 +13,7 @@ from jiro.agents.client import AgentClient
 from jiro.agents.dreaming import DreamingAgent
 from jiro.config.loader import load_config
 from jiro.core.paths import get_database_path, get_specs_dir
+from jiro.core.planner import Spec
 from jiro.db.database import ensure_schema, get_database
 from jiro.db.repository import PromptRepository
 
@@ -25,7 +26,7 @@ app = typer.Typer(
 console = Console()
 
 
-def _save_spec_to_file(spec, specs_dir: Path) -> Path:
+def _save_spec_to_file(spec: Spec, specs_dir: Path) -> Path:
     """Save a specification to a markdown file.
 
     Args:
@@ -74,7 +75,7 @@ def _save_spec_to_file(spec, specs_dir: Path) -> Path:
     return spec_path
 
 
-def _display_spec(spec) -> None:
+def _display_spec(spec: Spec) -> None:
     """Display a specification using Rich formatting.
 
     Args:
