@@ -13,7 +13,7 @@ from jiro.agents.base import AgentConfig
 from jiro.agents.client import AgentClient
 from jiro.config.loader import load_config
 from jiro.core.paths import get_database_path
-from jiro.core.planner import SpecPlanner, create_tasks, parse_spec
+from jiro.core.planner import PlanResult, SpecPlanner, create_tasks, parse_spec
 from jiro.db.database import ensure_schema, get_database
 from jiro.db.repository import PromptRepository
 from jiro.trackers.beads import BeadsTracker
@@ -27,7 +27,7 @@ app = typer.Typer(
 console = Console()
 
 
-def _display_plan_summary(plan_result) -> None:
+def _display_plan_summary(plan_result: PlanResult) -> None:
     """Display plan summary using Rich formatting.
 
     Args:
