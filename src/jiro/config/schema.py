@@ -7,9 +7,9 @@ from dataclasses import dataclass, field
 class ModelsConfig:
     """Configuration for AI models used by different agents."""
 
-    planning: str = "claude-opus-4-5-20250514"
-    execution: str = "claude-haiku-4-5-20250514"
-    review: str = "claude-sonnet-4-5-20250514"
+    planning: str = "claude-opus-4-20250514"
+    execution: str = "claude-3-5-haiku-20241022"
+    review: str = "claude-sonnet-4-20250514"
 
 
 @dataclass

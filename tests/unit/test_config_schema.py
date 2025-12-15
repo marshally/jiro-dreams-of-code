@@ -18,9 +18,9 @@ class TestModelsConfig:
     def test_defaults(self) -> None:
         """Models should have sensible defaults."""
         config = ModelsConfig()
-        assert config.planning == "claude-opus-4-5-20250514"
-        assert config.execution == "claude-haiku-4-5-20250514"
-        assert config.review == "claude-sonnet-4-5-20250514"
+        assert config.planning == "claude-opus-4-20250514"
+        assert config.execution == "claude-3-5-haiku-20241022"
+        assert config.review == "claude-sonnet-4-20250514"
 
     @pytest.mark.unit
     def test_custom_values(self) -> None:
@@ -104,7 +104,7 @@ class TestConfig:
         assert isinstance(config.conventions, ConventionsConfig)
         assert isinstance(config.preflight, PreflightConfig)
         # Verify default values propagate
-        assert config.models.planning == "claude-opus-4-5-20250514"
+        assert config.models.planning == "claude-opus-4-20250514"
         assert config.commands.test == "pytest"
         assert config.conventions.test_file_pattern == "test_{name}.py"
         assert config.preflight.skip_if_recent_minutes == 60

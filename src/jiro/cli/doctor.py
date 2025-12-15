@@ -381,9 +381,9 @@ def fix_missing_config(project_root: Path | None = None, project_name: str | Non
     try:
         default_config = {
             "models": {
-                "planning": "claude-opus-4-5-20250514",
-                "execution": "claude-haiku-4-5-20250514",
-                "review": "claude-sonnet-4-5-20250514",
+                "planning": "claude-opus-4-20250514",
+                "execution": "claude-3-5-haiku-20241022",
+                "review": "claude-sonnet-4-20250514",
             },
             "commands": {
                 "test": "pytest",

@@ -179,7 +179,7 @@ class TestPrompt:
             id="prompt-123",
             agent_type="planning",
             prompt_text="Analyze this code...",
-            model="claude-opus-4-5-20250514",
+            model="claude-opus-4-20250514",
             tokens_before=1000,
             tokens_after=1500,
             created_at=datetime(2024, 1, 15, 10, 30, 0),
@@ -187,7 +187,7 @@ class TestPrompt:
         assert prompt.id == "prompt-123"
         assert prompt.agent_type == "planning"
         assert prompt.prompt_text == "Analyze this code..."
-        assert prompt.model == "claude-opus-4-5-20250514"
+        assert prompt.model == "claude-opus-4-20250514"
         assert prompt.tokens_before == 1000
         assert prompt.tokens_after == 1500
 
@@ -198,7 +198,7 @@ class TestPrompt:
             id="prompt-123",
             agent_type="execution",
             prompt_text="Execute step 1...",
-            model="claude-haiku-4-5-20250514",
+            model="claude-3-5-haiku-20241022",
             tokens_before=500,
             tokens_after=800,
             created_at=datetime.now(),
@@ -213,7 +213,7 @@ class TestPrompt:
             "id": "prompt-123",
             "agent_type": "review",
             "prompt_text": "Review these commits...",
-            "model": "claude-sonnet-4-5-20250514",
+            "model": "claude-sonnet-4-20250514",
             "tokens_before": 2000,
             "tokens_after": 2500,
             "created_at": "2024-01-15T10:30:00",
@@ -234,7 +234,7 @@ class TestPrompt:
             id="prompt-123",
             agent_type="dreaming",
             prompt_text="Dream up a feature spec...",
-            model="claude-opus-4-5-20250514",
+            model="claude-opus-4-20250514",
             tokens_before=100,
             tokens_after=500,
             created_at=datetime(2024, 1, 15, 10, 30, 0),
@@ -255,7 +255,7 @@ class TestPrompt:
             id="prompt-123",
             agent_type="planning",
             prompt_text="Plan the implementation...",
-            model="claude-opus-4-5-20250514",
+            model="claude-opus-4-20250514",
             tokens_before=1000,
             tokens_after=1500,
             created_at=datetime(2024, 1, 15, 10, 30, 0),

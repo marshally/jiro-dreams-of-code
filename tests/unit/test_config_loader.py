@@ -30,9 +30,9 @@ class TestLoadConfig:
 
         # Verify defaults are used
         assert isinstance(result.models, ModelsConfig)
-        assert result.models.planning == "claude-opus-4-5-20250514"
-        assert result.models.execution == "claude-haiku-4-5-20250514"
-        assert result.models.review == "claude-sonnet-4-5-20250514"
+        assert result.models.planning == "claude-opus-4-20250514"
+        assert result.models.execution == "claude-3-5-haiku-20241022"
+        assert result.models.review == "claude-sonnet-4-20250514"
 
         assert isinstance(result.commands, CommandsConfig)
         assert result.commands.test == "pytest"
@@ -110,8 +110,8 @@ commands:
         assert result.commands.test == "custom-test-command"
 
         # Verify defaults for missing keys
-        assert result.models.execution == "claude-haiku-4-5-20250514"
-        assert result.models.review == "claude-sonnet-4-5-20250514"
+        assert result.models.execution == "claude-3-5-haiku-20241022"
+        assert result.models.review == "claude-sonnet-4-20250514"
         assert result.commands.lint == "ruff check"
         assert result.commands.lint_fix == "ruff check --fix"
         assert result.conventions.test_file_pattern == "test_{name}.py"
@@ -131,7 +131,7 @@ commands:
             result = load_config(tmp_path, "test-project")
 
         # Verify all defaults are used
-        assert result.models.planning == "claude-opus-4-5-20250514"
+        assert result.models.planning == "claude-opus-4-20250514"
         assert result.commands.test == "pytest"
         assert result.conventions.test_file_pattern == "test_{name}.py"
         assert result.preflight.skip_if_recent_minutes == 60
@@ -161,8 +161,8 @@ preflight:
         assert result.preflight.skip_if_recent_minutes == 90
 
         # Verify defaults for missing nested keys
-        assert result.models.execution == "claude-haiku-4-5-20250514"
-        assert result.models.review == "claude-sonnet-4-5-20250514"
+        assert result.models.execution == "claude-3-5-haiku-20241022"
+        assert result.models.review == "claude-sonnet-4-20250514"
         assert result.commands.test == "pytest"
 
     def test_load_config_with_project_name(self, tmp_path: Path) -> None:
@@ -184,4 +184,4 @@ models:
             result = load_config(tmp_path, "my-custom-project")
 
         assert result.models.planning == "project-specific-model"
-        assert result.models.execution == "claude-haiku-4-5-20250514"
+        assert result.models.execution == "claude-3-5-haiku-20241022"

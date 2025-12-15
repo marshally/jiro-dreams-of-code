@@ -26,9 +26,9 @@ class TestModelsConfigDefaults:
     def test_models_config_has_expected_defaults(self) -> None:
         """ModelsConfig should have all expected default values."""
         config = ModelsConfig()
-        assert config.planning == "claude-opus-4-5-20250514"
-        assert config.execution == "claude-haiku-4-5-20250514"
-        assert config.review == "claude-sonnet-4-5-20250514"
+        assert config.planning == "claude-opus-4-20250514"
+        assert config.execution == "claude-3-5-haiku-20241022"
+        assert config.review == "claude-sonnet-4-20250514"
 
     @pytest.mark.unit
     def test_models_config_custom_values(self) -> None:
@@ -47,8 +47,8 @@ class TestModelsConfigDefaults:
         """ModelsConfig should allow partial overrides with defaults."""
         config = ModelsConfig(planning="custom-planning")
         assert config.planning == "custom-planning"
-        assert config.execution == "claude-haiku-4-5-20250514"
-        assert config.review == "claude-sonnet-4-5-20250514"
+        assert config.execution == "claude-3-5-haiku-20241022"
+        assert config.review == "claude-sonnet-4-20250514"
 
 
 class TestCommandsConfigDefaults:
@@ -132,9 +132,9 @@ class TestConfigDefaults:
         """Config should have all expected defaults in nested configs."""
         config = Config()
         # Models defaults
-        assert config.models.planning == "claude-opus-4-5-20250514"
-        assert config.models.execution == "claude-haiku-4-5-20250514"
-        assert config.models.review == "claude-sonnet-4-5-20250514"
+        assert config.models.planning == "claude-opus-4-20250514"
+        assert config.models.execution == "claude-3-5-haiku-20241022"
+        assert config.models.review == "claude-sonnet-4-20250514"
         # Commands defaults
         assert config.commands.test == "pytest"
         assert config.commands.lint == "ruff check"
@@ -182,9 +182,9 @@ class TestLoadConfigMissingFile:
         assert isinstance(result, Config)
 
         # Verify all defaults
-        assert result.models.planning == "claude-opus-4-5-20250514"
-        assert result.models.execution == "claude-haiku-4-5-20250514"
-        assert result.models.review == "claude-sonnet-4-5-20250514"
+        assert result.models.planning == "claude-opus-4-20250514"
+        assert result.models.execution == "claude-3-5-haiku-20241022"
+        assert result.models.review == "claude-sonnet-4-20250514"
         assert result.commands.test == "pytest"
         assert result.commands.lint == "ruff check"
         assert result.commands.lint_fix == "ruff check --fix"
@@ -203,7 +203,7 @@ class TestLoadConfigMissingFile:
             result = load_config(tmp_path, "test-project")
 
         # Verify all defaults are used
-        assert result.models.planning == "claude-opus-4-5-20250514"
+        assert result.models.planning == "claude-opus-4-20250514"
         assert result.commands.test == "pytest"
         assert result.conventions.test_file_pattern == "test_{name}.py"
         assert result.preflight.skip_if_recent_minutes == 60
@@ -234,8 +234,8 @@ commands:
         assert result.models.planning == "custom-planning-model"
         assert result.commands.test == "custom-test-command"
         # Verify defaults for missing keys
-        assert result.models.execution == "claude-haiku-4-5-20250514"
-        assert result.models.review == "claude-sonnet-4-5-20250514"
+        assert result.models.execution == "claude-3-5-haiku-20241022"
+        assert result.models.review == "claude-sonnet-4-20250514"
         assert result.commands.lint == "ruff check"
         assert result.commands.lint_fix == "ruff check --fix"
         assert result.conventions.test_file_pattern == "test_{name}.py"
@@ -265,7 +265,7 @@ preflight:
         assert result.models.execution == "custom-execution-model"
         assert result.preflight.skip_if_recent_minutes == 90
         # Verify defaults for missing nested keys
-        assert result.models.review == "claude-sonnet-4-5-20250514"
+        assert result.models.review == "claude-sonnet-4-20250514"
         assert result.commands.test == "pytest"
 
     @pytest.mark.unit
@@ -385,7 +385,7 @@ models:
 
         assert result.models.planning == "project-specific-model"
         # Other models should have defaults
-        assert result.models.execution == "claude-haiku-4-5-20250514"
+        assert result.models.execution == "claude-3-5-haiku-20241022"
 
     @pytest.mark.unit
     def test_load_config_with_different_project_names_isolated(self, tmp_path: Path) -> None:
@@ -451,7 +451,7 @@ class TestLoadConfigErrorHandling:
             result = load_config(tmp_path, "test-project")
 
         # Should use defaults
-        assert result.models.planning == "claude-opus-4-5-20250514"
+        assert result.models.planning == "claude-opus-4-20250514"
 
 
 class TestLoadConfigReturnType:
@@ -566,5 +566,5 @@ class TestConfigIntegration:
         # Verify
         assert loaded.models.planning == "integration-test-model"
         # Defaults should be present for unset values
-        assert loaded.models.execution == "claude-haiku-4-5-20250514"
+        assert loaded.models.execution == "claude-3-5-haiku-20241022"
         assert isinstance(loaded.commands, CommandsConfig)

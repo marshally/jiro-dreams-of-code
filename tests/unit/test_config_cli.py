@@ -27,9 +27,9 @@ def sample_config() -> Config:
     """Create a sample config for testing."""
     return Config(
         models=ModelsConfig(
-            planning="claude-opus-4-5-20250514",
-            execution="claude-haiku-4-5-20250514",
-            review="claude-sonnet-4-5-20250514",
+            planning="claude-opus-4-20250514",
+            execution="claude-3-5-haiku-20241022",
+            review="claude-sonnet-4-20250514",
         ),
         commands=CommandsConfig(
             test="pytest",
@@ -109,9 +109,9 @@ class TestConfigListCommand:
 
         assert "models" in output
         models = output["models"]
-        assert models["planning"]["value"] == "claude-opus-4-5-20250514"
-        assert models["execution"]["value"] == "claude-haiku-4-5-20250514"
-        assert models["review"]["value"] == "claude-sonnet-4-5-20250514"
+        assert models["planning"]["value"] == "claude-opus-4-20250514"
+        assert models["execution"]["value"] == "claude-3-5-haiku-20241022"
+        assert models["review"]["value"] == "claude-sonnet-4-20250514"
 
     @mock.patch("jiro.cli.config.load_config")
     def test_config_list_json_commands_section(
@@ -244,7 +244,7 @@ class TestConfigGetCommand:
         result = cli_runner.invoke(app, ["config", "get", "models.planning"])
         assert result.exit_code == 0
         # Should contain the value
-        assert "claude-opus-4-5-20250514" in result.stdout
+        assert "claude-opus-4-20250514" in result.stdout
 
     @mock.patch("jiro.cli.config.load_config")
     def test_config_get_models_execution(
@@ -255,7 +255,7 @@ class TestConfigGetCommand:
 
         result = cli_runner.invoke(app, ["config", "get", "models.execution"])
         assert result.exit_code == 0
-        assert "claude-haiku-4-5-20250514" in result.stdout
+        assert "claude-3-5-haiku-20241022" in result.stdout
 
     @mock.patch("jiro.cli.config.load_config")
     def test_config_get_commands_test(
@@ -377,7 +377,7 @@ class TestConfigSetCommand:
         mock_save_config.return_value = None
 
         result = cli_runner.invoke(
-            app, ["config", "set", "models.planning", "claude-opus-4-5-20250514", "--project"]
+            app, ["config", "set", "models.planning", "claude-opus-4-20250514", "--project"]
         )
         assert result.exit_code == 0
         # Should show confirmation

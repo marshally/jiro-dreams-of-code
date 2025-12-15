@@ -91,9 +91,9 @@ def load_config(project_root: Path, project_name: str) -> Config:
     # Build nested configs with defaults
     models_data = config_data.get("models", {})
     models = ModelsConfig(
-        planning=models_data.get("planning", "claude-opus-4-5-20250514"),
-        execution=models_data.get("execution", "claude-haiku-4-5-20250514"),
-        review=models_data.get("review", "claude-sonnet-4-5-20250514"),
+        planning=models_data.get("planning", "claude-opus-4-20250514"),
+        execution=models_data.get("execution", "claude-3-5-haiku-20241022"),
+        review=models_data.get("review", "claude-sonnet-4-20250514"),
     )
 
     commands_data = config_data.get("commands", {})
