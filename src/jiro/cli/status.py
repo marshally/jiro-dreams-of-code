@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
 from rich.console import Console
@@ -11,12 +11,17 @@ from rich.table import Table
 from jiro.db.database import get_database
 from jiro.db.repository import PromptRepository, SessionRepository, TaskExecutionRepository
 
+if TYPE_CHECKING:
+    from sqlite_utils import Database
+
+    from jiro.db.models import Session, TaskExecution
+
 app = typer.Typer()
 
 console = Console()
 
 
-def _get_database():
+def _get_database() -> "Database":
     """Get the database connection for the current project."""
     project_root = Path.cwd()
     jiro_dir = project_root / ".jiro-dreams-of-code"
@@ -24,7 +29,9 @@ def _get_database():
     return get_database(db_path)
 
 
-def _format_session_json(session, task_executions, total_tokens):
+def _format_session_json(
+    session: "Session", task_executions: list["TaskExecution"], total_tokens: int
+) -> dict[str, Any]:
     """Convert session data to JSON-serializable dictionary."""
     # Calculate progress - count completed vs. total tasks
     completed_count = sum(1 for te in task_executions if te.status in ["success", "failed"])
@@ -56,7 +63,9 @@ def _format_session_json(session, task_executions, total_tokens):
     }
 
 
-def _display_session_table(sessions, task_repo, prompt_repo):
+def _display_session_table(
+    sessions: list["Session"], task_repo: TaskExecutionRepository, prompt_repo: PromptRepository
+) -> None:
     """Display sessions in a Rich table format."""
     if not sessions:
         console.print("[yellow]No active sessions[/yellow]")
