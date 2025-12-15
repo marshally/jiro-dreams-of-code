@@ -2,6 +2,33 @@
 
 Instructions for AI agents working on this repository.
 
+## User Experience Decisions
+
+**CRITICAL**: NEVER make UX decisions without explicit user approval.
+
+This includes but is not limited to:
+
+- Keyboard shortcuts and keybindings
+- User-facing messages and prompts
+- Interaction patterns (how users input data, navigate, etc.)
+- Default behaviors that affect user workflow
+- Adding new dependencies that change how users interact with the tool
+
+### What to Do Instead
+
+1. **ASK FIRST** - Before implementing any UX change, ask the user which approach they prefer
+1. **Present options** - Give 2-4 concrete choices with tradeoffs
+1. **Implement exactly what the user specifies** - Do not substitute your judgment for theirs
+1. **If technical constraints prevent the requested approach** - STOP and explain the constraint, then ask how to proceed
+
+### Examples
+
+**Bad**: User says "use Shift+Enter to continue typing" and you implement Meta+Enter instead because of technical limitations.
+
+**Good**: User says "use Shift+Enter to continue typing" and you respond: "Standard terminals can't distinguish Shift+Enter from Enter. Here are alternatives: (1) Meta+Enter, (2) double-Enter to submit, (3) Ctrl+D to submit. Which do you prefer?"
+
+This rule exists because UX decisions directly affect the user's daily workflow. Getting them wrong wastes time and creates frustration.
+
 ## Commit Philosophy
 
 All work must be committed in **small, discrete, orthogonal increments**. Each commit should:
