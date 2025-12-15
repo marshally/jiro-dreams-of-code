@@ -107,7 +107,7 @@ def check_correct_branch(config: Config) -> bool:
             # No target branch specified, so always pass
             return True
 
-        return current_branch == target_branch
+        return bool(current_branch == target_branch)
     except Exception:
         return False
 
@@ -555,7 +555,7 @@ class SessionOrchestrator:
         session = Session(
             id=session_id,
             branch_name=branch_name,
-            status="running",  # type: ignore
+            status="running",
             started_at=datetime.now(),
             epic_id=epic_id,
         )
@@ -571,13 +571,13 @@ class SessionOrchestrator:
                     session_id=session_id,
                     errors=preflight_result.errors,
                 )
-                session.status = "failed"  # type: ignore
+                session.status = "failed"
                 session.ended_at = datetime.now()
                 self.session_repo.update(session)
 
                 return SessionResult(
                     session_id=session_id,
-                    status="failed",  # type: ignore
+                    status="failed",
                     tasks_completed=0,
                     tasks_failed=0,
                     error=f"Preflight checks failed: {'; '.join(preflight_result.errors)}",
@@ -615,14 +615,14 @@ class SessionOrchestrator:
                     )
 
                     # HALT on task failure
-                    session.status = "halted"  # type: ignore
+                    session.status = "halted"
                     session.halt_reason = error_msg
                     session.ended_at = datetime.now()
                     self.session_repo.update(session)
 
                     return SessionResult(
                         session_id=session_id,
-                        status="halted",  # type: ignore
+                        status="halted",
                         tasks_completed=tasks_completed,
                         tasks_failed=tasks_failed,
                         error=f"Task {task.id} failed: {error_msg}",
@@ -636,20 +636,20 @@ class SessionOrchestrator:
                     session_id=session_id,
                     errors=postflight_result.errors,
                 )
-                session.status = "failed"  # type: ignore
+                session.status = "failed"
                 session.ended_at = datetime.now()
                 self.session_repo.update(session)
 
                 return SessionResult(
                     session_id=session_id,
-                    status="failed",  # type: ignore
+                    status="failed",
                     tasks_completed=tasks_completed,
                     tasks_failed=tasks_failed,
                     error=f"Postflight checks failed: {'; '.join(postflight_result.errors)}",
                 )
 
             # Step 6: Update session to completed
-            session.status = "completed"  # type: ignore
+            session.status = "completed"
             session.ended_at = datetime.now()
             self.session_repo.update(session)
             self.logger.info(
@@ -661,7 +661,7 @@ class SessionOrchestrator:
             # Step 7: Return result
             return SessionResult(
                 session_id=session_id,
-                status="completed",  # type: ignore
+                status="completed",
                 tasks_completed=tasks_completed,
                 tasks_failed=tasks_failed,
                 error=None,
@@ -674,13 +674,13 @@ class SessionOrchestrator:
                 session_id=session_id,
                 error=str(e),
             )
-            session.status = "failed"  # type: ignore
+            session.status = "failed"
             session.ended_at = datetime.now()
             self.session_repo.update(session)
 
             return SessionResult(
                 session_id=session_id,
-                status="failed",  # type: ignore
+                status="failed",
                 tasks_completed=0,
                 tasks_failed=0,
                 error=str(e),
