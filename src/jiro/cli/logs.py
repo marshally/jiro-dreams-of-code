@@ -52,7 +52,7 @@ def _get_all_log_entries(logs_dir: Path) -> list[dict]:
     Returns:
         List of log entries sorted chronologically.
     """
-    entries = []
+    entries: list[dict] = []
 
     # Get all JSONL files sorted by name (date)
     if not logs_dir.exists():
