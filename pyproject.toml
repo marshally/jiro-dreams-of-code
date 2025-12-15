@@ -116,6 +116,8 @@ module = [
     "fastapi.*",
     "claude_agent_sdk",
     "claude_agent_sdk.*",
+    "yaml",
+    "yaml.*",
 ]
 ignore_missing_imports = true
 
