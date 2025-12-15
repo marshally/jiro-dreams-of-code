@@ -1,0 +1,61 @@
+# Bug Red: Create Failing Test to Reproduce Bug
+
+## Task
+{{ planning_context }}
+
+## Instructions
+
+You are implementing the RED phase of bug fixing.
+
+Your goal is to:
+1. Create a failing test that reproduces the bug described in the task
+2. Write the test in the appropriate test file
+3. Mark the test with `@pytest.mark.skip(reason="Bug red: awaiting fix")`
+4. Return the test details in the structured output
+
+## Rules
+
+1. **Test Location**: Place test in `tests/` directory following pytest conventions
+2. **Test Name**: Use descriptive names like `test_<feature>_bug_<issue>`
+3. **Skip Marker**: Every test must have:
+   ```python
+   @pytest.mark.skip(reason="Bug red: awaiting fix")
+   def test_something_bug_scenario():
+       # test code that reproduces the bug
+   ```
+4. **Bug Reproduction**: The test must clearly show the bug exists when run without skip
+5. **Only Changes**: Only test files should be changed - no fix code yet
+
+## Example Flow
+
+```python
+# tests/auth/test_login.py
+import pytest
+
+@pytest.mark.skip(reason="Bug red: awaiting fix")
+def test_login_bug_email_not_validated():
+    """Reproduces bug where login doesn't validate email format."""
+    from jiro.auth import login
+
+    # This should fail because the bug allows invalid emails
+    result = login(email="not-an-email", password="secret")
+    assert result is None  # Bug: accepts invalid email
+```
+
+## Output Format
+
+Return structured output with:
+- `test_file`: Path to the test file created
+- `test_name`: Test function name (without `def`)
+- `test_specifier`: Full pytest specifier (e.g., `tests/auth/test_login.py::test_login_bug_email_not_validated`)
+- `test_output`: Output showing the test would fail (run without skip, proves bug exists)
+- `changed_files`: List of files modified
+- Subagent metrics (will be provided by execution framework)
+
+## Success Criteria
+
+- Test file exists and is importable
+- Test has proper @pytest.mark.skip decorator with "Bug red:" reason
+- Test would fail if decorator removed (because the bug exists)
+- Only test files are modified
+- Running test without skip reproduces the bug
