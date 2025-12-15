@@ -170,7 +170,7 @@ Requirements:
             data = json.loads(json_str)
 
             # Parse epics
-            epics = []
+            epics: list[Epic] = []
             if "epics" in data:
                 for epic_data in data["epics"]:
                     epic = Epic(
@@ -182,7 +182,7 @@ Requirements:
                     epics.append(epic)
 
             # Parse tasks
-            tasks = []
+            tasks: list[Task] = []
             if "tasks" in data:
                 for task_data in data["tasks"]:
                     task = Task(
