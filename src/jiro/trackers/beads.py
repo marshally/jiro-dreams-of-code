@@ -81,7 +81,7 @@ class BeadsTracker:
             title=data["title"],
             task_type=data.get("issue_type", "task"),
             status=data.get("status", "open"),
-            created_at=created_at,
+            created_at=created_at or datetime.now(),
             description=data.get("description"),
             epic_id=data.get("epic_id"),
             priority=data.get("priority"),
