@@ -21,7 +21,7 @@ app = typer.Typer(
 console = Console()
 
 
-def _get_tracker():
+def _get_tracker() -> BeadsTracker:
     """Get a BeadsTracker instance for the current project."""
     project_root = Path.cwd()
     project_name = project_root.name
@@ -48,7 +48,7 @@ def _format_task_json(task: Task) -> dict:
 
 def _group_tasks_by_status(tasks: list[Task]) -> dict[str, list[Task]]:
     """Group tasks by their status."""
-    grouped = {}
+    grouped: dict[str, list[Task]] = {}
     for task in tasks:
         if task.status not in grouped:
             grouped[task.status] = []
