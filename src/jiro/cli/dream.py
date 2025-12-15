@@ -164,7 +164,9 @@ async def _run_interactive_dream(
         return result.strip()
 
     def display_message(message: str) -> None:
-        console.print(f"\n[blue]Agent:[/blue] {message}\n")
+        console.print("\n[blue]Agent:[/blue]")
+        console.print(Markdown(message))
+        console.print()
 
     # Run interview
     result = await agent.interview(get_input, display_message)
