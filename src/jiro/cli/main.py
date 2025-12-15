@@ -20,6 +20,7 @@ from jiro.cli.mode import app as mode_app
 from jiro.cli.plan import app as plan_app
 from jiro.cli.status import app as status_app
 from jiro.cli.tasks import app as tasks_app
+from jiro.cli.terminal_setup import app as terminal_setup_app
 from jiro.cli.web import app as web_app
 from jiro.core.logging import configure_logging
 
@@ -162,6 +163,9 @@ app.add_typer(web_app, name="web")
 
 # Wire assets subcommand from assets module
 app.add_typer(assets_app, name="assets")
+
+# Wire terminal-setup subcommand from terminal_setup module
+app.add_typer(terminal_setup_app, name="terminal-setup")
 
 
 if __name__ == "__main__":

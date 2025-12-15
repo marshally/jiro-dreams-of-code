@@ -56,21 +56,49 @@ def _get_thinking_message() -> str:
 def _create_multiline_session() -> PromptSession[str]:
     """Create a prompt_toolkit session with multiline support.
 
-    In multiline mode:
+    After running `jiro terminal-setup` and configuring your terminal:
+    - Shift+Enter adds a new line
+    - Enter submits
+
+    Fallback (before terminal configuration):
     - Enter adds a new line
     - Meta+Enter (Alt+Enter / Option+Enter) or Escape then Enter submits
 
     Returns:
         A configured PromptSession for multiline input.
     """
+    from prompt_toolkit.keys import Keys
+
     bindings = KeyBindings()
 
+    # CSI u protocol: ESC [ 13 ; 2 u = Shift+Enter
+    # This handles terminals configured to send CSI u sequences
+    # The sequence arrives as: ESC [ 1 3 ; 2 u
+    @bindings.add(Keys.Escape, "[", "1", "3", ";", "2", "u")
+    def _insert_newline_csi_u(event: object) -> None:
+        """Insert newline when Shift+Enter via CSI u is received."""
+        from prompt_toolkit.buffer import Buffer
+
+        if hasattr(event, "current_buffer"):
+            buffer: Buffer = event.current_buffer
+            buffer.insert_text("\n")
+
+    # Ghostty's modifyOtherKeys format: ESC [ 27 ; 2 ; 13 ~
+    @bindings.add(Keys.Escape, "[", "2", "7", ";", "2", ";", "1", "3", "~")
+    def _insert_newline_modify_other_keys(event: object) -> None:
+        """Insert newline when Shift+Enter via modifyOtherKeys is received."""
+        from prompt_toolkit.buffer import Buffer
+
+        if hasattr(event, "current_buffer"):
+            buffer: Buffer = event.current_buffer
+            buffer.insert_text("\n")
+
+    # Escape+Enter submits (fallback)
     @bindings.add("escape", "enter")
     def _submit_on_escape_enter(event: object) -> None:
         """Submit input when Escape+Enter is pressed."""
         from prompt_toolkit.buffer import Buffer
 
-        # Get the buffer from the event
         if hasattr(event, "current_buffer"):
             buffer: Buffer = event.current_buffer
             buffer.validate_and_handle()
@@ -225,6 +253,7 @@ async def _run_interactive_dream(
     console.print("[cyan]Interactive Spec Generation[/cyan]")
     console.print("I'll ask questions to understand what you want to build.\n")
     console.print("[dim]Enter = new line, Meta+Enter (Alt/Option+Enter) = submit[/dim]")
+    console.print("[dim]Run 'jiro terminal-setup' to enable Shift+Enter for newlines[/dim]")
     console.print("[dim]Type 'quit', 'exit', or '/quit' to cancel[/dim]\n")
 
     # Create multiline input session
@@ -268,6 +297,7 @@ async def _run_interactive_dream(
     # Enter refinement loop (same as _run_dream)
     console.print("\n[cyan]Enter refinement chat.[/cyan]")
     console.print("[dim]Enter = new line, Meta+Enter (Alt/Option+Enter) = submit[/dim]")
+    console.print("[dim]Run 'jiro terminal-setup' to enable Shift+Enter for newlines[/dim]")
     console.print("[dim]Commands: 'done' / 'exit' / '/quit' / Ctrl+D to save and exit[/dim]\n")
 
     # Create new session for refinement
@@ -364,6 +394,7 @@ async def _run_dream(
     # Chat refinement loop
     console.print("\n[cyan]Enter refinement chat.[/cyan]")
     console.print("[dim]Enter = new line, Meta+Enter (Alt/Option+Enter) = submit[/dim]")
+    console.print("[dim]Run 'jiro terminal-setup' to enable Shift+Enter for newlines[/dim]")
     console.print("[dim]Commands: 'done' / 'exit' / '/quit' / Ctrl+D to save and exit[/dim]\n")
 
     # Create multiline session for refinement
