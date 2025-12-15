@@ -35,7 +35,7 @@ class Result:
         Returns:
             Dictionary representation with all Path objects converted to strings.
         """
-        result = {}
+        result: dict[str, Any] = {}
         for field in fields(self):
             value = getattr(self, field.name)
             if isinstance(value, list):
