@@ -239,7 +239,7 @@ class ReviewAgent:
 Task ID: {task.id}
 Title: {task.title}
 Type: {task.task_type}
-Description: {task.description or 'No description'}
+Description: {task.description or "No description"}
 
 ## Commit to Review
 Commit SHA: {commit_sha}
