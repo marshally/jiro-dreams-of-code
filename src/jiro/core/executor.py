@@ -3,6 +3,7 @@
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import structlog
 
@@ -11,10 +12,13 @@ from jiro.agents.review import ReviewAgent, ReviewResult
 from jiro.config.schema import Config
 from jiro.trackers.interface import Task
 
+if TYPE_CHECKING:
+    from jiro.trackers.beads import BeadsTracker
+
 logger = structlog.get_logger()
 
 
-def get_tracker():
+def get_tracker() -> "BeadsTracker":
     """Get the issue tracker instance.
 
     This is a placeholder that will be replaced with actual tracker retrieval.
@@ -23,9 +27,11 @@ def get_tracker():
         An IssueTracker instance.
     """
     # This will be injected by the calling code
+    from pathlib import Path
+
     from jiro.trackers.beads import BeadsTracker
 
-    return BeadsTracker()
+    return BeadsTracker(Path.cwd())
 
 
 def find_relevant_test_files(task: Task) -> list[str]:
@@ -573,7 +579,7 @@ async def run_task_postflight(
             if review_agent is None:
                 from jiro.agents.client import AgentClient
 
-                client = AgentClient(config=config, repository=None)
+                client = AgentClient(config=config, repository=None)  # type: ignore[arg-type]
                 review_agent = ReviewAgent(client, config)
 
             review_result = await review_commits(task, commits, review_agent)
