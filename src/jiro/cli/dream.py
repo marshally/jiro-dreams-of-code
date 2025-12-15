@@ -12,7 +12,6 @@ import typer
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
-from rich.status import Status
 
 from jiro.agents.client import AgentClient
 from jiro.agents.dreaming import DreamingAgent
@@ -206,19 +205,13 @@ async def _run_interactive_dream(
         console.print(Markdown(message))
         console.print()
 
-    # Create status indicator for thinking
-    status = Status(
-        f"[cyan]✽ {_get_thinking_message()}[/cyan]",
-        spinner="dots",
-        console=console,
-    )
-
+    # Simple text-based thinking indicator (avoids terminal state issues with Status)
     def on_thinking_start() -> None:
-        status.update(f"[cyan]✽ {_get_thinking_message()}[/cyan]")
-        status.start()
+        console.print(f"[dim]✽ {_get_thinking_message()}[/dim]", end="\r")
 
     def on_thinking_end() -> None:
-        status.stop()
+        # Clear the thinking line
+        console.print(" " * 40, end="\r")
 
     # Run interview (suppress JSON logs unless debug mode)
     if debug:
