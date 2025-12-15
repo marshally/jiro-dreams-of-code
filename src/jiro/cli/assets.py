@@ -6,7 +6,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from jiro.assets.loader import get_asset_path, list_assets
+from jiro.assets.loader import AssetInfo, get_asset_path, list_assets
 
 app = typer.Typer(
     name="assets",
@@ -17,7 +17,7 @@ app = typer.Typer(
 console = Console()
 
 
-def _display_assets_table(assets) -> None:
+def _display_assets_table(assets: list[AssetInfo]) -> None:
     """Display assets in a Rich table format, grouped by type.
 
     Args:
