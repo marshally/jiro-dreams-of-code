@@ -1,0 +1,21 @@
+📝 Improve documentation
+
+Task: {{ task_id }} - {{ task_title }}
+Type: documentation
+
+Files changed:
+{% for file in changed_files -%}
+  - {{ file }}
+{% endfor %}
+
+Documentation files: {{ doc_files_changed }}
+Code files with doc changes: {{ py_files_changed }}
+
+Verification: {{ verification_command }}
+{{ verification_output | indent(2) }}
+Verification time: {{ verification_time }}
+
+Subagent: {{ subagent_type }}
+Tokens: {{ tokens_in }} → {{ tokens_out }}
+Subagent time: {{ subagent_time }}
+E2E time: {{ e2e_time }}
