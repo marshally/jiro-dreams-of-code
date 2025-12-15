@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from prompt_toolkit import PromptSession
+from prompt_toolkit.key_binding import KeyBindings
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
@@ -49,6 +51,34 @@ def _get_thinking_message() -> str:
     import random
 
     return random.choice(THINKING_MESSAGES)
+
+
+def _create_multiline_session() -> PromptSession[str]:
+    """Create a prompt_toolkit session with multiline support.
+
+    In multiline mode:
+    - Enter adds a new line
+    - Meta+Enter (Alt+Enter / Option+Enter) or Escape then Enter submits
+
+    Returns:
+        A configured PromptSession for multiline input.
+    """
+    bindings = KeyBindings()
+
+    @bindings.add("escape", "enter")
+    def _submit_on_escape_enter(event: object) -> None:
+        """Submit input when Escape+Enter is pressed."""
+        from prompt_toolkit.buffer import Buffer
+
+        # Get the buffer from the event
+        if hasattr(event, "current_buffer"):
+            buffer: Buffer = event.current_buffer
+            buffer.validate_and_handle()
+
+    return PromptSession(
+        multiline=True,
+        key_bindings=bindings,
+    )
 
 
 app = typer.Typer(
@@ -194,10 +224,14 @@ async def _run_interactive_dream(
     # Welcome message
     console.print("[cyan]Interactive Spec Generation[/cyan]")
     console.print("I'll ask questions to understand what you want to build.\n")
+    console.print("[dim]Enter = new line, Meta+Enter (Alt/Option+Enter) = submit[/dim]")
     console.print("[dim]Type 'quit', 'exit', or '/quit' to cancel[/dim]\n")
 
+    # Create multiline input session
+    session = _create_multiline_session()
+
     def get_input() -> str:
-        result: str = console.input("[yellow]>[/yellow] ")
+        result: str = session.prompt("> ")
         return result.strip()
 
     def display_message(message: str) -> None:
@@ -232,15 +266,18 @@ async def _run_interactive_dream(
     specs_dir = get_specs_dir(project_root, stealth=False, project_name=project_name)
 
     # Enter refinement loop (same as _run_dream)
-    console.print(
-        "\n[cyan]Enter refinement chat. Commands: 'done' / 'exit' / '/quit' / Ctrl+D to save and exit[/cyan]\n"
-    )
+    console.print("\n[cyan]Enter refinement chat.[/cyan]")
+    console.print("[dim]Enter = new line, Meta+Enter (Alt/Option+Enter) = submit[/dim]")
+    console.print("[dim]Commands: 'done' / 'exit' / '/quit' / Ctrl+D to save and exit[/dim]\n")
+
+    # Create new session for refinement
+    refinement_session = _create_multiline_session()
 
     spec = result.spec
     try:
         while True:
             try:
-                feedback = console.input("[yellow]Refinement:[/yellow] ").strip()
+                feedback = refinement_session.prompt("Refinement> ").strip()
             except EOFError:
                 console.print("\n[green]Exiting...[/green]")
                 break
@@ -325,14 +362,17 @@ async def _run_dream(
     specs_dir = get_specs_dir(project_root, stealth=False, project_name=project_name)
 
     # Chat refinement loop
-    console.print(
-        "\n[cyan]Enter refinement chat. Commands: 'done' / 'exit' / '/quit' / Ctrl+D to save and exit[/cyan]\n"
-    )
+    console.print("\n[cyan]Enter refinement chat.[/cyan]")
+    console.print("[dim]Enter = new line, Meta+Enter (Alt/Option+Enter) = submit[/dim]")
+    console.print("[dim]Commands: 'done' / 'exit' / '/quit' / Ctrl+D to save and exit[/dim]\n")
+
+    # Create multiline session for refinement
+    refinement_session = _create_multiline_session()
 
     try:
         while True:
             try:
-                feedback = input("[yellow]Refinement:[/yellow] ").strip()
+                feedback = refinement_session.prompt("Refinement> ").strip()
             except EOFError:
                 # Ctrl+D was pressed
                 console.print("\n[green]Exiting...[/green]")

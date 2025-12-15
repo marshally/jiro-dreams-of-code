@@ -122,8 +122,10 @@ class TestDreamCommand:
             mock_agent.refine = AsyncMock(return_value=mock_spec)
             mock_agent_class.return_value = mock_agent
 
-            # Mock input for exit
-            with patch("builtins.input", side_effect=EOFError):
+            # Mock prompt_toolkit session for exit
+            mock_session = MagicMock()
+            mock_session.prompt.side_effect = EOFError
+            with patch("jiro.cli.dream._create_multiline_session", return_value=mock_session):
                 result = cli_runner.invoke(app, ["dream", "build a user authentication system"])
 
             # Should not have critical errors (may have other output)
@@ -160,8 +162,10 @@ class TestDreamCommand:
             mock_agent.refine = AsyncMock(return_value=mock_spec)
             mock_agent_class.return_value = mock_agent
 
-            # Mock input to exit immediately
-            with patch("builtins.input", side_effect=EOFError):
+            # Mock prompt_toolkit session to exit immediately
+            mock_session = MagicMock()
+            mock_session.prompt.side_effect = EOFError
+            with patch("jiro.cli.dream._create_multiline_session", return_value=mock_session):
                 cli_runner.invoke(app, ["dream", "build a user authentication system"])
 
             # Check that spec was saved
@@ -195,8 +199,10 @@ class TestDreamCommand:
             mock_agent.dream = AsyncMock(return_value=mock_spec)
             mock_agent_class.return_value = mock_agent
 
-            # Test with 'done' command
-            with patch("builtins.input", return_value="done"):
+            # Test with 'done' command via prompt_toolkit session
+            mock_session = MagicMock()
+            mock_session.prompt.return_value = "done"
+            with patch("jiro.cli.dream._create_multiline_session", return_value=mock_session):
                 result = cli_runner.invoke(app, ["dream", "build a user authentication system"])
                 assert result.exit_code == 0
 
@@ -226,7 +232,9 @@ class TestDreamCommand:
             mock_agent.dream = AsyncMock(return_value=mock_spec)
             mock_agent_class.return_value = mock_agent
 
-            with patch("builtins.input", side_effect=EOFError):
+            mock_session = MagicMock()
+            mock_session.prompt.side_effect = EOFError
+            with patch("jiro.cli.dream._create_multiline_session", return_value=mock_session):
                 result = cli_runner.invoke(
                     app,
                     ["dream", "build a feature", "--model", "claude-opus-4"],
@@ -262,7 +270,9 @@ class TestDreamCommand:
             mock_agent.dream = AsyncMock(return_value=mock_spec)
             mock_agent_class.return_value = mock_agent
 
-            with patch("builtins.input", side_effect=EOFError):
+            mock_session = MagicMock()
+            mock_session.prompt.side_effect = EOFError
+            with patch("jiro.cli.dream._create_multiline_session", return_value=mock_session):
                 cli_runner.invoke(app, ["dream", "build a user authentication system"])
 
             # Check that console.print was called for displaying spec

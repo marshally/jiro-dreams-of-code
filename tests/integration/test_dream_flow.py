@@ -99,8 +99,10 @@ class TestDreamFlowIntegration:
             mock_agent.dream = AsyncMock(return_value=mock_spec)
             mock_agent_class.return_value = mock_agent
 
-            # Simulate user pressing Ctrl+D
-            with patch("builtins.input", side_effect=EOFError):
+            # Simulate user pressing Ctrl+D via prompt_toolkit session
+            mock_session = MagicMock()
+            mock_session.prompt.side_effect = EOFError
+            with patch("jiro.cli.dream._create_multiline_session", return_value=mock_session):
                 result = cli_runner.invoke(
                     app,
                     ["dream", "build a user authentication system"],
@@ -142,7 +144,9 @@ class TestDreamFlowIntegration:
             mock_agent.dream = AsyncMock(return_value=mock_spec)
             mock_agent_class.return_value = mock_agent
 
-            with patch("builtins.input", side_effect=EOFError):
+            mock_session = MagicMock()
+            mock_session.prompt.side_effect = EOFError
+            with patch("jiro.cli.dream._create_multiline_session", return_value=mock_session):
                 result = cli_runner.invoke(
                     app,
                     ["dream", "build a user authentication system"],
@@ -193,7 +197,9 @@ class TestDreamFlowIntegration:
             mock_agent.dream = AsyncMock(return_value=mock_spec)
             mock_agent_class.return_value = mock_agent
 
-            with patch("builtins.input", side_effect=EOFError):
+            mock_session = MagicMock()
+            mock_session.prompt.side_effect = EOFError
+            with patch("jiro.cli.dream._create_multiline_session", return_value=mock_session):
                 cli_runner.invoke(
                     app,
                     ["dream", "build a user authentication system"],
@@ -277,8 +283,10 @@ class TestDreamFlowIntegration:
             mock_agent.refine = AsyncMock(return_value=refined_spec)
             mock_agent_class.return_value = mock_agent
 
-            # Simulate refinement: one feedback, then exit
-            with patch("builtins.input", side_effect=["add biometric auth", "done"]):
+            # Simulate refinement: one feedback, then exit via prompt_toolkit session
+            mock_session = MagicMock()
+            mock_session.prompt.side_effect = ["add biometric auth", "done"]
+            with patch("jiro.cli.dream._create_multiline_session", return_value=mock_session):
                 result = cli_runner.invoke(
                     app,
                     ["dream", "build a user authentication system"],
@@ -359,15 +367,14 @@ class TestDreamFlowIntegration:
             mock_agent.refine = AsyncMock(side_effect=[spec_v2, spec_v3])
             mock_agent_class.return_value = mock_agent
 
-            # Simulate: feedback 1, feedback 2, exit
-            with patch(
-                "builtins.input",
-                side_effect=[
-                    "add enhanced security with rate limiting",
-                    "add LDAP and SAML support for enterprise",
-                    "done",
-                ],
-            ):
+            # Simulate: feedback 1, feedback 2, exit via prompt_toolkit session
+            mock_session = MagicMock()
+            mock_session.prompt.side_effect = [
+                "add enhanced security with rate limiting",
+                "add LDAP and SAML support for enterprise",
+                "done",
+            ]
+            with patch("jiro.cli.dream._create_multiline_session", return_value=mock_session):
                 result = cli_runner.invoke(
                     app,
                     ["dream", "build a user authentication system"],
@@ -417,7 +424,9 @@ class TestDreamFlowIntegration:
                 mock_agent.dream = AsyncMock(return_value=mock_spec)
                 mock_agent_class.return_value = mock_agent
 
-                with patch("builtins.input", return_value=cmd):
+                mock_session = MagicMock()
+                mock_session.prompt.return_value = cmd
+                with patch("jiro.cli.dream._create_multiline_session", return_value=mock_session):
                     result = cli_runner.invoke(
                         app,
                         ["dream", "build a feature"],
@@ -455,7 +464,9 @@ class TestDreamFlowIntegration:
             mock_agent.dream = AsyncMock(return_value=mock_spec)
             mock_agent_class.return_value = mock_agent
 
-            with patch("builtins.input", side_effect=EOFError):
+            mock_session = MagicMock()
+            mock_session.prompt.side_effect = EOFError
+            with patch("jiro.cli.dream._create_multiline_session", return_value=mock_session):
                 result = cli_runner.invoke(
                     app,
                     [
@@ -692,13 +703,12 @@ Use PyJWT for token handling, bcrypt for password hashing, and authlib for OAuth
             mock_agent.refine = AsyncMock(side_effect=[spec_v2])
             mock_agent_class.return_value = mock_agent
 
-            with patch(
-                "builtins.input",
-                side_effect=[
-                    "add PayPal and retry logic",
-                    "done",
-                ],
-            ):
+            mock_session = MagicMock()
+            mock_session.prompt.side_effect = [
+                "add PayPal and retry logic",
+                "done",
+            ]
+            with patch("jiro.cli.dream._create_multiline_session", return_value=mock_session):
                 result = cli_runner.invoke(
                     app,
                     ["dream", "build a payment processing system"],
