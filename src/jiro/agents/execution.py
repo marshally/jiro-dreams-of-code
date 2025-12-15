@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import structlog
 
 from jiro.agents.client import AgentClient
-from jiro.agents.planning import ExecutionPlan
+from jiro.agents.planning import ExecutionPlan, PlanStep
 
 logger = structlog.get_logger()
 
@@ -158,7 +158,7 @@ class ExecutionAgent:
 
         return execution_result
 
-    def _build_step_prompt(self, step, step_index: int, total_steps: int) -> str:
+    def _build_step_prompt(self, step: PlanStep, step_index: int, total_steps: int) -> str:
         """Build a prompt for executing a single step.
 
         Args:
