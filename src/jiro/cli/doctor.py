@@ -10,6 +10,7 @@ import structlog
 import yaml
 
 from jiro.config.loader import load_config
+from jiro.config.schema import Config
 from jiro.core.paths import get_config_path
 from jiro.core.session import CheckResult
 
@@ -161,7 +162,7 @@ def check_git() -> CheckResult:
         )
 
 
-def check_test_command(config) -> CheckResult:
+def check_test_command(config: Config) -> CheckResult:
     """Check if the configured test command is available.
 
     Verifies the test runner is installed by checking --version, rather than
@@ -218,7 +219,7 @@ def check_test_command(config) -> CheckResult:
         )
 
 
-def check_lint_command(config) -> CheckResult:
+def check_lint_command(config: Config) -> CheckResult:
     """Check if the configured lint command is available.
 
     Verifies the linter is installed by checking --version, rather than
@@ -665,7 +666,7 @@ def run_doctor(project_root: Path | None = None) -> DoctorResult:
     all_passed = all(check.passed for check in checks.values())
 
     # Create result
-    result = DoctorResult(passed=all_passed, checks=checks, errors=errors)
+    doctor_result = DoctorResult(passed=all_passed, checks=checks, errors=errors)
 
     # Log results
     logger.info(
@@ -675,4 +676,4 @@ def run_doctor(project_root: Path | None = None) -> DoctorResult:
         errors=errors if errors else None,
     )
 
-    return result
+    return doctor_result
