@@ -1,0 +1,20 @@
+# Lint Fix Task
+
+Fix the following lint error in the specified file.
+
+## Task
+{{ planning_context }}
+
+## Instructions
+
+1. Identify the specific lint error that needs fixing
+2. Apply the minimal fix to correct the error
+3. Verify the file passes linting
+4. Return the error code and filename
+
+## Expected Output
+
+Return a structured result with:
+- `changed_files`: List containing the single file you modified
+- `error_code`: The lint error code (e.g., "E501", "W503")
+- `filename`: The file that was fixed

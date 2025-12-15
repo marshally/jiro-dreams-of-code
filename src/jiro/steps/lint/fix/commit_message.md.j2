@@ -1,0 +1,12 @@
+🧹 lint fix {{ error_code }} in {{ filename }}
+
+Task: {{ task_id }} - {{ task_title }}
+Type: lint_fix
+File: {{ filename }}
+Error Code: {{ error_code }}
+
+Verification: {{ verification_command }}
+{{ verification_output | indent(2) }}
+Verification time: {{ verification_time | format_duration }}
+
+E2E time: {{ e2e_time | format_duration }}
