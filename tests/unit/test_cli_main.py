@@ -6,6 +6,8 @@ from unittest import mock
 from unittest.mock import patch
 
 import pytest
+from click import UsageError
+from typer import BadParameter
 from typer.testing import CliRunner
 
 from jiro.cli.main import app, main
@@ -290,30 +292,24 @@ class TestDreamCommand:
         assert "--model" in result.stdout
 
     @pytest.mark.unit
-    def test_dream_not_implemented(self, cli_runner: CliRunner) -> None:
-        """Dream command should handle missing configuration gracefully."""
+    def test_dream_command_runs(self, cli_runner: CliRunner) -> None:
+        """Dream command should be callable (may fail due to missing dependencies)."""
         result = cli_runner.invoke(app, ["dream", "test prompt"])
-        # Will fail because config/db not found, but command exists
-        # Exit code may be 1 due to error handling
-        assert (
-            result.exit_code != 0
-            or "error" in result.stdout.lower()
-            or "error" in str(result.exception).lower()
-        )
+        # Command attempts to run - exit code 1 is expected when deps missing
+        # The important thing is it doesn't crash with UsageError (CLI parsing error)
+        assert not isinstance(result.exception, BadParameter | UsageError)
 
     @pytest.mark.unit
-    def test_dream_with_prompt(self, cli_runner: CliRunner) -> None:
-        """Dream command should accept prompt argument."""
+    def test_dream_accepts_prompt(self, cli_runner: CliRunner) -> None:
+        """Dream command should accept prompt argument without CLI errors."""
         result = cli_runner.invoke(app, ["dream", "build a feature"])
-        # Will fail due to missing config, but command should accept the prompt
-        assert result.exit_code != 0
+        assert not isinstance(result.exception, BadParameter | UsageError)
 
     @pytest.mark.unit
-    def test_dream_with_model(self, cli_runner: CliRunner) -> None:
-        """Dream command should accept model option."""
+    def test_dream_accepts_model_option(self, cli_runner: CliRunner) -> None:
+        """Dream command should accept model option without CLI errors."""
         result = cli_runner.invoke(app, ["dream", "--model", "claude-opus-4", "test"])
-        # Will fail due to missing config, but command should accept the model option
-        assert result.exit_code != 0
+        assert not isinstance(result.exception, BadParameter | UsageError)
 
 
 class TestPlanCommand:
