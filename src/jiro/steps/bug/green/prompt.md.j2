@@ -1,0 +1,61 @@
+# Bug Green: Fix the Bug
+
+## Task
+{{ planning_context }}
+
+## Instructions
+
+You are implementing the GREEN phase of bug fixing.
+
+Your goal is to:
+1. Fix the bug to make the failing test pass
+2. Only modify implementation files (NOT test files)
+3. Run the test without the skip decorator to verify it passes
+4. Return the implementation details in the structured output
+
+## Rules
+
+1. **Implementation Only**: Only implement code to fix the bug - no refactoring yet
+2. **No Test Changes**: Do NOT modify the test file itself (except removing @pytest.mark.skip if needed)
+3. **File Location**: Place implementation in the appropriate source directory (e.g., `src/`, `jiro/`)
+4. **Test Must Pass**: When run without the skip decorator, test must pass with exit code 0
+5. **Minimal Changes**: Implement the minimum necessary to fix the bug
+6. **No Skip Decorator**: The @pytest.mark.skip decorator should be removed to allow the test to run
+
+## Example Flow
+
+```python
+# Original test (was failing with skip):
+# tests/auth/test_login.py
+@pytest.mark.skip(reason="Bug green: awaiting fix")
+def test_login_handles_empty_password():
+    from jiro.auth import login
+
+    with pytest.raises(ValueError, match="password required"):
+        login(email="user@example.com", password="")
+
+# Fix to make test pass:
+# jiro/auth.py (or similar)
+def login(email: str, password: str) -> None:
+    if "@" not in email:
+        raise ValueError("invalid email")
+    if not password:
+        raise ValueError("password required")
+    # ... rest of implementation
+```
+
+## Output Format
+
+Return structured output with:
+- `test_specifier`: Full pytest specifier (e.g., `tests/auth/test_login.py::test_login_handles_empty_password`)
+- `test_output`: Output showing the test passes (run without skip)
+- `changed_files`: List of implementation files modified
+- `implementation_files`: List of implementation files (same as changed_files for green step)
+- Subagent metrics (will be provided by execution framework)
+
+## Success Criteria
+
+- Implementation files exist and are importable
+- Test passes when run without skip decorator (exit code 0)
+- Only implementation files are modified (no test changes)
+- Minimal code added to satisfy test requirements
