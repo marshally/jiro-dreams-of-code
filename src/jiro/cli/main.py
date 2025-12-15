@@ -11,7 +11,7 @@ from rich.table import Table
 from jiro import __version__
 from jiro.cli.assets import app as assets_app
 from jiro.cli.config import app as config_app
-from jiro.cli.doctor import fix_missing_config, fix_missing_directories, run_doctor
+from jiro.cli.doctor import fix_missing_config, run_doctor
 from jiro.cli.dream import app as dream_app
 from jiro.cli.execute import app as execute_app
 from jiro.cli.init import app as init_app
@@ -112,20 +112,13 @@ def doctor(
     if fix:
         console.print("\n[cyan]Attempting to fix issues...[/cyan]")
 
-        # Fix missing directories
-        created_dirs = fix_missing_directories(project_root)
-        if created_dirs:
-            console.print(f"[green]Created {len(created_dirs)} directory/directories:[/green]")
-            for dir_path in created_dirs:
-                console.print(f"  - {dir_path}")
-
         # Fix missing config
         config_created = fix_missing_config(project_root, project_root.name)
         if config_created:
             config_path = project_root / ".jiro-dreams-of-code" / "config.yaml"
             console.print(f"[green]Created config file:[/green] {config_path}")
 
-        if not created_dirs and not config_created:
+        if not config_created:
             console.print("[yellow]No fixable issues found[/yellow]")
 
     # Exit with error code if checks failed

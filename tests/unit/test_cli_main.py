@@ -190,18 +190,15 @@ class TestDoctorCommand:
 
     @pytest.mark.unit
     @patch("jiro.cli.main.fix_missing_config")
-    @patch("jiro.cli.main.fix_missing_directories")
     @patch("jiro.cli.main.run_doctor")
     def test_doctor_fix_option(
-        self, mock_run_doctor, mock_fix_dirs, mock_fix_config, cli_runner: CliRunner
+        self, mock_run_doctor, mock_fix_config, cli_runner: CliRunner
     ) -> None:
         """Doctor command should apply fixes when --fix is specified."""
-        from pathlib import Path
-
         from jiro.cli.doctor import DoctorResult
         from jiro.core.session import CheckResult
 
-        # Mock successful checks
+        # Mock checks with config failure
         mock_checks = {
             "python_version": CheckResult("python_version", True),
             "claude_sdk": CheckResult("claude_sdk", True),
@@ -210,21 +207,18 @@ class TestDoctorCommand:
             "test_command": CheckResult("test_command", True),
             "lint_command": CheckResult("lint_command", True),
             "beads": CheckResult("beads", True),
-            "config": CheckResult("config", True),
-            "directories": CheckResult("directories", False, "Missing directories"),
+            "config": CheckResult("config", False, "Missing config"),
         }
         mock_run_doctor.return_value = DoctorResult(
             passed=False,
             checks=mock_checks,
-            errors=["directories: Missing directories"],
+            errors=["config: Missing config"],
         )
-        mock_fix_dirs.return_value = [Path("/tmp/src"), Path("/tmp/tests")]
-        mock_fix_config.return_value = False
+        mock_fix_config.return_value = True
 
         result = cli_runner.invoke(app, ["doctor", "--fix"])
         # Should still exit with 1 because there were failures, but fixes were attempted
         assert result.exit_code == 1
-        mock_fix_dirs.assert_called_once()
         mock_fix_config.assert_called_once()
 
 

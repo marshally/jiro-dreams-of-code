@@ -13,13 +13,11 @@ from jiro.cli.doctor import (
     check_beads,
     check_claude_sdk,
     check_config,
-    check_directories,
     check_git,
     check_lint_command,
     check_python_version,
     check_test_command,
     fix_missing_config,
-    fix_missing_directories,
     run_doctor,
 )
 from jiro.config.schema import Config
@@ -276,39 +274,6 @@ class TestCheckConfig:
             assert result.error is not None
 
 
-class TestCheckDirectories:
-    """Tests for check_directories."""
-
-    @pytest.mark.unit
-    def test_directories_exist(self, tmp_path: Path) -> None:
-        """Should pass if required directories exist."""
-        # Create a minimal project structure
-        src_dir = tmp_path / "src"
-        tests_dir = tmp_path / "tests"
-        src_dir.mkdir()
-        tests_dir.mkdir()
-
-        with patch("jiro.cli.doctor.Path") as mock_path_class:
-            mock_path_instance = MagicMock()
-            mock_path_instance.exists.return_value = True
-            mock_path_class.return_value = mock_path_instance
-
-            result = check_directories()
-            assert isinstance(result, CheckResult)
-            assert result.name == "directories"
-            assert result.passed is True
-            assert result.error is None
-
-    @pytest.mark.unit
-    def test_directories_missing(self, tmp_path: Path) -> None:
-        """Should fail if required directories are missing."""
-        # Create empty temp directory without src and tests
-        result = check_directories(tmp_path)
-        assert result.passed is False
-        assert result.error is not None
-        assert "src" in result.error or "tests" in result.error
-
-
 class TestDoctorResult:
     """Tests for DoctorResult dataclass."""
 
@@ -354,7 +319,6 @@ class TestRunDoctor:
             patch("jiro.cli.doctor.check_lint_command") as mock_lint,
             patch("jiro.cli.doctor.check_beads") as mock_beads,
             patch("jiro.cli.doctor.check_config") as mock_config,
-            patch("jiro.cli.doctor.check_directories") as mock_dirs,
         ):
             # All checks pass
             check_obj = CheckResult("test", True)
@@ -366,12 +330,11 @@ class TestRunDoctor:
             mock_lint.return_value = check_obj
             mock_beads.return_value = check_obj
             mock_config.return_value = check_obj
-            mock_dirs.return_value = check_obj
 
             result = run_doctor()
             assert isinstance(result, DoctorResult)
             assert result.passed is True
-            assert len(result.checks) == 9
+            assert len(result.checks) == 8
             assert len(result.errors) == 0
 
     @pytest.mark.unit
@@ -386,7 +349,6 @@ class TestRunDoctor:
             patch("jiro.cli.doctor.check_lint_command") as mock_lint,
             patch("jiro.cli.doctor.check_beads") as mock_beads,
             patch("jiro.cli.doctor.check_config") as mock_config,
-            patch("jiro.cli.doctor.check_directories") as mock_dirs,
         ):
             # api_key check fails
             pass_check = CheckResult("test", True)
@@ -400,17 +362,16 @@ class TestRunDoctor:
             mock_lint.return_value = pass_check
             mock_beads.return_value = pass_check
             mock_config.return_value = pass_check
-            mock_dirs.return_value = pass_check
 
             result = run_doctor()
             assert result.passed is False
-            assert len(result.checks) == 9
+            assert len(result.checks) == 8
             assert len(result.errors) >= 1
             assert any("api_key" in error for error in result.errors)
 
     @pytest.mark.unit
     def test_run_doctor_returns_all_checks(self) -> None:
-        """run_doctor should return all 9 checks."""
+        """run_doctor should return all 8 checks."""
         with (
             patch("jiro.cli.doctor.check_python_version") as mock_py,
             patch("jiro.cli.doctor.check_claude_sdk") as mock_sdk,
@@ -420,7 +381,6 @@ class TestRunDoctor:
             patch("jiro.cli.doctor.check_lint_command") as mock_lint,
             patch("jiro.cli.doctor.check_beads") as mock_beads,
             patch("jiro.cli.doctor.check_config") as mock_config,
-            patch("jiro.cli.doctor.check_directories") as mock_dirs,
         ):
             check_obj = CheckResult("test", True)
             mock_py.return_value = check_obj
@@ -431,11 +391,10 @@ class TestRunDoctor:
             mock_lint.return_value = check_obj
             mock_beads.return_value = check_obj
             mock_config.return_value = check_obj
-            mock_dirs.return_value = check_obj
 
             result = run_doctor()
 
-            # Verify all 9 checks are present
+            # Verify all 8 checks are present
             expected_checks = {
                 "python_version",
                 "claude_sdk",
@@ -445,7 +404,6 @@ class TestRunDoctor:
                 "lint_command",
                 "beads",
                 "config",
-                "directories",
             }
             assert expected_checks == set(result.checks.keys())
 
@@ -457,11 +415,9 @@ class TestFixResult:
     def test_fix_result_creation(self) -> None:
         """FixResult should be created with fix data."""
         result = FixResult(
-            directories_created=["src", "tests"],
             config_created=True,
             errors=[],
         )
-        assert result.directories_created == ["src", "tests"]
         assert result.config_created is True
         assert result.errors == []
 
@@ -469,79 +425,12 @@ class TestFixResult:
     def test_fix_result_with_errors(self) -> None:
         """FixResult should track errors from failed fixes."""
         result = FixResult(
-            directories_created=["src"],
             config_created=False,
             errors=["Failed to create config"],
         )
-        assert result.directories_created == ["src"]
         assert result.config_created is False
         assert len(result.errors) == 1
         assert "Failed to create config" in result.errors
-
-
-class TestFixMissingDirectories:
-    """Tests for fix_missing_directories function."""
-
-    @pytest.mark.unit
-    def test_create_missing_directories(self, tmp_path: Path) -> None:
-        """Should create missing directories."""
-        # Verify directories don't exist
-        src_dir = tmp_path / "src"
-        tests_dir = tmp_path / "tests"
-        assert not src_dir.exists()
-        assert not tests_dir.exists()
-
-        # Fix missing directories
-        result = fix_missing_directories(tmp_path)
-
-        # Verify directories were created
-        assert src_dir.exists()
-        assert tests_dir.exists()
-        assert src_dir in result
-        assert tests_dir in result
-
-    @pytest.mark.unit
-    def test_skip_existing_directories(self, tmp_path: Path) -> None:
-        """Should not create directories that already exist."""
-        # Create src directory
-        src_dir = tmp_path / "src"
-        src_dir.mkdir()
-        tests_dir = tmp_path / "tests"
-
-        # Fix missing directories
-        result = fix_missing_directories(tmp_path)
-
-        # Only tests should be in result
-        assert tests_dir in result
-        assert src_dir not in result
-        assert tests_dir.exists()
-
-    @pytest.mark.unit
-    def test_return_empty_list_if_all_exist(self, tmp_path: Path) -> None:
-        """Should return empty list if all directories exist."""
-        # Create both directories
-        (tmp_path / "src").mkdir()
-        (tmp_path / "tests").mkdir()
-
-        # Fix missing directories
-        result = fix_missing_directories(tmp_path)
-
-        # Should return empty list
-        assert result == []
-
-    @pytest.mark.unit
-    def test_default_to_cwd(self, tmp_path: Path, monkeypatch) -> None:
-        """Should default to current working directory."""
-        # Change to temp directory
-        monkeypatch.chdir(tmp_path)
-
-        # Fix missing directories without specifying path
-        result = fix_missing_directories()
-
-        # Verify directories were created
-        assert (tmp_path / "src").exists()
-        assert (tmp_path / "tests").exists()
-        assert len(result) == 2
 
 
 class TestFixMissingConfig:

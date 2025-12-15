@@ -35,12 +35,10 @@ class FixResult:
     """Result of running doctor fixes.
 
     Attributes:
-        directories_created: List of Path objects for directories that were created.
         config_created: Whether the config file was created.
         errors: List of error messages from failed fixes.
     """
 
-    directories_created: list[Path] = field(default_factory=list)
     config_created: bool = False
     errors: list[str] = field(default_factory=list)
 
@@ -342,83 +340,6 @@ def check_config(project_root: Path | None = None) -> CheckResult:
         )
 
 
-def check_directories(project_root: Path | None = None) -> CheckResult:
-    """Check if required project directories exist.
-
-    Args:
-        project_root: Optional project root path. Defaults to current directory.
-
-    Returns:
-        CheckResult indicating if directories are present.
-    """
-    try:
-        if project_root is None:
-            project_root = Path.cwd()
-
-        required_dirs = [
-            project_root / "src",
-            project_root / "tests",
-        ]
-
-        missing = [d for d in required_dirs if not d.exists()]
-
-        if not missing:
-            return CheckResult(
-                name="directories",
-                passed=True,
-            )
-        else:
-            missing_paths = ", ".join(str(d) for d in missing)
-            return CheckResult(
-                name="directories",
-                passed=False,
-                error=f"Required directories missing: {missing_paths}",
-            )
-    except Exception as e:
-        return CheckResult(
-            name="directories",
-            passed=False,
-            error=f"Error checking directories: {str(e)}",
-        )
-
-
-def fix_missing_directories(project_root: Path | None = None) -> list[Path]:
-    """Fix missing required project directories.
-
-    Creates src and tests directories if they don't exist.
-
-    Args:
-        project_root: Optional project root path. Defaults to current directory.
-
-    Returns:
-        List of Path objects for directories that were created.
-    """
-    if project_root is None:
-        project_root = Path.cwd()
-
-    required_dirs = [
-        project_root / "src",
-        project_root / "tests",
-    ]
-
-    created = []
-    for dir_path in required_dirs:
-        if not dir_path.exists():
-            try:
-                dir_path.mkdir(parents=True, exist_ok=True)
-                created.append(dir_path)
-            except Exception as e:
-                # Log the error but continue
-                logger = structlog.get_logger()
-                logger.warning(
-                    "failed_to_create_directory",
-                    directory=str(dir_path),
-                    error=str(e),
-                )
-
-    return created
-
-
 def fix_missing_config(project_root: Path | None = None, project_name: str | None = None) -> bool:
     """Fix missing project configuration file.
 
@@ -647,20 +568,6 @@ def run_doctor(project_root: Path | None = None) -> DoctorResult:
             error=str(e),
         )
         errors.append(f"config: {str(e)}")
-
-    # Run check_directories
-    try:
-        result = check_directories(project_root)
-        checks["directories"] = result
-        if not result.passed:
-            errors.append(f"directories: {result.error}")
-    except Exception as e:
-        checks["directories"] = CheckResult(
-            name="directories",
-            passed=False,
-            error=str(e),
-        )
-        errors.append(f"directories: {str(e)}")
 
     # Determine overall result
     all_passed = all(check.passed for check in checks.values())
