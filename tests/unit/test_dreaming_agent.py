@@ -5,7 +5,12 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from jiro.agents.base import AgentResult
-from jiro.agents.dreaming import DreamingAgent
+from jiro.agents.dreaming import (
+    MAX_INTERVIEW_QUESTIONS,
+    DreamingAgent,
+    InterviewMessage,
+    InterviewResult,
+)
 from jiro.core.planner import Spec
 
 
@@ -565,3 +570,422 @@ Refined overview.
         # Should not include a dedicated Technical Notes section (without the spec.technical_notes value)
         # The prompt mentions "Technical Notes if applicable" but doesn't include it in the structure
         assert "## Technical Notes\n\n" not in prompt
+
+
+class TestInterviewDataclasses:
+    """Tests for interview-related dataclasses."""
+
+    def test_interview_message_creation(self):
+        """InterviewMessage should store role and content."""
+        msg = InterviewMessage(role="assistant", content="What would you like to build?")
+        assert msg.role == "assistant"
+        assert msg.content == "What would you like to build?"
+
+    def test_interview_message_user_role(self):
+        """InterviewMessage should accept user role."""
+        msg = InterviewMessage(role="user", content="A user auth system")
+        assert msg.role == "user"
+        assert msg.content == "A user auth system"
+
+    def test_interview_result_creation(self):
+        """InterviewResult should store spec and conversation."""
+        spec = Spec(
+            title="Test",
+            overview="Test overview",
+            requirements=["Req 1"],
+            acceptance_criteria=["Criterion 1"],
+            out_of_scope=["Item"],
+        )
+        conversation = [
+            InterviewMessage(role="assistant", content="Question?"),
+            InterviewMessage(role="user", content="Answer"),
+        ]
+        result = InterviewResult(spec=spec, conversation=conversation)
+        assert result.spec == spec
+        assert len(result.conversation) == 2
+
+
+class TestDreamingAgentInterview:
+    """Tests for DreamingAgent.interview() method."""
+
+    @pytest.fixture
+    def mock_client(self):
+        """Create a mock AgentClient."""
+        client = MagicMock()
+        client.execute = AsyncMock()
+        return client
+
+    @pytest.fixture
+    def valid_spec_output(self):
+        """Return a valid spec output string."""
+        return """# Feature: Test Feature
+
+## Overview
+
+This is a test feature.
+
+## Requirements
+
+- Requirement 1
+- Requirement 2
+- Requirement 3
+
+## Acceptance Criteria
+
+- [ ] Criterion 1
+- [ ] Criterion 2
+- [ ] Criterion 3
+
+## Out of Scope
+
+- Out of scope 1
+- Out of scope 2
+"""
+
+    @pytest.mark.asyncio
+    async def test_interview_returns_result_on_ready_signal(self, mock_client, valid_spec_output):
+        """interview() should return InterviewResult when agent signals ready."""
+        # Arrange - first call returns question, second returns ready signal
+        mock_client.execute.side_effect = [
+            AgentResult(
+                success=True,
+                output="What would you like to build?",
+                tokens_before=100,
+                tokens_after=150,
+                error=None,
+            ),
+            AgentResult(
+                success=True,
+                output="[READY_TO_GENERATE]\nI have enough context for: User auth",
+                tokens_before=150,
+                tokens_after=200,
+                error=None,
+            ),
+            AgentResult(
+                success=True,
+                output=valid_spec_output,
+                tokens_before=200,
+                tokens_after=400,
+                error=None,
+            ),
+        ]
+
+        agent = DreamingAgent(mock_client)
+        user_inputs = iter(["A user authentication system"])
+
+        # Act
+        result = await agent.interview(lambda: next(user_inputs))
+
+        # Assert
+        assert isinstance(result, InterviewResult)
+        assert isinstance(result.spec, Spec)
+        assert len(result.conversation) == 2  # 1 question, 1 answer
+
+    @pytest.mark.asyncio
+    async def test_interview_asks_multiple_questions(self, mock_client, valid_spec_output):
+        """interview() should ask multiple questions before generating spec."""
+        # Arrange - 3 questions before ready
+        mock_client.execute.side_effect = [
+            AgentResult(
+                success=True, output="Question 1?", tokens_before=100, tokens_after=150, error=None
+            ),
+            AgentResult(
+                success=True, output="Question 2?", tokens_before=150, tokens_after=200, error=None
+            ),
+            AgentResult(
+                success=True, output="Question 3?", tokens_before=200, tokens_after=250, error=None
+            ),
+            AgentResult(
+                success=True,
+                output="[READY_TO_GENERATE]\nReady",
+                tokens_before=250,
+                tokens_after=300,
+                error=None,
+            ),
+            AgentResult(
+                success=True,
+                output=valid_spec_output,
+                tokens_before=300,
+                tokens_after=500,
+                error=None,
+            ),
+        ]
+
+        agent = DreamingAgent(mock_client)
+        answers = iter(["Answer 1", "Answer 2", "Answer 3"])
+
+        # Act
+        result = await agent.interview(lambda: next(answers))
+
+        # Assert
+        assert len(result.conversation) == 6  # 3 questions, 3 answers
+
+    @pytest.mark.asyncio
+    async def test_interview_cancellation_with_quit(self, mock_client):
+        """interview() should raise ValueError when user types quit."""
+        # Arrange
+        mock_client.execute.return_value = AgentResult(
+            success=True,
+            output="What would you like to build?",
+            tokens_before=100,
+            tokens_after=150,
+            error=None,
+        )
+
+        agent = DreamingAgent(mock_client)
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="cancelled"):
+            await agent.interview(lambda: "quit")
+
+    @pytest.mark.asyncio
+    async def test_interview_cancellation_with_exit(self, mock_client):
+        """interview() should raise ValueError when user types exit."""
+        # Arrange
+        mock_client.execute.return_value = AgentResult(
+            success=True,
+            output="What would you like to build?",
+            tokens_before=100,
+            tokens_after=150,
+            error=None,
+        )
+
+        agent = DreamingAgent(mock_client)
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="cancelled"):
+            await agent.interview(lambda: "exit")
+
+    @pytest.mark.asyncio
+    async def test_interview_cancellation_with_slash_quit(self, mock_client):
+        """interview() should raise ValueError when user types /quit."""
+        # Arrange
+        mock_client.execute.return_value = AgentResult(
+            success=True,
+            output="What would you like to build?",
+            tokens_before=100,
+            tokens_after=150,
+            error=None,
+        )
+
+        agent = DreamingAgent(mock_client)
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="cancelled"):
+            await agent.interview(lambda: "/quit")
+
+    @pytest.mark.asyncio
+    async def test_interview_handles_eof_error(self, mock_client):
+        """interview() should raise ValueError on EOFError (Ctrl+D)."""
+        # Arrange
+        mock_client.execute.return_value = AgentResult(
+            success=True,
+            output="What would you like to build?",
+            tokens_before=100,
+            tokens_after=150,
+            error=None,
+        )
+
+        agent = DreamingAgent(mock_client)
+
+        def raise_eof():
+            raise EOFError()
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="cancelled"):
+            await agent.interview(raise_eof)
+
+    @pytest.mark.asyncio
+    async def test_interview_handles_keyboard_interrupt(self, mock_client):
+        """interview() should raise ValueError on KeyboardInterrupt."""
+        # Arrange
+        mock_client.execute.return_value = AgentResult(
+            success=True,
+            output="What would you like to build?",
+            tokens_before=100,
+            tokens_after=150,
+            error=None,
+        )
+
+        agent = DreamingAgent(mock_client)
+
+        def raise_interrupt():
+            raise KeyboardInterrupt()
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="cancelled"):
+            await agent.interview(raise_interrupt)
+
+    @pytest.mark.asyncio
+    async def test_interview_skips_empty_responses(self, mock_client, valid_spec_output):
+        """interview() should skip empty user responses."""
+        # Arrange
+        mock_client.execute.side_effect = [
+            AgentResult(
+                success=True, output="Question?", tokens_before=100, tokens_after=150, error=None
+            ),
+            AgentResult(
+                success=True,
+                output="[READY_TO_GENERATE]\nReady",
+                tokens_before=150,
+                tokens_after=200,
+                error=None,
+            ),
+            AgentResult(
+                success=True,
+                output=valid_spec_output,
+                tokens_before=200,
+                tokens_after=400,
+                error=None,
+            ),
+        ]
+
+        agent = DreamingAgent(mock_client)
+        inputs = iter(["", "", "Real answer"])  # Two empty responses, then real answer
+
+        # Act
+        result = await agent.interview(lambda: next(inputs))
+
+        # Assert
+        # Only the real answer should be in conversation
+        user_messages = [m for m in result.conversation if m.role == "user"]
+        assert len(user_messages) == 1
+        assert user_messages[0].content == "Real answer"
+
+    @pytest.mark.asyncio
+    async def test_interview_max_questions_forces_generation(self, mock_client, valid_spec_output):
+        """interview() should generate spec after MAX_INTERVIEW_QUESTIONS."""
+        # Arrange - always return a question (never ready signal)
+        # Need: 1 first question + (MAX-1) follow-up questions = MAX total
+        # Then spec generation call
+        question_responses = [
+            AgentResult(
+                success=True,
+                output=f"Question {i}?",
+                tokens_before=100 + i * 50,
+                tokens_after=150 + i * 50,
+                error=None,
+            )
+            for i in range(MAX_INTERVIEW_QUESTIONS)
+        ]
+        # Last call is for spec generation
+        question_responses.append(
+            AgentResult(
+                success=True,
+                output=valid_spec_output,
+                tokens_before=600,
+                tokens_after=800,
+                error=None,
+            )
+        )
+
+        mock_client.execute.side_effect = question_responses
+
+        agent = DreamingAgent(mock_client)
+        answer_count = [0]
+
+        def get_answer():
+            answer_count[0] += 1
+            return f"Answer {answer_count[0]}"
+
+        # Act
+        result = await agent.interview(get_answer)
+
+        # Assert - should have generated spec even without ready signal
+        assert isinstance(result.spec, Spec)
+
+    @pytest.mark.asyncio
+    async def test_interview_fails_on_client_error_first_question(self, mock_client):
+        """interview() should raise ValueError if first question fails."""
+        # Arrange
+        mock_client.execute.return_value = AgentResult(
+            success=False,
+            output="",
+            tokens_before=100,
+            tokens_after=100,
+            error="API Error",
+        )
+
+        agent = DreamingAgent(mock_client)
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="Failed to start interview"):
+            await agent.interview(lambda: "answer")
+
+    @pytest.mark.asyncio
+    async def test_interview_fails_on_client_error_mid_conversation(self, mock_client):
+        """interview() should raise ValueError if client fails mid-conversation."""
+        # Arrange
+        mock_client.execute.side_effect = [
+            AgentResult(
+                success=True, output="Question?", tokens_before=100, tokens_after=150, error=None
+            ),
+            AgentResult(
+                success=False, output="", tokens_before=150, tokens_after=150, error="API Error"
+            ),
+        ]
+
+        agent = DreamingAgent(mock_client)
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="Interview failed"):
+            await agent.interview(lambda: "answer")
+
+    @pytest.mark.asyncio
+    async def test_interview_calls_display_message(self, mock_client, valid_spec_output):
+        """interview() should call display_message callback with agent messages."""
+        # Arrange
+        mock_client.execute.side_effect = [
+            AgentResult(
+                success=True, output="Question 1?", tokens_before=100, tokens_after=150, error=None
+            ),
+            AgentResult(
+                success=True,
+                output="[READY_TO_GENERATE]\nReady",
+                tokens_before=150,
+                tokens_after=200,
+                error=None,
+            ),
+            AgentResult(
+                success=True,
+                output=valid_spec_output,
+                tokens_before=200,
+                tokens_after=400,
+                error=None,
+            ),
+        ]
+
+        agent = DreamingAgent(mock_client)
+        displayed_messages = []
+
+        # Act
+        await agent.interview(
+            get_user_input=lambda: "answer",
+            display_message=displayed_messages.append,
+        )
+
+        # Assert
+        assert len(displayed_messages) == 1
+        assert "Question 1?" in displayed_messages[0]
+
+    @pytest.mark.unit
+    def test_build_interview_prompt_includes_conversation(self, mock_client):
+        """_build_interview_prompt() should include full conversation history."""
+        # Arrange
+        agent = DreamingAgent(mock_client)
+        conversation = [
+            InterviewMessage(role="assistant", content="What to build?"),
+            InterviewMessage(role="user", content="Auth system"),
+            InterviewMessage(role="assistant", content="What users?"),
+            InterviewMessage(role="user", content="External customers"),
+        ]
+
+        # Act
+        prompt = agent._build_interview_prompt(conversation)
+
+        # Assert
+        assert "What to build?" in prompt
+        assert "Auth system" in prompt
+        assert "What users?" in prompt
+        assert "External customers" in prompt
+        assert "[READY_TO_GENERATE]" in prompt  # Instructions included

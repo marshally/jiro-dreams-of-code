@@ -1,5 +1,9 @@
 """DreamingAgent for generating feature specifications from prompts."""
 
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Literal
+
 import structlog
 
 from jiro.agents.client import AgentClient
@@ -11,6 +15,35 @@ from jiro.core.planner import (
 )
 
 logger = structlog.get_logger()
+
+# Safety limit to prevent infinite loops - agent should signal ready well before this
+MAX_INTERVIEW_QUESTIONS = 50
+
+
+@dataclass
+class InterviewMessage:
+    """A message in the interview conversation.
+
+    Attributes:
+        role: Either "assistant" (agent question) or "user" (user answer).
+        content: The message content.
+    """
+
+    role: Literal["assistant", "user"]
+    content: str
+
+
+@dataclass
+class InterviewResult:
+    """Result of the interview process.
+
+    Attributes:
+        spec: The generated specification.
+        conversation: The full conversation history.
+    """
+
+    spec: Spec
+    conversation: list[InterviewMessage]
 
 
 class DreamingAgent:
@@ -232,3 +265,215 @@ Generate an improved specification in the same Markdown format, addressing the f
             Markdown-formatted list.
         """
         return "\n".join(f"- {item}" for item in items)
+
+    async def interview(
+        self,
+        get_user_input: Callable[[], str],
+        display_message: Callable[[str], None] | None = None,
+    ) -> InterviewResult:
+        """Conduct interactive interview to gather requirements.
+
+        The agent asks one question at a time, waits for user response,
+        and continues until it has enough information to generate a spec.
+
+        Args:
+            get_user_input: Callable that returns user's response string.
+                This allows for testing and different input sources.
+            display_message: Optional callable to display agent messages.
+                If not provided, messages are only logged.
+
+        Returns:
+            InterviewResult containing the generated Spec and conversation history.
+
+        Raises:
+            ValueError: If interview is cancelled or cannot complete.
+        """
+        logger.info("interview_start")
+        conversation: list[InterviewMessage] = []
+
+        # Get first question from agent
+        first_prompt = (
+            "Start the interview by asking the user what they want to build. Ask only ONE question."
+        )
+        result = await self.client.execute(first_prompt)
+
+        if not result.success:
+            raise ValueError(f"Failed to start interview: {result.error}")
+
+        agent_message = result.output.strip()
+        conversation.append(InterviewMessage(role="assistant", content=agent_message))
+
+        if display_message:
+            display_message(agent_message)
+
+        logger.info("interview_question", question_num=1, question=agent_message[:100])
+
+        question_count = 1
+
+        while question_count < MAX_INTERVIEW_QUESTIONS:
+            # Get user response
+            try:
+                user_response = get_user_input()
+            except (EOFError, KeyboardInterrupt) as e:
+                logger.info("interview_cancelled", reason="user_interrupt")
+                raise ValueError("Interview cancelled by user") from e
+
+            if not user_response:
+                continue  # Skip empty responses
+
+            if user_response.lower() in ["quit", "exit", "/quit"]:
+                logger.info("interview_cancelled", reason="user_quit")
+                raise ValueError("Interview cancelled by user")
+
+            conversation.append(InterviewMessage(role="user", content=user_response))
+            logger.info("interview_user_response", response=user_response[:100])
+
+            # Get next agent response
+            prompt = self._build_interview_prompt(conversation)
+            result = await self.client.execute(prompt)
+
+            if not result.success:
+                raise ValueError(f"Interview failed: {result.error}")
+
+            agent_message = result.output.strip()
+
+            # Check for ready signal
+            if "[READY_TO_GENERATE]" in agent_message:
+                logger.info(
+                    "interview_ready_to_generate",
+                    question_count=question_count,
+                )
+                spec = await self._generate_spec_from_interview(conversation)
+                return InterviewResult(spec=spec, conversation=conversation)
+
+            conversation.append(InterviewMessage(role="assistant", content=agent_message))
+            question_count += 1
+
+            if display_message:
+                display_message(agent_message)
+
+            logger.info(
+                "interview_question",
+                question_num=question_count,
+                question=agent_message[:100],
+            )
+
+        # Max questions reached - force generation
+        logger.warning(
+            "interview_max_questions_reached",
+            max_questions=MAX_INTERVIEW_QUESTIONS,
+        )
+        spec = await self._generate_spec_from_interview(conversation)
+        return InterviewResult(spec=spec, conversation=conversation)
+
+    def _build_interview_prompt(self, conversation: list[InterviewMessage]) -> str:
+        """Build prompt with conversation history for next turn.
+
+        Args:
+            conversation: The conversation history so far.
+
+        Returns:
+            A formatted prompt for the agent.
+        """
+        # Format conversation as context
+        conv_text = "\n\n".join(
+            f"**{'You' if msg.role == 'assistant' else 'User'}**: {msg.content}"
+            for msg in conversation
+        )
+
+        return f"""You are conducting an interactive interview to gather requirements for a feature specification.
+
+Your goal is to create a specification detailed enough that a junior developer or Claude Haiku could implement it correctly without asking clarifying questions.
+
+Here is the conversation so far:
+
+{conv_text}
+
+Based on the conversation, either:
+1. Ask ONE follow-up question to gather more information, OR
+2. If you are 95% confident you have complete information, respond with:
+
+[READY_TO_GENERATE]
+I have enough context to generate a specification for: <one-line summary>
+
+Remember:
+- Ask only ONE question at a time
+- Build on the user's previous answers
+- Cover ALL areas: core feature, users, data model, UI, business logic, edge cases, integrations, success criteria, constraints, scope boundaries
+- Keep asking until you are 95% confident in completeness
+- Don't assume - verify your understanding explicitly
+- Think about what a junior developer would need to know"""
+
+    async def _generate_spec_from_interview(self, conversation: list[InterviewMessage]) -> Spec:
+        """Generate final spec from completed interview.
+
+        Args:
+            conversation: The full conversation history.
+
+        Returns:
+            A Spec object generated from the interview context.
+
+        Raises:
+            ValueError: If spec generation fails.
+        """
+        # Format conversation as context
+        conv_text = "\n\n".join(
+            f"**{'Assistant' if msg.role == 'assistant' else 'User'}**: {msg.content}"
+            for msg in conversation
+        )
+
+        prompt = f"""Based on the following interview conversation, generate a complete feature specification.
+
+## Interview Transcript
+
+{conv_text}
+
+## Instructions
+
+Generate a specification in the exact Markdown format below. Include all sections:
+
+# Feature: <Clear, descriptive title>
+
+## Overview
+
+<1-2 paragraphs explaining what the feature does and why it matters>
+
+## Requirements
+
+- <Specific, testable requirement 1>
+- <Specific, testable requirement 2>
+- <Specific, testable requirement 3>
+(Include at least 3 requirements)
+
+## Acceptance Criteria
+
+- <Verifiable criterion 1>
+- <Verifiable criterion 2>
+- <Verifiable criterion 3>
+(Include at least 3 criteria)
+
+## Out of Scope
+
+- <What is NOT included>
+- <Another exclusion>
+(Include at least 2 items)
+
+## Technical Notes
+
+<Optional: Implementation hints or constraints mentioned in the interview>"""
+
+        logger.info("interview_generating_spec")
+        result = await self.client.execute(prompt)
+
+        if not result.success:
+            raise ValueError(f"Failed to generate spec from interview: {result.error}")
+
+        spec = self._parse_spec_from_output(result.output)
+
+        logger.info(
+            "interview_spec_generated",
+            title=spec.title,
+            num_requirements=len(spec.requirements),
+        )
+
+        return spec

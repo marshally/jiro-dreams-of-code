@@ -52,12 +52,47 @@ class TestDreamCommand:
         )
 
     @pytest.mark.unit
-    def test_dream_requires_prompt_argument(self, cli_runner: CliRunner) -> None:
-        """Dream command requires a prompt argument."""
-        result = cli_runner.invoke(app, ["dream"])
-        assert result.exit_code != 0
-        # Output is in both stdout and result output on exit
-        assert result.exit_code == 2  # Typer's usage error code
+    def test_dream_interactive_mode_without_prompt(
+        self,
+        cli_runner: CliRunner,
+        mock_spec: Spec,
+        tmp_path: Path,
+    ) -> None:
+        """Dream command without prompt should start interactive mode."""
+        from jiro.agents.dreaming import InterviewResult
+
+        with (
+            patch("jiro.cli.dream.Path.cwd", return_value=tmp_path),
+            patch("jiro.cli.dream.load_config") as mock_load_config,
+            patch("jiro.cli.dream.get_database") as mock_get_db,
+            patch("jiro.cli.dream.DreamingAgent") as mock_agent_class,
+            patch("jiro.cli.dream.console") as mock_console,
+        ):
+            # Setup mocks
+            mock_config = MagicMock()
+            mock_config.models.planning = "claude-opus-4"
+            mock_load_config.return_value = mock_config
+
+            mock_db = MagicMock()
+            mock_get_db.return_value = mock_db
+
+            # Setup mock dreaming agent with interview method
+            mock_agent = MagicMock()
+            mock_interview_result = InterviewResult(
+                spec=mock_spec,
+                conversation=[],
+            )
+            mock_agent.interview = AsyncMock(return_value=mock_interview_result)
+            mock_agent.refine = AsyncMock(return_value=mock_spec)
+            mock_agent_class.return_value = mock_agent
+
+            # Mock console.input for interactive mode - immediately exit
+            mock_console.input.side_effect = ["done"]
+
+            cli_runner.invoke(app, ["dream"])
+
+            # Should call interview method (interactive mode)
+            assert mock_agent.interview.called
 
     @pytest.mark.unit
     def test_dream_generates_initial_spec(

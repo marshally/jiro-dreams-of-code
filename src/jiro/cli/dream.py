@@ -114,6 +114,99 @@ def _display_spec(spec: Spec) -> None:
     console.print(panel)
 
 
+async def _run_interactive_dream(
+    model: str | None = None,
+    project_root: Path | None = None,
+) -> None:
+    """Run interactive dream mode with question-by-question interview.
+
+    Args:
+        model: Optional model override.
+        project_root: The project root directory.
+    """
+    if project_root is None:
+        project_root = Path.cwd()
+
+    # Get project name
+    project_name = project_root.name
+
+    # Load configuration
+    config = load_config(project_root, project_name)
+
+    # Get database
+    db_path = get_database_path(project_root, stealth=False, project_name=project_name)
+    db = get_database(db_path)
+    ensure_schema(db)
+
+    # Create repository
+    repository = PromptRepository(db)
+
+    # Create agent config
+    from jiro.agents.base import AgentConfig
+
+    model_to_use = model or config.models.planning
+    agent_config = AgentConfig(
+        model=model_to_use,
+        system_prompt="You are an expert software architect conducting an interview to understand requirements.",
+    )
+
+    # Create client and agent
+    client = AgentClient(agent_config, repository)
+    agent = DreamingAgent(client)
+
+    # Welcome message
+    console.print("[cyan]Interactive Spec Generation[/cyan]")
+    console.print("I'll ask questions to understand what you want to build.\n")
+    console.print("[dim]Type 'quit', 'exit', or '/quit' to cancel[/dim]\n")
+
+    def get_input() -> str:
+        result: str = console.input("[yellow]>[/yellow] ")
+        return result.strip()
+
+    def display_message(message: str) -> None:
+        console.print(f"\n[blue]Agent:[/blue] {message}\n")
+
+    # Run interview
+    result = await agent.interview(get_input, display_message)
+
+    # Display generated spec
+    console.print("\n")
+    _display_spec(result.spec)
+
+    # Get specs directory
+    specs_dir = get_specs_dir(project_root, stealth=False, project_name=project_name)
+
+    # Enter refinement loop (same as _run_dream)
+    console.print(
+        "\n[cyan]Enter refinement chat. Commands: 'done' / 'exit' / '/quit' / Ctrl+D to save and exit[/cyan]\n"
+    )
+
+    spec = result.spec
+    try:
+        while True:
+            try:
+                feedback = console.input("[yellow]Refinement:[/yellow] ").strip()
+            except EOFError:
+                console.print("\n[green]Exiting...[/green]")
+                break
+
+            if feedback.lower() in ["done", "exit", "/quit", ""]:
+                if feedback:
+                    console.print("[green]Exiting refinement mode[/green]")
+                break
+
+            console.print("[cyan]Refining specification...[/cyan]")
+            spec = await agent.refine(spec, feedback)
+            _display_spec(spec)
+
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Interrupted by user[/yellow]")
+
+    # Save the final spec
+    spec_path = _save_spec_to_file(spec, specs_dir)
+    console.print(f"\n[green]Specification saved to:[/green] {spec_path}")
+
+
 async def _run_dream(
     prompt: str,
     model: str | None = None,
@@ -204,7 +297,9 @@ async def _run_dream(
 @app.callback(invoke_without_command=True)
 def dream_callback(
     ctx: typer.Context,
-    prompt: Annotated[str, typer.Argument(help="Natural language description of what to build")],
+    prompt: Annotated[
+        str | None, typer.Argument(help="Natural language description of what to build")
+    ] = None,
     model: Annotated[
         str | None, typer.Option("--model", help="Override the model for this operation")
     ] = None,
@@ -212,11 +307,15 @@ def dream_callback(
     """
     Generate a specification from natural language.
 
+    Run without arguments for interactive mode where the agent asks questions
+    to understand requirements. Run with a prompt for direct spec generation.
+
     Opens interactive chat refinement mode. Saves spec to
     .jiro-dreams-of-code/specs/ (or stealth equivalent).
 
     Examples:
-        jiro dream "build a user authentication system with OAuth"
+        jiro dream                                          # Interactive mode
+        jiro dream "build a user authentication system"     # Direct mode
         jiro dream "add GraphQL API support" --model claude-opus-4
     """
     # Only run if no subcommand was invoked
@@ -226,8 +325,12 @@ def dream_callback(
     project_root = Path.cwd()
 
     try:
-        # Run the async dream function
-        asyncio.run(_run_dream(prompt, model, project_root))
+        if prompt is None:
+            # Interactive mode - agent asks questions
+            asyncio.run(_run_interactive_dream(model, project_root))
+        else:
+            # Direct mode - generate spec from prompt
+            asyncio.run(_run_dream(prompt, model, project_root))
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
         raise typer.Exit(code=1) from e
