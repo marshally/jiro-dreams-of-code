@@ -16,7 +16,7 @@ Example mappings:
 from __future__ import annotations
 
 import importlib
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from jiro.steps.types import StepType
 
@@ -88,7 +88,7 @@ def discover_command(step_type: StepType) -> Command:
 
     module = importlib.import_module(f"{module_path}.{step_type.value}_command")
     command_cls = getattr(module, class_name)
-    return command_cls()
+    return cast("Command", command_cls())
 
 
 def discover_verification(step_type: StepType) -> Verification:
@@ -109,7 +109,7 @@ def discover_verification(step_type: StepType) -> Verification:
 
     module = importlib.import_module(f"{module_path}.{step_type.value}_verify")
     verify_cls = getattr(module, class_name)
-    return verify_cls()
+    return cast("Verification", verify_cls())
 
 
 def discover_commit(step_type: StepType) -> Commit:
@@ -130,4 +130,4 @@ def discover_commit(step_type: StepType) -> Commit:
 
     module = importlib.import_module(f"{module_path}.{step_type.value}_commit")
     commit_cls = getattr(module, class_name)
-    return commit_cls()
+    return cast("Commit", commit_cls())
