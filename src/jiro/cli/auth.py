@@ -69,10 +69,10 @@ def login(
 
     except typer.Abort:
         console.print("[red]Cancelled by user[/red]")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from None
     except Exception as e:
         console.print(f"[red]Error storing API key: {str(e)}[/red]")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from None
 
 
 @app.command()
@@ -113,7 +113,7 @@ def logout() -> None:
 
     except Exception as e:
         console.print(f"[red]Error removing API key: {str(e)}[/red]")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from None
 
 
 @app.command()
@@ -149,4 +149,4 @@ def status() -> None:
 
     except Exception as e:
         console.print(f"[red]Error checking authentication status: {str(e)}[/red]")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from None
