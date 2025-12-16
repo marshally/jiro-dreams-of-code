@@ -205,7 +205,7 @@ class TestDreamCommand:
 
             # Test with 'done' command via prompt_toolkit session
             mock_session = MagicMock()
-            mock_session.prompt.return_value = "done"
+            mock_session.prompt_async = AsyncMock(return_value="done")
             with patch("jiro.cli.dream._create_multiline_session", return_value=mock_session):
                 result = cli_runner.invoke(app, ["dream", "build a user authentication system"])
                 assert result.exit_code == 0

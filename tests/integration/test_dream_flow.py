@@ -105,7 +105,7 @@ class TestDreamFlowIntegration:
 
             # Simulate user pressing Ctrl+D via prompt_toolkit session
             mock_session = MagicMock()
-            mock_session.prompt.side_effect = EOFError
+            mock_session.prompt_async = AsyncMock(side_effect=EOFError)
             with patch("jiro.cli.dream._create_multiline_session", return_value=mock_session):
                 result = cli_runner.invoke(
                     app,
@@ -149,7 +149,7 @@ class TestDreamFlowIntegration:
             mock_agent_class.return_value = mock_agent
 
             mock_session = MagicMock()
-            mock_session.prompt.side_effect = EOFError
+            mock_session.prompt_async = AsyncMock(side_effect=EOFError)
             with patch("jiro.cli.dream._create_multiline_session", return_value=mock_session):
                 result = cli_runner.invoke(
                     app,
@@ -202,7 +202,7 @@ class TestDreamFlowIntegration:
             mock_agent_class.return_value = mock_agent
 
             mock_session = MagicMock()
-            mock_session.prompt.side_effect = EOFError
+            mock_session.prompt_async = AsyncMock(side_effect=EOFError)
             with patch("jiro.cli.dream._create_multiline_session", return_value=mock_session):
                 cli_runner.invoke(
                     app,
@@ -289,7 +289,7 @@ class TestDreamFlowIntegration:
 
             # Simulate refinement: one feedback, then exit via prompt_toolkit session
             mock_session = MagicMock()
-            mock_session.prompt.side_effect = ["add biometric auth", "done"]
+            mock_session.prompt_async = AsyncMock(side_effect=["add biometric auth", "done"])
             with patch("jiro.cli.dream._create_multiline_session", return_value=mock_session):
                 result = cli_runner.invoke(
                     app,
@@ -373,11 +373,13 @@ class TestDreamFlowIntegration:
 
             # Simulate: feedback 1, feedback 2, exit via prompt_toolkit session
             mock_session = MagicMock()
-            mock_session.prompt.side_effect = [
-                "add enhanced security with rate limiting",
-                "add LDAP and SAML support for enterprise",
-                "done",
-            ]
+            mock_session.prompt_async = AsyncMock(
+                side_effect=[
+                    "add enhanced security with rate limiting",
+                    "add LDAP and SAML support for enterprise",
+                    "done",
+                ]
+            )
             with patch("jiro.cli.dream._create_multiline_session", return_value=mock_session):
                 result = cli_runner.invoke(
                     app,
@@ -429,7 +431,7 @@ class TestDreamFlowIntegration:
                 mock_agent_class.return_value = mock_agent
 
                 mock_session = MagicMock()
-                mock_session.prompt.return_value = cmd
+                mock_session.prompt_async = AsyncMock(return_value=cmd)
                 with patch("jiro.cli.dream._create_multiline_session", return_value=mock_session):
                     result = cli_runner.invoke(
                         app,
@@ -469,7 +471,7 @@ class TestDreamFlowIntegration:
             mock_agent_class.return_value = mock_agent
 
             mock_session = MagicMock()
-            mock_session.prompt.side_effect = EOFError
+            mock_session.prompt_async = AsyncMock(side_effect=EOFError)
             with patch("jiro.cli.dream._create_multiline_session", return_value=mock_session):
                 result = cli_runner.invoke(
                     app,
@@ -708,10 +710,12 @@ Use PyJWT for token handling, bcrypt for password hashing, and authlib for OAuth
             mock_agent_class.return_value = mock_agent
 
             mock_session = MagicMock()
-            mock_session.prompt.side_effect = [
-                "add PayPal and retry logic",
-                "done",
-            ]
+            mock_session.prompt_async = AsyncMock(
+                side_effect=[
+                    "add PayPal and retry logic",
+                    "done",
+                ]
+            )
             with patch("jiro.cli.dream._create_multiline_session", return_value=mock_session):
                 result = cli_runner.invoke(
                     app,

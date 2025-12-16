@@ -1,6 +1,7 @@
 """DreamingAgent for generating feature specifications from prompts."""
 
-from collections.abc import Callable
+import asyncio
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Literal
 
@@ -268,7 +269,7 @@ Generate an improved specification in the same Markdown format, addressing the f
 
     async def interview(
         self,
-        get_user_input: Callable[[], str],
+        get_user_input: Callable[[], str] | Callable[[], Awaitable[str]],
         display_message: Callable[[str], None] | None = None,
         on_thinking_start: Callable[[], None] | None = None,
         on_thinking_end: Callable[[], None] | None = None,
@@ -280,7 +281,7 @@ Generate an improved specification in the same Markdown format, addressing the f
 
         Args:
             get_user_input: Callable that returns user's response string.
-                This allows for testing and different input sources.
+                Can be sync or async. This allows for testing and different input sources.
             display_message: Optional callable to display agent messages.
                 If not provided, messages are only logged.
             on_thinking_start: Optional callback called when agent starts processing.
@@ -319,9 +320,13 @@ Generate an improved specification in the same Markdown format, addressing the f
         question_count = 1
 
         while question_count < MAX_INTERVIEW_QUESTIONS:
-            # Get user response
+            # Get user response (handle both sync and async callables)
             try:
-                user_response = get_user_input()
+                input_result = get_user_input()
+                if asyncio.iscoroutine(input_result):
+                    user_response = await input_result
+                else:
+                    user_response = input_result
             except (EOFError, KeyboardInterrupt) as e:
                 logger.info("interview_cancelled", reason="user_interrupt")
                 raise ValueError("Interview cancelled by user") from e

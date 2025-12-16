@@ -259,8 +259,8 @@ async def _run_interactive_dream(
     # Create multiline input session
     session = _create_multiline_session()
 
-    def get_input() -> str:
-        result: str = session.prompt("> ")
+    async def get_input() -> str:
+        result: str = await session.prompt_async("> ")
         return result.strip()
 
     def display_message(message: str) -> None:
@@ -307,7 +307,7 @@ async def _run_interactive_dream(
     try:
         while True:
             try:
-                feedback = refinement_session.prompt("Refinement> ").strip()
+                feedback = (await refinement_session.prompt_async("Refinement> ")).strip()
             except EOFError:
                 console.print("\n[green]Exiting...[/green]")
                 break
@@ -403,7 +403,7 @@ async def _run_dream(
     try:
         while True:
             try:
-                feedback = refinement_session.prompt("Refinement> ").strip()
+                feedback = (await refinement_session.prompt_async("Refinement> ")).strip()
             except EOFError:
                 # Ctrl+D was pressed
                 console.print("\n[green]Exiting...[/green]")
