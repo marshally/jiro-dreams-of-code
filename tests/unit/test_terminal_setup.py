@@ -1,4 +1,26 @@
-"""Tests for terminal setup command."""
+"""Tests for terminal setup command.
+
+Testing CLI Commands with Rich Console Output
+=============================================
+
+When testing CLI commands that use Rich's Console with stderr=True
+(e.g., `Console(stderr=True)`), the output goes to stderr, not stdout.
+
+In typer's CliRunner:
+- `result.stdout` - Only captures stdout
+- `result.output` - Combines stdout AND stderr
+
+Always use `result.output` when testing commands that use Rich Console:
+
+    # WRONG - stdout is empty when Console uses stderr
+    assert "expected" in result.stdout
+
+    # CORRECT - output captures both streams
+    assert "expected" in result.output
+
+This pattern applies to all jiro CLI commands because they use
+`Console(stderr=True)` to separate Rich formatting from JSON logs.
+"""
 
 from unittest.mock import patch
 
