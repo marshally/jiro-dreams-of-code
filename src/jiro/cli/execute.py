@@ -77,6 +77,9 @@ def execute(
     except HaltError as e:
         console.print(f"[red]Session halted: {e.reason}[/red]")
         raise typer.Exit(5) from e
+    except typer.Exit:
+        # Re-raise Exit exceptions (don't catch them as general exceptions)
+        raise
     except Exception as e:
         console.print(f"[red]Unexpected error: {e}[/red]")
         raise typer.Exit(1) from e
