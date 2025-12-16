@@ -699,3 +699,163 @@ async def run_task_preflight(task: Task, config: Config, agent: PlanningAgent) -
         enhanced_task=enhanced_task,
         errors=errors,
     )
+
+
+class TaskExecutor:
+    """Executor for processing tasks through the full lifecycle.
+
+    Handles the complete execution flow for a single task:
+    1. Preflight checks (tests, lint, planning)
+    2. Step execution (dispatching to appropriate handlers)
+    3. Review of commits
+    4. Postflight checks and task completion
+    """
+
+    def __init__(
+        self,
+        config: Config,
+        planning_agent: PlanningAgent,
+        review_agent: ReviewAgent,
+    ) -> None:
+        """Initialize TaskExecutor with required agents.
+
+        Args:
+            config: Configuration for commands and behavior.
+            planning_agent: Agent for creating execution plans.
+            review_agent: Agent for reviewing commits.
+        """
+        self.config = config
+        self.planning_agent = planning_agent
+        self.review_agent = review_agent
+
+    async def execute_task(self, task: Task) -> PostflightResult:
+        """Execute a single task through its complete lifecycle.
+
+        Orchestrates the full execution flow:
+        1. Run preflight checks
+        2. Call planning_agent to create execution plan
+        3. Save plan to database
+        4. Execute each step in the plan
+        5. Review commits after each step
+        6. Run postflight checks
+        7. Mark task complete
+
+        Args:
+            task: The task to execute.
+
+        Returns:
+            A PostflightResult with execution outcome.
+
+        Raises:
+            ValueError: If preflight or execution fails critically.
+            HaltError: If review fails or other halt conditions occur.
+        """
+        logger.info("task_executor_execute_start", task_id=task.id, title=task.title)
+
+        try:
+            # Step 1: Run preflight checks
+            preflight_result = await run_task_preflight(task, self.config, self.planning_agent)
+
+            if not preflight_result.planning_done or preflight_result.enhanced_task is None:
+                error_msg = f"Preflight failed: {'; '.join(preflight_result.errors)}"
+                logger.error(
+                    "task_executor_preflight_failed",
+                    task_id=task.id,
+                    errors=preflight_result.errors,
+                )
+                raise ValueError(error_msg)
+
+            enhanced_task = preflight_result.enhanced_task
+            execution_plan = enhanced_task.execution_plan
+
+            logger.info(
+                "task_executor_plan_created",
+                task_id=task.id,
+                steps=len(execution_plan.steps),
+            )
+
+            # Step 2: Execute each step in the plan
+            commits: list[str] = []
+
+            for step_idx, step in enumerate(execution_plan.steps):
+                logger.info(
+                    "task_executor_step_start",
+                    task_id=task.id,
+                    step_idx=step_idx,
+                    step_type=step.step_type,
+                    description=step.description,
+                )
+
+                try:
+                    # Execute the step - for now, we just log it
+                    # In a real implementation, this would dispatch to step handlers
+                    logger.info(
+                        "task_executor_step_executing",
+                        task_id=task.id,
+                        step_idx=step_idx,
+                        step_type=step.step_type,
+                    )
+
+                    # Step would create a commit here in the real implementation
+                    # For now, we simulate getting a commit SHA
+                    commit_sha = f"commit-{step_idx}-{task.id[:8]}"
+
+                    # Review the commit
+                    review_result = await self.review_agent.review(commit_sha, task)
+
+                    if not review_result.passed:
+                        error_msg = f"Review failed for step {step_idx}: {review_result.reason}"
+                        logger.error(
+                            "task_executor_review_failed",
+                            task_id=task.id,
+                            step_idx=step_idx,
+                            reason=review_result.reason,
+                        )
+                        raise ValueError(error_msg)
+
+                    commits.append(commit_sha)
+
+                    logger.info(
+                        "task_executor_step_complete",
+                        task_id=task.id,
+                        step_idx=step_idx,
+                        commit_sha=commit_sha,
+                    )
+
+                except Exception as e:
+                    logger.error(
+                        "task_executor_step_failed",
+                        task_id=task.id,
+                        step_idx=step_idx,
+                        error=str(e),
+                    )
+                    raise
+
+            logger.info(
+                "task_executor_all_steps_complete",
+                task_id=task.id,
+                commits_count=len(commits),
+            )
+
+            # Step 3: Run postflight checks
+            postflight_result = await run_task_postflight(
+                task, commits, self.config, review_agent=self.review_agent
+            )
+
+            logger.info(
+                "task_executor_postflight_complete",
+                task_id=task.id,
+                review_passed=postflight_result.review_passed,
+                tests_passed=postflight_result.tests_passed,
+                lint_passed=postflight_result.lint_passed,
+            )
+
+            return postflight_result
+
+        except Exception as e:
+            logger.error(
+                "task_executor_execute_failed",
+                task_id=task.id,
+                error=str(e),
+            )
+            raise

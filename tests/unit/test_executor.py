@@ -947,3 +947,258 @@ class TestPostflightResult:
         # Assert
         assert result.review_passed is False
         assert result.error == "Review failed"
+
+
+class TestTaskExecutor:
+    """Tests for TaskExecutor class."""
+
+    @pytest.fixture
+    def sample_task(self):
+        """Create a sample task."""
+        return Task(
+            id="task-123",
+            title="Implement feature X",
+            task_type="feature",
+            status="open",
+            created_at=datetime.now(),
+            description="Feature description",
+            labels=["feature"],
+        )
+
+    @pytest.fixture
+    def config(self):
+        """Create a sample config."""
+        return Config(
+            commands=CommandsConfig(
+                test="pytest",
+                lint="ruff check",
+            )
+        )
+
+    @pytest.fixture
+    def mock_planning_agent(self):
+        """Create a mock PlanningAgent."""
+        agent = MagicMock(spec=PlanningAgent)
+        agent.plan = AsyncMock()
+        return agent
+
+    @pytest.fixture
+    def mock_review_agent(self):
+        """Create a mock ReviewAgent."""
+        agent = MagicMock(spec=ReviewAgent)
+        agent.review = AsyncMock()
+        return agent
+
+    @pytest.mark.asyncio
+    async def test_task_executor_initialization(
+        self, config, mock_planning_agent, mock_review_agent
+    ):
+        """TaskExecutor should initialize with agents and config."""
+        from jiro.core.executor import TaskExecutor
+
+        executor = TaskExecutor(
+            config=config,
+            planning_agent=mock_planning_agent,
+            review_agent=mock_review_agent,
+        )
+
+        assert executor.config == config
+        assert executor.planning_agent == mock_planning_agent
+        assert executor.review_agent == mock_review_agent
+
+    @pytest.mark.asyncio
+    async def test_task_executor_execute_task_success(
+        self, sample_task, config, mock_planning_agent, mock_review_agent
+    ):
+        """execute_task should complete successfully with valid inputs."""
+        from jiro.core.executor import TaskExecutor
+
+        # Arrange
+        plan = ExecutionPlanSchema(
+            task_id="task-123",
+            steps=[
+                ExecutionStep(
+                    description="Create file",
+                    step_type="tdd_green",
+                    files=[FileAction(path="src/file.py", action="create")],
+                    verification_command="pytest tests/test_file.py",
+                ),
+            ],
+            estimated_tokens=300,
+        )
+        mock_planning_agent.plan.return_value = plan
+
+        review_result = ReviewResult(
+            passed=True,
+            halt=False,
+            reason="All checks passed",
+            checks={"tests": "PASSED", "lint": "PASSED", "llm": "APPROVED"},
+        )
+        mock_review_agent.review.return_value = review_result
+
+        executor = TaskExecutor(
+            config=config,
+            planning_agent=mock_planning_agent,
+            review_agent=mock_review_agent,
+        )
+
+        with (
+            patch("jiro.core.executor.run_relevant_tests") as mock_tests,
+            patch("jiro.core.executor.run_relevant_lint") as mock_lint,
+            patch("jiro.core.executor.run_relevant_tests_post") as mock_tests_post,
+            patch("jiro.core.executor.run_relevant_lint_post") as mock_lint_post,
+            patch("jiro.core.executor.record_results"),
+            patch("jiro.core.executor.close_task_in_tracker"),
+        ):
+            mock_tests.return_value = True
+            mock_lint.return_value = True
+            mock_tests_post.return_value = True
+            mock_lint_post.return_value = True
+
+            # Act
+            result = await executor.execute_task(sample_task)
+
+            # Assert
+            assert isinstance(result, PostflightResult)
+            assert result.review_passed is True
+            mock_planning_agent.plan.assert_called_once_with(sample_task)
+            mock_review_agent.review.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_task_executor_execute_task_preflight_fails(
+        self, sample_task, config, mock_planning_agent, mock_review_agent
+    ):
+        """execute_task should raise when preflight fails."""
+        from jiro.core.executor import TaskExecutor
+
+        # Arrange
+        mock_planning_agent.plan.side_effect = ValueError("Planning failed")
+
+        executor = TaskExecutor(
+            config=config,
+            planning_agent=mock_planning_agent,
+            review_agent=mock_review_agent,
+        )
+
+        with (
+            patch("jiro.core.executor.run_relevant_tests") as mock_tests,
+            patch("jiro.core.executor.run_relevant_lint") as mock_lint,
+        ):
+            mock_tests.return_value = True
+            mock_lint.return_value = True
+
+            # Act & Assert
+            with pytest.raises(ValueError):
+                await executor.execute_task(sample_task)
+
+    @pytest.mark.asyncio
+    async def test_task_executor_execute_task_review_fails(
+        self, sample_task, config, mock_planning_agent, mock_review_agent
+    ):
+        """execute_task should halt when review fails."""
+        from jiro.core.executor import TaskExecutor
+
+        # Arrange
+        plan = ExecutionPlanSchema(
+            task_id="task-123",
+            steps=[
+                ExecutionStep(
+                    description="Create file",
+                    step_type="tdd_green",
+                    files=[FileAction(path="src/file.py", action="create")],
+                ),
+            ],
+            estimated_tokens=300,
+        )
+        mock_planning_agent.plan.return_value = plan
+
+        review_result = ReviewResult(
+            passed=False,
+            halt=True,
+            reason="Tests failed",
+            checks={"tests": "FAILED"},
+        )
+        mock_review_agent.review.return_value = review_result
+
+        executor = TaskExecutor(
+            config=config,
+            planning_agent=mock_planning_agent,
+            review_agent=mock_review_agent,
+        )
+
+        with (
+            patch("jiro.core.executor.run_relevant_tests") as mock_tests,
+            patch("jiro.core.executor.run_relevant_lint") as mock_lint,
+        ):
+            mock_tests.return_value = True
+            mock_lint.return_value = True
+
+            # Act & Assert
+            with pytest.raises(ValueError, match="Review failed"):
+                await executor.execute_task(sample_task)
+
+    @pytest.mark.asyncio
+    async def test_task_executor_execute_task_multiple_steps(
+        self, sample_task, config, mock_planning_agent, mock_review_agent
+    ):
+        """execute_task should process multiple steps in sequence."""
+        from jiro.core.executor import TaskExecutor
+
+        # Arrange
+        plan = ExecutionPlanSchema(
+            task_id="task-123",
+            steps=[
+                ExecutionStep(
+                    description="Create test file",
+                    step_type="tdd_red",
+                    files=[FileAction(path="tests/test_file.py", action="create")],
+                ),
+                ExecutionStep(
+                    description="Implement function",
+                    step_type="tdd_green",
+                    files=[FileAction(path="src/file.py", action="create")],
+                ),
+                ExecutionStep(
+                    description="Refactor code",
+                    step_type="tdd_refactor",
+                    files=[FileAction(path="src/file.py", action="modify")],
+                ),
+            ],
+            estimated_tokens=500,
+        )
+        mock_planning_agent.plan.return_value = plan
+
+        review_result = ReviewResult(
+            passed=True,
+            halt=False,
+            reason="All checks passed",
+            checks={"tests": "PASSED", "lint": "PASSED", "llm": "APPROVED"},
+        )
+        mock_review_agent.review.return_value = review_result
+
+        executor = TaskExecutor(
+            config=config,
+            planning_agent=mock_planning_agent,
+            review_agent=mock_review_agent,
+        )
+
+        with (
+            patch("jiro.core.executor.run_relevant_tests") as mock_tests,
+            patch("jiro.core.executor.run_relevant_lint") as mock_lint,
+            patch("jiro.core.executor.run_relevant_tests_post") as mock_tests_post,
+            patch("jiro.core.executor.run_relevant_lint_post") as mock_lint_post,
+            patch("jiro.core.executor.record_results"),
+            patch("jiro.core.executor.close_task_in_tracker"),
+        ):
+            mock_tests.return_value = True
+            mock_lint.return_value = True
+            mock_tests_post.return_value = True
+            mock_lint_post.return_value = True
+
+            # Act
+            result = await executor.execute_task(sample_task)
+
+            # Assert
+            assert isinstance(result, PostflightResult)
+            # Review should be called once for each step plus once for postflight
+            assert mock_review_agent.review.call_count >= 3
