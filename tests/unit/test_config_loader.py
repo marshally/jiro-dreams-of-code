@@ -276,3 +276,165 @@ models:
 
         # Verify project scope config is used
         assert result.models.planning == "project-planning-model"
+
+    def test_load_config_with_global_config_file(self, tmp_path: Path) -> None:
+        """load_config should load values from global ~/.jiro-dreams-of-code/config.yaml."""
+        # Create global config file
+        global_config_dir = tmp_path / ".jiro-dreams-of-code"
+        global_config_dir.mkdir(parents=True, exist_ok=True)
+
+        global_config_file = global_config_dir / "config.yaml"
+        global_config_file.write_text(
+            """
+models:
+  planning: "global-planning-model"
+  execution: "global-execution-model"
+commands:
+  test: "global-test-command"
+"""
+        )
+
+        # Mock home directory to use tmp_path
+        with patch("jiro.config.loader.Path.home", return_value=tmp_path):
+            result = load_config(tmp_path, "test-project")
+
+        # Verify global config values are loaded
+        assert result.models.planning == "global-planning-model"
+        assert result.models.execution == "global-execution-model"
+        assert result.commands.test == "global-test-command"
+
+        # Verify defaults for missing keys
+        assert result.models.review == "claude-sonnet-4-20250514"
+        assert result.commands.lint == "ruff check"
+
+    def test_load_config_prefers_project_scope_over_global(self, tmp_path: Path) -> None:
+        """load_config should prefer project scope config over global config."""
+        # Create global config
+        global_config_dir = tmp_path / ".jiro-dreams-of-code"
+        global_config_dir.mkdir(parents=True, exist_ok=True)
+        global_config_file = global_config_dir / "config.yaml"
+        global_config_file.write_text(
+            """
+models:
+  planning: "global-planning-model"
+commands:
+  test: "global-test-command"
+"""
+        )
+
+        # Create project scope config
+        config_dir = tmp_path / ".jiro-dreams-of-code" / "test-project"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        config_file = config_dir / "config.yaml"
+        config_file.write_text(
+            """
+models:
+  planning: "project-planning-model"
+"""
+        )
+
+        # Mock home directory to use tmp_path
+        with patch("jiro.config.loader.Path.home", return_value=tmp_path):
+            result = load_config(tmp_path, "test-project")
+
+        # Verify project scope config takes precedence over global
+        assert result.models.planning == "project-planning-model"
+        # Global config value should be used for keys not in project scope
+        assert result.commands.test == "global-test-command"
+
+    def test_load_config_prefers_local_over_global(self, tmp_path: Path) -> None:
+        """load_config should prefer local config over global config."""
+        # Create global config
+        global_config_dir = tmp_path / ".jiro-dreams-of-code"
+        global_config_dir.mkdir(parents=True, exist_ok=True)
+        global_config_file = global_config_dir / "config.yaml"
+        global_config_file.write_text(
+            """
+models:
+  planning: "global-planning-model"
+  execution: "global-execution-model"
+commands:
+  test: "global-test-command"
+"""
+        )
+
+        # Create local config file
+        local_config_file = tmp_path / ".jiro-dreams-of-code.yaml"
+        local_config_file.write_text(
+            """
+models:
+  planning: "local-planning-model"
+"""
+        )
+
+        # Mock home directory to use tmp_path
+        with patch("jiro.config.loader.Path.home", return_value=tmp_path):
+            result = load_config(tmp_path, "test-project")
+
+        # Verify local config takes precedence
+        assert result.models.planning == "local-planning-model"
+        # Global config value should be used for keys not in local config
+        assert result.models.execution == "global-execution-model"
+        assert result.commands.test == "global-test-command"
+
+    def test_load_config_full_precedence_order(self, tmp_path: Path) -> None:
+        """load_config should follow precedence: local > project scope > global > defaults."""
+        # Create global config
+        global_config_dir = tmp_path / ".jiro-dreams-of-code"
+        global_config_dir.mkdir(parents=True, exist_ok=True)
+        global_config_file = global_config_dir / "config.yaml"
+        global_config_file.write_text(
+            """
+models:
+  planning: "global-planning-model"
+  execution: "global-execution-model"
+  review: "global-review-model"
+commands:
+  test: "global-test-command"
+  lint: "global-lint-command"
+"""
+        )
+
+        # Create project scope config
+        config_dir = tmp_path / ".jiro-dreams-of-code" / "test-project"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        config_file = config_dir / "config.yaml"
+        config_file.write_text(
+            """
+models:
+  planning: "project-planning-model"
+commands:
+  test: "project-test-command"
+preflight:
+  skip_if_recent_minutes: 75
+"""
+        )
+
+        # Create local config file
+        local_config_file = tmp_path / ".jiro-dreams-of-code.yaml"
+        local_config_file.write_text(
+            """
+models:
+  planning: "local-planning-model"
+conventions:
+  test_file_pattern: "local_test_{name}.py"
+"""
+        )
+
+        # Mock home directory to use tmp_path
+        with patch("jiro.config.loader.Path.home", return_value=tmp_path):
+            result = load_config(tmp_path, "test-project")
+
+        # Verify precedence order:
+        # - local > project scope > global > defaults
+        assert result.models.planning == "local-planning-model"  # from local
+        assert result.models.execution == "global-execution-model"  # from global (not in local)
+        assert (
+            result.models.review == "global-review-model"
+        )  # from global (not in local or project)
+        assert result.commands.test == "project-test-command"  # from project (not in local)
+        assert (
+            result.commands.lint == "global-lint-command"
+        )  # from global (not in local or project)
+        assert result.conventions.test_file_pattern == "local_test_{name}.py"  # from local
+        assert result.preflight.skip_if_recent_minutes == 75  # from project scope (not in local)

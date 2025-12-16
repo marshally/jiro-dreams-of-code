@@ -109,3 +109,12 @@ def get_local_config_path(project_root: Path) -> Path:
         Path to the .jiro-dreams-of-code.yaml file in project root.
     """
     return project_root / ".jiro-dreams-of-code.yaml"
+
+
+def get_global_config_path() -> Path:
+    """Get the global config file path in the home directory.
+
+    Returns:
+        Path to the ~/.jiro-dreams-of-code/config.yaml file.
+    """
+    return Path.home() / JIRO_DIR_NAME / "config.yaml"

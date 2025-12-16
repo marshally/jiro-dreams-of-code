@@ -11,7 +11,7 @@ from jiro.config.schema import (
     ModelsConfig,
     PreflightConfig,
 )
-from jiro.core.paths import get_config_path, get_local_config_path
+from jiro.core.paths import get_config_path, get_global_config_path, get_local_config_path
 
 
 def _flatten_config_for_save(config: Config) -> dict:
@@ -65,12 +65,13 @@ def save_config(config: Config, project_root: Path, project_name: str) -> None:
 
 
 def load_config(project_root: Path, project_name: str) -> Config:
-    """Load configuration from local and project scope directories.
+    """Load configuration from global, project scope, and local config files.
 
     Loads config in order of precedence:
     1. Local config from .jiro-dreams-of-code.yaml in project root (highest priority)
     2. Project scope config from ~/.jiro-dreams-of-code/$PROJECT/config.yaml
-    3. Defaults for any missing values
+    3. Global config from ~/.jiro-dreams-of-code/config.yaml
+    4. Defaults for any missing values (lowest priority)
 
     Args:
         project_root: The root directory of the project.
@@ -82,21 +83,30 @@ def load_config(project_root: Path, project_name: str) -> Config:
     # Start with empty config data
     config_data = {}
 
-    # First load project scope config from ~/.jiro-dreams-of-code/$PROJECT/config.yaml
+    # First load global config from ~/.jiro-dreams-of-code/config.yaml (lowest priority)
+    global_config_path = get_global_config_path()
+    if global_config_path.exists():
+        with open(global_config_path) as f:
+            loaded_data = yaml.safe_load(f)
+            if loaded_data:
+                config_data = loaded_data
+
+    # Then load project scope config from ~/.jiro-dreams-of-code/$PROJECT/config.yaml
     project_config_path = get_config_path(project_root, stealth=True, project_name=project_name)
     if project_config_path.exists():
         with open(project_config_path) as f:
             loaded_data = yaml.safe_load(f)
             if loaded_data:
-                config_data = loaded_data
+                # Merge project config into config_data (project values override global)
+                _merge_config_dicts(config_data, loaded_data)
 
-    # Then load local config from .jiro-dreams-of-code.yaml in project root (overrides project scope)
+    # Finally load local config from .jiro-dreams-of-code.yaml in project root (highest priority)
     local_config_path = get_local_config_path(project_root)
     if local_config_path.exists():
         with open(local_config_path) as f:
             loaded_data = yaml.safe_load(f)
             if loaded_data:
-                # Merge local config into config_data (local values override project scope)
+                # Merge local config into config_data (local values override project scope and global)
                 _merge_config_dicts(config_data, loaded_data)
 
     # Build nested configs with defaults
