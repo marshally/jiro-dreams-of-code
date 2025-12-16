@@ -1,7 +1,7 @@
 """Tests for dream command implementation.
 
 Note: Rich Console output goes to stderr. Use `result.output` (not `result.stdout`)
-when checking CLI output. See test_terminal_setup.py docstring for details.
+when checking CLI output.
 """
 
 from pathlib import Path

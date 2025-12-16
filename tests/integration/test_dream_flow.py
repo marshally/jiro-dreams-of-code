@@ -1,7 +1,7 @@
 """Integration tests for the complete dream flow.
 
 Note: Rich Console output goes to stderr. Use `result.output` (not `result.stdout`)
-when checking CLI output. See tests/unit/test_terminal_setup.py docstring for details.
+when checking CLI output.
 """
 
 from pathlib import Path
