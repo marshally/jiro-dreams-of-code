@@ -8,7 +8,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from jiro.config.loader import load_config, save_config
+from jiro.config.loader import load_config, load_config_with_sources, save_config
 from jiro.config.schema import Config
 
 app = typer.Typer(
@@ -27,122 +27,180 @@ def _get_config() -> Config:
     return load_config(project_root, project_name)
 
 
-def _flatten_config(config: Config) -> dict:
+def _get_config_with_sources() -> tuple[Config, dict[str, str]]:
+    """Get the effective configuration and source information for each value."""
+    project_root = Path.cwd()
+    project_name = project_root.name
+    try:
+        return load_config_with_sources(project_root, project_name)
+    except Exception:
+        # Fallback for when load_config_with_sources is not available or mocked
+        config = load_config(project_root, project_name)
+        return config, {}
+
+
+def _flatten_config(config: Config, sources: dict[str, str] | None = None) -> dict:
     """Flatten the nested config structure into a key-value format.
 
     Returns a dictionary with keys like "models.planning" and values
     containing the actual value and its source.
+
+    Args:
+        config: The Config object to flatten.
+        sources: Optional dict mapping dotted keys to their source. If not provided,
+                 all sources default to "default".
     """
+    if sources is None:
+        sources = {}
+
     flattened = {}
 
     # Process models section
     for key in ["planning", "execution", "review"]:
         value = getattr(config.models, key)
-        flattened[f"models.{key}"] = {
+        full_key = f"models.{key}"
+        flattened[full_key] = {
             "value": value,
-            "source": "default",  # For now, assume all are defaults
+            "source": sources.get(full_key, "default"),
             "section": "models",
         }
 
     # Process commands section
     for key in ["test", "lint", "lint_fix"]:
         value = getattr(config.commands, key)
-        flattened[f"commands.{key}"] = {
+        full_key = f"commands.{key}"
+        flattened[full_key] = {
             "value": value,
-            "source": "default",
+            "source": sources.get(full_key, "default"),
             "section": "commands",
         }
 
     # Process conventions section
     for key in ["test_file_pattern"]:
         value = getattr(config.conventions, key)
-        flattened[f"conventions.{key}"] = {
+        full_key = f"conventions.{key}"
+        flattened[full_key] = {
             "value": value,
-            "source": "default",
+            "source": sources.get(full_key, "default"),
             "section": "conventions",
         }
 
     # Process preflight section
     for key in ["skip_if_recent_minutes"]:
         value = getattr(config.preflight, key)
-        flattened[f"preflight.{key}"] = {
+        full_key = f"preflight.{key}"
+        flattened[full_key] = {
             "value": value,
-            "source": "default",
+            "source": sources.get(full_key, "default"),
             "section": "preflight",
         }
 
     return flattened
 
 
-def _build_json_output(config: Config) -> dict:
-    """Build a JSON-serializable representation of the config with sources."""
+def _build_json_output(config: Config, sources: dict[str, str] | None = None) -> dict:
+    """Build a JSON-serializable representation of the config with sources.
+
+    Args:
+        config: The Config object to serialize.
+        sources: Optional dict mapping dotted keys to their source. If not provided,
+                 all sources default to "default".
+    """
+    if sources is None:
+        sources = {}
+
     return {
         "models": {
             "planning": {
                 "value": config.models.planning,
-                "source": "default",
+                "source": sources.get("models.planning", "default"),
             },
             "execution": {
                 "value": config.models.execution,
-                "source": "default",
+                "source": sources.get("models.execution", "default"),
             },
             "review": {
                 "value": config.models.review,
-                "source": "default",
+                "source": sources.get("models.review", "default"),
             },
         },
         "commands": {
             "test": {
                 "value": config.commands.test,
-                "source": "default",
+                "source": sources.get("commands.test", "default"),
             },
             "lint": {
                 "value": config.commands.lint,
-                "source": "default",
+                "source": sources.get("commands.lint", "default"),
             },
             "lint_fix": {
                 "value": config.commands.lint_fix,
-                "source": "default",
+                "source": sources.get("commands.lint_fix", "default"),
             },
         },
         "conventions": {
             "test_file_pattern": {
                 "value": config.conventions.test_file_pattern,
-                "source": "default",
+                "source": sources.get("conventions.test_file_pattern", "default"),
             },
         },
         "preflight": {
             "skip_if_recent_minutes": {
                 "value": config.preflight.skip_if_recent_minutes,
-                "source": "default",
+                "source": sources.get("preflight.skip_if_recent_minutes", "default"),
             },
         },
     }
 
 
-def _display_config_table(config: Config) -> None:
-    """Display configuration values in a Rich table."""
+def _display_config_table(config: Config, sources: dict[str, str] | None = None) -> None:
+    """Display configuration values in a Rich table.
+
+    Args:
+        config: The Config object to display.
+        sources: Optional dict mapping dotted keys to their source. If not provided,
+                 all sources default to "default".
+    """
+    if sources is None:
+        sources = {}
+
     table = Table(title="Configuration")
     table.add_column("Setting", style="cyan")
     table.add_column("Value", style="white")
     table.add_column("Source", style="yellow")
 
     # Models section
-    table.add_row("models.planning", config.models.planning, "default")
-    table.add_row("models.execution", config.models.execution, "default")
-    table.add_row("models.review", config.models.review, "default")
+    table.add_row(
+        "models.planning", config.models.planning, sources.get("models.planning", "default")
+    )
+    table.add_row(
+        "models.execution",
+        config.models.execution,
+        sources.get("models.execution", "default"),
+    )
+    table.add_row("models.review", config.models.review, sources.get("models.review", "default"))
 
     # Commands section
-    table.add_row("commands.test", config.commands.test, "default")
-    table.add_row("commands.lint", config.commands.lint, "default")
-    table.add_row("commands.lint_fix", config.commands.lint_fix, "default")
+    table.add_row("commands.test", config.commands.test, sources.get("commands.test", "default"))
+    table.add_row("commands.lint", config.commands.lint, sources.get("commands.lint", "default"))
+    table.add_row(
+        "commands.lint_fix",
+        config.commands.lint_fix,
+        sources.get("commands.lint_fix", "default"),
+    )
 
     # Conventions section
-    table.add_row("conventions.test_file_pattern", config.conventions.test_file_pattern, "default")
+    table.add_row(
+        "conventions.test_file_pattern",
+        config.conventions.test_file_pattern,
+        sources.get("conventions.test_file_pattern", "default"),
+    )
 
     # Preflight section
     table.add_row(
-        "preflight.skip_if_recent_minutes", str(config.preflight.skip_if_recent_minutes), "default"
+        "preflight.skip_if_recent_minutes",
+        str(config.preflight.skip_if_recent_minutes),
+        sources.get("preflight.skip_if_recent_minutes", "default"),
     )
 
     console.print(table)
@@ -166,13 +224,13 @@ def config_list(
         jiro config list --global
         jiro config list --project
     """
-    config = _get_config()
+    config, sources = _get_config_with_sources()
 
     if json_output:
-        output = _build_json_output(config)
+        output = _build_json_output(config, sources)
         console.print(json.dumps(output))
     else:
-        _display_config_table(config)
+        _display_config_table(config, sources)
 
 
 @app.command("get")
@@ -190,8 +248,8 @@ def config_get(
         jiro config get models.execution
         jiro config get models.planning --json
     """
-    config = _get_config()
-    flattened = _flatten_config(config)
+    config, sources = _get_config_with_sources()
+    flattened = _flatten_config(config, sources)
 
     if key not in flattened:
         console.print(f"[red]Error: Configuration key '{key}' not found[/red]")

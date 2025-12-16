@@ -182,3 +182,120 @@ def _merge_config_dicts(base: dict, override: dict) -> None:
         override: The override dictionary whose values take precedence.
     """
     merge_configs(base, override)
+
+
+def load_config_with_sources(project_root: Path, project_name: str) -> tuple[Config, dict]:
+    """Load configuration and track the source of each value.
+
+    Loads config in order of precedence and returns both the Config object
+    and a dictionary mapping each config key to its source level.
+
+    Args:
+        project_root: The root directory of the project.
+        project_name: The project name for scoped config directory.
+
+    Returns:
+        Tuple of (Config dataclass, sources dict) where sources dict maps
+        dotted keys like "models.planning" to their source ("local", "project", "global", or "default").
+    """
+    # Start with empty config data and empty sources
+    config_data = {}
+    sources: dict[str, str] = {}
+
+    # Set all defaults and track them as sources
+    defaults: dict[str, dict[str, str | int]] = {
+        "models": {
+            "planning": "claude-opus-4-20250514",
+            "execution": "claude-3-5-haiku-20241022",
+            "review": "claude-sonnet-4-20250514",
+        },
+        "commands": {
+            "test": "pytest",
+            "lint": "ruff check",
+            "lint_fix": "ruff check --fix",
+        },
+        "conventions": {
+            "test_file_pattern": "test_{name}.py",
+        },
+        "preflight": {
+            "skip_if_recent_minutes": 60,
+        },
+    }
+
+    # Mark all defaults
+    for section, keys in defaults.items():
+        for key, _value in keys.items():
+            sources[f"{section}.{key}"] = "default"
+
+    # Load global config
+    global_config_path = get_global_config_path()
+    if global_config_path.exists():
+        with open(global_config_path) as f:
+            loaded_data = yaml.safe_load(f)
+            if loaded_data:
+                config_data = loaded_data
+                # Track global sources
+                for section, section_data in loaded_data.items():
+                    if isinstance(section_data, dict):
+                        for key in section_data:
+                            sources[f"{section}.{key}"] = "global"
+
+    # Load project scope config
+    project_config_path = get_config_path(project_root, stealth=True, project_name=project_name)
+    if project_config_path.exists():
+        with open(project_config_path) as f:
+            loaded_data = yaml.safe_load(f)
+            if loaded_data:
+                _merge_config_dicts(config_data, loaded_data)
+                # Track project sources (overriding global)
+                for section, section_data in loaded_data.items():
+                    if isinstance(section_data, dict):
+                        for key in section_data:
+                            sources[f"{section}.{key}"] = "project"
+
+    # Load local config
+    local_config_path = get_local_config_path(project_root)
+    if local_config_path.exists():
+        with open(local_config_path) as f:
+            loaded_data = yaml.safe_load(f)
+            if loaded_data:
+                _merge_config_dicts(config_data, loaded_data)
+                # Track local sources (overriding project and global)
+                for section, section_data in loaded_data.items():
+                    if isinstance(section_data, dict):
+                        for key in section_data:
+                            sources[f"{section}.{key}"] = "local"
+
+    # Build nested configs with defaults
+    models_data = config_data.get("models", {})
+    models = ModelsConfig(
+        planning=models_data.get("planning", "claude-opus-4-20250514"),
+        execution=models_data.get("execution", "claude-3-5-haiku-20241022"),
+        review=models_data.get("review", "claude-sonnet-4-20250514"),
+    )
+
+    commands_data = config_data.get("commands", {})
+    commands = CommandsConfig(
+        test=commands_data.get("test", "pytest"),
+        lint=commands_data.get("lint", "ruff check"),
+        lint_fix=commands_data.get("lint_fix", "ruff check --fix"),
+    )
+
+    conventions_data = config_data.get("conventions", {})
+    conventions = ConventionsConfig(
+        test_file_pattern=conventions_data.get("test_file_pattern", "test_{name}.py"),
+    )
+
+    preflight_data = config_data.get("preflight", {})
+    preflight = PreflightConfig(
+        skip_if_recent_minutes=preflight_data.get("skip_if_recent_minutes", 60),
+    )
+
+    config = Config(
+        models=models,
+        commands=commands,
+        conventions=conventions,
+        preflight=preflight,
+    )
+
+    return config, sources
