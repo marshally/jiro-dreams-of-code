@@ -659,3 +659,107 @@ class TestSessionOrchestratorEpicFiltering:
 
         # Should have called get_tasks with epic_id
         mock_get_tasks.assert_called_once_with(epic_id="epic-456")
+
+
+class TestSessionOrchestratorHalt:
+    """Tests for session halt mechanism."""
+
+    @pytest.mark.unit
+    def test_halt_updates_session_status(
+        self,
+        config: Config,
+        session_repo: SessionRepository,
+        task_repo: TaskExecutionRepository,
+    ) -> None:
+        """Should update session status to 'halted' when halt is called."""
+        from datetime import datetime
+
+        from jiro.core.session import SessionOrchestrator
+        from jiro.db.models import Session
+
+        orchestrator = SessionOrchestrator(
+            config=config,
+            session_repo=session_repo,
+            task_repo=task_repo,
+        )
+
+        session = Session(
+            id="test-session",
+            branch_name="test-branch",
+            status="running",
+            started_at=datetime.now(),
+        )
+        session_repo.create(session)
+
+        orchestrator.halt(session, "Test halt reason")
+
+        updated_session = session_repo.get("test-session")
+        assert updated_session is not None
+        assert updated_session.status == "halted"
+
+    @pytest.mark.unit
+    def test_halt_records_halt_reason(
+        self,
+        config: Config,
+        session_repo: SessionRepository,
+        task_repo: TaskExecutionRepository,
+    ) -> None:
+        """Should record halt reason in session."""
+        from datetime import datetime
+
+        from jiro.core.session import SessionOrchestrator
+        from jiro.db.models import Session
+
+        orchestrator = SessionOrchestrator(
+            config=config,
+            session_repo=session_repo,
+            task_repo=task_repo,
+        )
+
+        session = Session(
+            id="test-session",
+            branch_name="test-branch",
+            status="running",
+            started_at=datetime.now(),
+        )
+        session_repo.create(session)
+
+        halt_reason = "Review failed: code quality issues"
+        orchestrator.halt(session, halt_reason)
+
+        updated_session = session_repo.get("test-session")
+        assert updated_session is not None
+        assert updated_session.halt_reason == halt_reason
+
+    @pytest.mark.unit
+    def test_halt_sets_ended_at_timestamp(
+        self,
+        config: Config,
+        session_repo: SessionRepository,
+        task_repo: TaskExecutionRepository,
+    ) -> None:
+        """Should set ended_at timestamp when halt is called."""
+        from datetime import datetime
+
+        from jiro.core.session import SessionOrchestrator
+        from jiro.db.models import Session
+
+        orchestrator = SessionOrchestrator(
+            config=config,
+            session_repo=session_repo,
+            task_repo=task_repo,
+        )
+
+        session = Session(
+            id="test-session",
+            branch_name="test-branch",
+            status="running",
+            started_at=datetime.now(),
+        )
+        session_repo.create(session)
+
+        orchestrator.halt(session, "Test halt")
+
+        updated_session = session_repo.get("test-session")
+        assert updated_session is not None
+        assert updated_session.ended_at is not None

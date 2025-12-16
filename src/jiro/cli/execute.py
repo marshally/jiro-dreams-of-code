@@ -8,7 +8,7 @@ from rich.console import Console
 
 from jiro.config.loader import load_config
 from jiro.core.paths import get_database_path
-from jiro.core.session import SessionOrchestrator
+from jiro.core.session import HaltError, SessionOrchestrator
 from jiro.db.database import ensure_schema, get_database
 from jiro.db.repository import SessionRepository, TaskExecutionRepository
 
@@ -68,12 +68,15 @@ def execute(
             console.print(f"  Error: {result.error}")
             console.print(f"  Tasks completed: {result.tasks_completed}")
             console.print(f"  Tasks failed: {result.tasks_failed}")
-            raise typer.Exit(1)
+            raise typer.Exit(5)
         elif result.status == "failed":
             console.print("[red]Session failed[/red]")
             console.print(f"  Error: {result.error}")
             raise typer.Exit(1)
 
+    except HaltError as e:
+        console.print(f"[red]Session halted: {e.reason}[/red]")
+        raise typer.Exit(5) from e
     except Exception as e:
         console.print(f"[red]Unexpected error: {e}[/red]")
         raise typer.Exit(1) from e

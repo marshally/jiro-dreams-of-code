@@ -13,6 +13,23 @@ from jiro.db.models import Session, SessionStatus
 from jiro.db.repository import SessionRepository, TaskExecutionRepository
 
 
+class HaltError(Exception):
+    """Exception raised when a session is halted.
+
+    Raised when the session needs to stop execution due to a failure
+    in review, execution, preflight, postflight checks, or other errors.
+    """
+
+    def __init__(self, reason: str) -> None:
+        """Initialize HaltError.
+
+        Args:
+            reason: The reason the session was halted.
+        """
+        self.reason = reason
+        super().__init__(f"Session halted: {reason}")
+
+
 @dataclass
 class CheckResult:
     """Result of a single preflight check.
@@ -756,4 +773,25 @@ class SessionOrchestrator:
             "task_execution_start",
             task_id=task.id,
             session_id=session_id,
+        )
+
+    def halt(self, session: Session, halt_reason: str) -> None:
+        """Halt the session and record the reason.
+
+        Updates session status to 'halted' and records the halt reason.
+        Also logs the halt with full context.
+
+        Args:
+            session: The session to halt.
+            halt_reason: The reason the session is being halted.
+        """
+        session.status = "halted"
+        session.halt_reason = halt_reason
+        session.ended_at = datetime.now()
+        self.session_repo.update(session)
+
+        self.logger.error(
+            "session_halted",
+            session_id=session.id,
+            halt_reason=halt_reason,
         )
