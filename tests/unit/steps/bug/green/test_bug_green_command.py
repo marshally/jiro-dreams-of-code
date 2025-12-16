@@ -47,8 +47,9 @@ class TestBugGreenCommandClassAttributes:
 class TestBugGreenCommandExecute:
     """Test the execute method."""
 
-    def test_execute_raises_not_implemented(self):
-        """execute() should raise NotImplementedError (placeholder)."""
+    @pytest.mark.asyncio
+    async def test_execute_requires_client(self):
+        """execute() should raise ValueError if client is not set."""
         cmd = BugGreenCommand()
 
         # Create minimal task and step
@@ -65,8 +66,8 @@ class TestBugGreenCommandExecute:
             planning_context="Fix the password validation bug to make test pass",
         )
 
-        with pytest.raises(NotImplementedError, match="not yet implemented"):
-            cmd.execute(step=step, task=task)
+        with pytest.raises(ValueError, match="AgentClient not configured"):
+            await cmd.execute(step=step, task=task)
 
     def test_execute_has_keyword_only_arguments(self):
         """execute() should use keyword-only arguments."""
