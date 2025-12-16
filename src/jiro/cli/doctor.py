@@ -9,6 +9,7 @@ from pathlib import Path
 import structlog
 import yaml
 
+from jiro.auth.manager import get_api_key
 from jiro.config.loader import load_config
 from jiro.config.schema import Config
 from jiro.core.paths import get_config_path
@@ -100,13 +101,17 @@ def check_claude_sdk() -> CheckResult:
 
 
 def check_api_key() -> CheckResult:
-    """Check if ANTHROPIC_API_KEY environment variable is set.
+    """Check if API key is available in keyring or environment.
+
+    Checks system keyring first (macOS Keychain, Windows Credential Manager,
+    Linux Secret Service), then falls back to ANTHROPIC_API_KEY environment
+    variable.
 
     Returns:
         CheckResult indicating if API key is configured.
     """
     try:
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+        api_key = get_api_key()
 
         if api_key:
             return CheckResult(
@@ -117,7 +122,7 @@ def check_api_key() -> CheckResult:
             return CheckResult(
                 name="api_key",
                 passed=False,
-                error="ANTHROPIC_API_KEY environment variable not set",
+                error="No API key found in keyring or ANTHROPIC_API_KEY environment variable",
             )
     except Exception as e:
         return CheckResult(
