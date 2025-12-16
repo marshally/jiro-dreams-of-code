@@ -1,11 +1,14 @@
 """ReviewAgent for reviewing code changes via deterministic checks and LLM."""
 
+import json
+import re
 import subprocess
 from dataclasses import dataclass
 
 import structlog
 
 from jiro.agents.client import AgentClient
+from jiro.assets.loader import load_template
 from jiro.config.schema import Config
 from jiro.trackers.interface import Task
 
@@ -206,8 +209,54 @@ class ReviewAgent:
             logger.error("lint_error", error=str(e))
             return False
 
+    def _get_commit_message(self, commit_sha: str) -> str:
+        """Get the commit message for a commit SHA.
+
+        Args:
+            commit_sha: The commit SHA.
+
+        Returns:
+            The commit message, or empty string if unable to retrieve.
+        """
+        try:
+            result = subprocess.run(
+                ["git", "log", "-1", "--pretty=%B", commit_sha],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0:
+                return result.stdout.strip()
+        except Exception as e:
+            logger.warning("get_commit_message_failed", error=str(e))
+        return ""
+
+    def _get_commit_diff(self, commit_sha: str) -> str:
+        """Get the unified diff for a commit.
+
+        Args:
+            commit_sha: The commit SHA.
+
+        Returns:
+            The unified diff, or empty string if unable to retrieve.
+        """
+        try:
+            result = subprocess.run(
+                ["git", "show", commit_sha],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0:
+                return result.stdout.strip()
+        except Exception as e:
+            logger.warning("get_commit_diff_failed", error=str(e))
+        return ""
+
     def _parse_llm_response(self, output: str) -> bool:
         """Parse LLM response to determine approval status.
+
+        Handles both JSON and legacy text-based responses.
 
         Args:
             output: The LLM response text.
@@ -215,13 +264,30 @@ class ReviewAgent:
         Returns:
             True if approved, False if rejected.
         """
+        # Try to parse as JSON first (new format)
+        json_match = re.search(r"\{.*?\}", output, re.DOTALL)
+        if json_match:
+            try:
+                response_json = json.loads(json_match.group())
+                if isinstance(response_json, dict):
+                    passed = response_json.get("passed", False)
+                    logger.info(
+                        "llm_review_json_parsed",
+                        passed=passed,
+                        has_concerns=bool(response_json.get("concerns")),
+                    )
+                    return bool(passed)
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+        # Fallback to text-based parsing (legacy format)
         output_upper = output.upper()
         if "APPROVED" in output_upper:
             return True
         if "REJECTED" in output_upper:
             return False
-        # Default to approval if no clear decision
-        return "APPROVED" in output_upper
+        # Default to False if no clear decision
+        return False
 
     def _build_review_prompt(self, commit_sha: str, task: Task) -> str:
         """Build a prompt for the LLM review.
@@ -233,7 +299,27 @@ class ReviewAgent:
         Returns:
             A formatted prompt for the LLM reviewer.
         """
-        prompt = f"""You are a code reviewer evaluating changes for semantic correctness and quality.
+        # Load the base prompt template
+        try:
+            template = load_template("review_agent.md")
+            base_prompt = template.render()
+        except Exception:
+            # Fallback if template loading fails
+            base_prompt = "You are a code review agent. Review the changes below."
+
+        # Get commit message and diff
+        commit_message = self._get_commit_message(commit_sha)
+        diff = self._get_commit_diff(commit_sha)
+
+        # Truncate diff if too large (LLM context limits)
+        max_diff_lines = 500
+        diff_lines = diff.split("\n")
+        if len(diff_lines) > max_diff_lines:
+            diff = "\n".join(diff_lines[:max_diff_lines])
+            diff += f"\n\n... (diff truncated, {len(diff_lines) - max_diff_lines} lines omitted)"
+
+        # Build full prompt
+        prompt = f"""{base_prompt}
 
 ## Task Context
 Task ID: {task.id}
@@ -242,20 +328,18 @@ Type: {task.task_type}
 Description: {task.description or "No description"}
 
 ## Commit to Review
-Commit SHA: {commit_sha}
+SHA: {commit_sha}
 
-## Your Review Task
+### Commit Message
+```
+{commit_message}
+```
 
-Please review the code changes in this commit and determine if:
-1. The changes align with the task requirements
-2. The code follows best practices and conventions
-3. Error handling is appropriate
-4. The implementation is complete and correct
+### Diff
+```diff
+{diff}
+```
 
-Respond with either:
-- APPROVED: If the code is ready to merge
-- REJECTED: With explanation of what needs to be fixed
-
-Be concise and specific in your feedback."""
+Please analyze these changes and respond with valid JSON following the output format specified above."""
 
         return prompt

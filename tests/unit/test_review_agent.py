@@ -530,8 +530,9 @@ class TestDeterministicCheckMethods:
         assert "feature" in prompt
         assert "Test description" in prompt
         assert "abc123" in prompt
-        assert "APPROVED" in prompt
-        assert "REJECTED" in prompt
+        # New format checks
+        assert "passed" in prompt
+        assert "JSON" in prompt
 
     @pytest.mark.unit
     def test_run_deterministic_checks_both_pass(self, mock_client, sample_config):
@@ -608,3 +609,316 @@ class TestDeterministicCheckMethods:
             assert passed is False
             assert results["tests"] == "FAILED"
             assert results["lint"] == "FAILED"
+
+
+class TestLLMResponseParsing:
+    """Tests for LLM response parsing with JSON format."""
+
+    @pytest.fixture
+    def mock_client(self):
+        """Create a mock AgentClient."""
+        client = MagicMock()
+        client.execute = AsyncMock()
+        return client
+
+    @pytest.fixture
+    def sample_config(self):
+        """Create a sample config."""
+        return Config()
+
+    @pytest.mark.unit
+    def test_parse_json_response_passed(self, mock_client, sample_config):
+        """_parse_llm_response() should parse JSON with passed: true."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+        json_response = """{
+  "passed": true,
+  "concerns": [],
+  "summary": "All changes match the commit message"
+}"""
+
+        # Act
+        result = agent._parse_llm_response(json_response)
+
+        # Assert
+        assert result is True
+
+    @pytest.mark.unit
+    def test_parse_json_response_failed(self, mock_client, sample_config):
+        """_parse_llm_response() should parse JSON with passed: false."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+        json_response = """{
+  "passed": false,
+  "concerns": [
+    {
+      "severity": "error",
+      "description": "Scope creep detected",
+      "file": "src/unrelated.py"
+    }
+  ],
+  "summary": "Changes exceed claimed scope"
+}"""
+
+        # Act
+        result = agent._parse_llm_response(json_response)
+
+        # Assert
+        assert result is False
+
+    @pytest.mark.unit
+    def test_parse_json_response_with_text(self, mock_client, sample_config):
+        """_parse_llm_response() should extract JSON from mixed text."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+        mixed_response = """Let me analyze this commit...
+
+{"passed": true, "concerns": [], "summary": "Looks good"}
+
+That's my review."""
+
+        # Act
+        result = agent._parse_llm_response(mixed_response)
+
+        # Assert
+        assert result is True
+
+    @pytest.mark.unit
+    def test_parse_legacy_approved_text(self, mock_client, sample_config):
+        """_parse_llm_response() should handle legacy APPROVED text."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+        text = "APPROVED: Code looks good and follows conventions."
+
+        # Act
+        result = agent._parse_llm_response(text)
+
+        # Assert
+        assert result is True
+
+    @pytest.mark.unit
+    def test_parse_legacy_rejected_text(self, mock_client, sample_config):
+        """_parse_llm_response() should handle legacy REJECTED text."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+        text = "REJECTED: Missing error handling on line 42."
+
+        # Act
+        result = agent._parse_llm_response(text)
+
+        # Assert
+        assert result is False
+
+    @pytest.mark.unit
+    def test_parse_ambiguous_response_defaults_false(self, mock_client, sample_config):
+        """_parse_llm_response() should default to False for ambiguous responses."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+        text = "The code seems okay but might need review."
+
+        # Act
+        result = agent._parse_llm_response(text)
+
+        # Assert
+        assert result is False
+
+
+class TestCommitDataRetrieval:
+    """Tests for getting commit message and diff."""
+
+    @pytest.fixture
+    def mock_client(self):
+        """Create a mock AgentClient."""
+        client = MagicMock()
+        client.execute = AsyncMock()
+        return client
+
+    @pytest.fixture
+    def sample_config(self):
+        """Create a sample config."""
+        return Config()
+
+    @pytest.mark.unit
+    def test_get_commit_message(self, mock_client, sample_config):
+        """_get_commit_message() should retrieve commit message."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+
+        with patch("jiro.agents.review.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=0,
+                stdout="docs: Update API documentation\n\nAdded examples for auth endpoints.",
+            )
+
+            # Act
+            result = agent._get_commit_message("abc123")
+
+            # Assert
+            assert result == "docs: Update API documentation\n\nAdded examples for auth endpoints."
+            mock_run.assert_called_once()
+
+    @pytest.mark.unit
+    def test_get_commit_message_failure(self, mock_client, sample_config):
+        """_get_commit_message() should return empty string on failure."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+
+        with patch("jiro.agents.review.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=1, stdout="")
+
+            # Act
+            result = agent._get_commit_message("invalid")
+
+            # Assert
+            assert result == ""
+
+    @pytest.mark.unit
+    def test_get_commit_diff(self, mock_client, sample_config):
+        """_get_commit_diff() should retrieve commit diff."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+        expected_diff = """commit abc123
+Author: Test <test@example.com>
+Date:   Mon Jan 1 00:00:00 2024 +0000
+
+    docs: Update
+
+diff --git a/README.md b/README.md
+--- a/README.md
++++ b/README.md
+@@ -1,3 +1,4 @@
+ # Project
++Updated"""
+
+        with patch("jiro.agents.review.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout=expected_diff)
+
+            # Act
+            result = agent._get_commit_diff("abc123")
+
+            # Assert
+            assert "README.md" in result
+            assert "Updated" in result
+
+    @pytest.mark.unit
+    def test_get_commit_diff_failure(self, mock_client, sample_config):
+        """_get_commit_diff() should return empty string on failure."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+
+        with patch("jiro.agents.review.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=128, stdout="")
+
+            # Act
+            result = agent._get_commit_diff("invalid")
+
+            # Assert
+            assert result == ""
+
+
+class TestPromptBuilding:
+    """Tests for LLM prompt construction."""
+
+    @pytest.fixture
+    def mock_client(self):
+        """Create a mock AgentClient."""
+        client = MagicMock()
+        client.execute = AsyncMock()
+        return client
+
+    @pytest.fixture
+    def sample_config(self):
+        """Create a sample config."""
+        return Config()
+
+    @pytest.mark.unit
+    def test_build_review_prompt_includes_diff(self, mock_client, sample_config):
+        """_build_review_prompt() should include commit diff."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+        task = Task(
+            id="task-123",
+            title="Add docs",
+            task_type="docs",
+            status="open",
+            created_at=datetime.now(),
+            description="Add API documentation",
+        )
+
+        with (
+            patch.object(agent, "_get_commit_message") as mock_msg,
+            patch.object(agent, "_get_commit_diff") as mock_diff,
+        ):
+            mock_msg.return_value = "docs: Add API examples"
+            mock_diff.return_value = "--- a/README.md\n+++ b/README.md\n@@ -1,3 +1,5 @@ Example"
+
+            # Act
+            prompt = agent._build_review_prompt("abc123", task)
+
+            # Assert
+            assert "task-123" in prompt
+            assert "Add docs" in prompt
+            assert "Add API examples" in prompt
+            assert "README.md" in prompt
+            assert "Example" in prompt
+
+    @pytest.mark.unit
+    def test_build_review_prompt_includes_task_context(self, mock_client, sample_config):
+        """_build_review_prompt() should include full task context."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+        task = Task(
+            id="task-456",
+            title="Fix bug",
+            task_type="bug_fix",
+            status="in_progress",
+            created_at=datetime.now(),
+            description="Fix null pointer in parser",
+        )
+
+        with (
+            patch.object(agent, "_get_commit_message") as mock_msg,
+            patch.object(agent, "_get_commit_diff") as mock_diff,
+        ):
+            mock_msg.return_value = "fix: null check in parser"
+            mock_diff.return_value = "--- a/src/parser.py\n+++ b/src/parser.py"
+
+            # Act
+            prompt = agent._build_review_prompt("def456", task)
+
+            # Assert
+            assert "task-456" in prompt
+            assert "Fix bug" in prompt
+            assert "bug_fix" in prompt
+            assert "Fix null pointer in parser" in prompt
+
+    @pytest.mark.unit
+    def test_build_review_prompt_truncates_large_diff(self, mock_client, sample_config):
+        """_build_review_prompt() should truncate very large diffs."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+        task = Task(
+            id="task-789",
+            title="Large changes",
+            task_type="refactor",
+            status="open",
+            created_at=datetime.now(),
+            description="Large refactoring",
+        )
+
+        # Create a very large diff
+        large_diff = "\n".join([f"+ line {i}" for i in range(600)])
+
+        with (
+            patch.object(agent, "_get_commit_message") as mock_msg,
+            patch.object(agent, "_get_commit_diff") as mock_diff,
+        ):
+            mock_msg.return_value = "refactor: large changes"
+            mock_diff.return_value = large_diff
+
+            # Act
+            prompt = agent._build_review_prompt("ghi789", task)
+
+            # Assert
+            assert "truncated" in prompt
+            assert "600 lines omitted" in prompt or "lines omitted" in prompt
