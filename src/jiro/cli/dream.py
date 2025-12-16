@@ -36,6 +36,32 @@ def _suppress_structlog_output() -> Generator[None, None, None]:
         sys.stdout = old_stdout
 
 
+@contextmanager
+def _enhanced_keyboard_mode() -> Generator[None, None, None]:
+    """Enable modifyOtherKeys mode for enhanced keyboard input.
+
+    This allows the terminal to send distinct escape sequences for modified keys
+    like Shift+Enter, without requiring manual terminal configuration.
+
+    Sends escape sequences to enable modifyOtherKeys level 2 on entry and
+    disables it on exit. Terminals that don't support this will simply ignore
+    the sequences.
+
+    Reference: https://invisible-island.net/xterm/ctlseqs/ctlseqs.html
+    """
+    # Enable modifyOtherKeys level 2 (all keys)
+    # CSI > 4 ; 2 m
+    sys.stderr.write("\x1b[>4;2m")
+    sys.stderr.flush()
+    try:
+        yield
+    finally:
+        # Disable modifyOtherKeys
+        # CSI > 4 ; 0 m
+        sys.stderr.write("\x1b[>4;0m")
+        sys.stderr.flush()
+
+
 # Thinking indicator messages (similar to Claude Code)
 THINKING_MESSAGES = [
     "Contemplating…",
@@ -56,11 +82,11 @@ def _get_thinking_message() -> str:
 def _create_multiline_session() -> PromptSession[str]:
     """Create a prompt_toolkit session with multiline support.
 
-    After running `jiro terminal-setup` and configuring your terminal:
+    When used with _enhanced_keyboard_mode() context manager:
     - Enter submits
     - Shift+Enter adds a new line
 
-    Fallback (before terminal configuration):
+    Fallback (terminals that don't support modifyOtherKeys):
     - Enter submits
     - Meta+Enter (Alt+Enter / Option+Enter) adds a new line
 
@@ -262,8 +288,7 @@ async def _run_interactive_dream(
     # Welcome message
     console.print("[cyan]Interactive Spec Generation[/cyan]")
     console.print("I'll ask questions to understand what you want to build.\n")
-    console.print("[dim]Enter to submit. Meta+Enter for a newline.[/dim]")
-    console.print("[dim]Run 'jiro terminal-setup' to use Shift+Enter for newlines instead.[/dim]")
+    console.print("[dim]Enter to submit. Shift+Enter for a newline.[/dim]")
     console.print("[dim]Type 'quit', 'exit', or '/quit' to cancel[/dim]\n")
 
     # Create multiline input session
@@ -306,8 +331,7 @@ async def _run_interactive_dream(
 
     # Enter refinement loop (same as _run_dream)
     console.print("\n[cyan]Enter refinement chat.[/cyan]")
-    console.print("[dim]Enter to submit. Meta+Enter for a newline.[/dim]")
-    console.print("[dim]Run 'jiro terminal-setup' to use Shift+Enter for newlines instead.[/dim]")
+    console.print("[dim]Enter to submit. Shift+Enter for a newline.[/dim]")
     console.print("[dim]Commands: 'done' / 'exit' / '/quit' / Ctrl+D to save and exit[/dim]\n")
 
     # Create new session for refinement
@@ -403,8 +427,7 @@ async def _run_dream(
 
     # Chat refinement loop
     console.print("\n[cyan]Enter refinement chat.[/cyan]")
-    console.print("[dim]Enter to submit. Meta+Enter for a newline.[/dim]")
-    console.print("[dim]Run 'jiro terminal-setup' to use Shift+Enter for newlines instead.[/dim]")
+    console.print("[dim]Enter to submit. Shift+Enter for a newline.[/dim]")
     console.print("[dim]Commands: 'done' / 'exit' / '/quit' / Ctrl+D to save and exit[/dim]\n")
 
     # Create multiline session for refinement
@@ -477,12 +500,13 @@ def dream_callback(
     project_root = Path.cwd()
 
     try:
-        if prompt is None:
-            # Interactive mode - agent asks questions
-            asyncio.run(_run_interactive_dream(model, project_root, debug))
-        else:
-            # Direct mode - generate spec from prompt
-            asyncio.run(_run_dream(prompt, model, project_root, debug))
+        with _enhanced_keyboard_mode():
+            if prompt is None:
+                # Interactive mode - agent asks questions
+                asyncio.run(_run_interactive_dream(model, project_root, debug))
+            else:
+                # Direct mode - generate spec from prompt
+                asyncio.run(_run_dream(prompt, model, project_root, debug))
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
         raise typer.Exit(code=1) from e
