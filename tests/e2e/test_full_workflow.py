@@ -460,7 +460,7 @@ class TestFullWorkflowE2E:
 
             result = cli_runner.invoke(app, ["execute"])
 
-            assert result.exit_code == 1
+            assert result.exit_code == 5
             assert "halted" in result.stdout.lower()
             assert "Tasks completed: 1" in result.stdout
             assert "Tasks failed: 1" in result.stdout
