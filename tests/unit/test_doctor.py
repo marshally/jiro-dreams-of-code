@@ -80,11 +80,12 @@ class TestCheckAPIKey:
     def test_api_key_exists(self) -> None:
         """Should pass if ANTHROPIC_API_KEY is set."""
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key-12345"}):
-            result = check_api_key()
-            assert isinstance(result, CheckResult)
-            assert result.name == "api_key"
-            assert result.passed is True
-            assert result.error is None
+            with patch("jiro.cli.doctor.get_api_key", return_value="test-key-12345"):
+                result = check_api_key()
+                assert isinstance(result, CheckResult)
+                assert result.name == "api_key"
+                assert result.passed is True
+                assert result.error is None
 
     @pytest.mark.unit
     def test_api_key_missing(self) -> None:
@@ -92,18 +93,20 @@ class TestCheckAPIKey:
         with patch.dict(os.environ, {}, clear=False):
             # Remove the API key if it exists
             os.environ.pop("ANTHROPIC_API_KEY", None)
-            result = check_api_key()
-            assert result.passed is False
-            assert result.error is not None
-            assert "ANTHROPIC_API_KEY" in result.error
+            with patch("jiro.cli.doctor.get_api_key", return_value=None):
+                result = check_api_key()
+                assert result.passed is False
+                assert result.error is not None
+                assert "keyring" in result.error or "ANTHROPIC_API_KEY" in result.error
 
     @pytest.mark.unit
     def test_api_key_empty(self) -> None:
         """Should fail if ANTHROPIC_API_KEY is empty."""
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": ""}):
-            result = check_api_key()
-            assert result.passed is False
-            assert result.error is not None
+            with patch("jiro.cli.doctor.get_api_key", return_value=None):
+                result = check_api_key()
+                assert result.passed is False
+                assert result.error is not None
 
 
 class TestCheckGit:
