@@ -33,6 +33,7 @@ dependencies = [
     "sqlite-utils>=3.35",
     "structlog>=24.0",
     "prompt_toolkit>=3.0",
+    "keyring>=24.0",
 ]
 
 [project.optional-dependencies]
@@ -121,6 +122,8 @@ module = [
     "yaml.*",
     "prompt_toolkit",
     "prompt_toolkit.*",
+    "keyring",
+    "keyring.*",
 ]
 ignore_missing_imports = true
 
