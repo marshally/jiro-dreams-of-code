@@ -142,8 +142,37 @@ def load_config(project_root: Path, project_name: str) -> Config:
     )
 
 
+def merge_configs(base: dict, override: dict) -> None:
+    """Merge override dictionary into base dictionary in-place.
+
+    Performs a deep merge of nested dictionaries with proper precedence.
+    Values from override take precedence over base values. Used for merging
+    config files across multiple levels (global, project scope, local).
+
+    Args:
+        base: The base dictionary to merge into (modified in-place).
+        override: The override dictionary whose values take precedence.
+
+    Example:
+        >>> base = {"models": {"planning": "gpt-4"}, "timeout": 30}
+        >>> override = {"models": {"execution": "gpt-3.5"}}
+        >>> merge_configs(base, override)
+        >>> base
+        {"models": {"planning": "gpt-4", "execution": "gpt-3.5"}, "timeout": 30}
+    """
+    for key, value in override.items():
+        if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+            # Recursively merge nested dicts
+            merge_configs(base[key], value)
+        else:
+            # Override takes precedence
+            base[key] = value
+
+
 def _merge_config_dicts(base: dict, override: dict) -> None:
     """Merge override dictionary into base dictionary in-place.
+
+    Deprecated: Use merge_configs() instead.
 
     For nested dictionaries, values from override take precedence.
     This is used to merge local config over project scope config.
@@ -152,10 +181,4 @@ def _merge_config_dicts(base: dict, override: dict) -> None:
         base: The base dictionary to merge into (modified in-place).
         override: The override dictionary whose values take precedence.
     """
-    for key, value in override.items():
-        if key in base and isinstance(base[key], dict) and isinstance(value, dict):
-            # Recursively merge nested dicts
-            _merge_config_dicts(base[key], value)
-        else:
-            # Override takes precedence
-            base[key] = value
+    merge_configs(base, override)

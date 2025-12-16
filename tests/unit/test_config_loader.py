@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from jiro.config.loader import load_config
+from jiro.config.loader import load_config, merge_configs
 from jiro.config.schema import (
     CommandsConfig,
     Config,
@@ -438,3 +438,109 @@ conventions:
         )  # from global (not in local or project)
         assert result.conventions.test_file_pattern == "local_test_{name}.py"  # from local
         assert result.preflight.skip_if_recent_minutes == 75  # from project scope (not in local)
+
+
+@pytest.mark.unit
+class TestMergeConfigs:
+    """Test config merge functionality."""
+
+    def test_merge_configs_simple_values(self) -> None:
+        """merge_configs should merge simple key-value pairs."""
+        base = {"key1": "value1", "key2": "value2"}
+        override = {"key3": "value3"}
+        merge_configs(base, override)
+
+        assert base == {"key1": "value1", "key2": "value2", "key3": "value3"}
+
+    def test_merge_configs_override_takes_precedence(self) -> None:
+        """merge_configs should give override values precedence."""
+        base = {"key1": "base_value"}
+        override = {"key1": "override_value"}
+        merge_configs(base, override)
+
+        assert base == {"key1": "override_value"}
+
+    def test_merge_configs_nested_dicts(self) -> None:
+        """merge_configs should deep-merge nested dictionaries."""
+        base = {"models": {"planning": "gpt-4", "execution": "gpt-3.5"}}
+        override = {"models": {"execution": "claude-3"}}
+        merge_configs(base, override)
+
+        assert base == {"models": {"planning": "gpt-4", "execution": "claude-3"}}
+
+    def test_merge_configs_nested_adds_new_keys(self) -> None:
+        """merge_configs should add new keys in nested dicts."""
+        base = {"models": {"planning": "gpt-4"}}
+        override = {"models": {"execution": "gpt-3.5"}}
+        merge_configs(base, override)
+
+        assert base == {"models": {"planning": "gpt-4", "execution": "gpt-3.5"}}
+
+    def test_merge_configs_deep_nesting(self) -> None:
+        """merge_configs should handle deeply nested dictionaries."""
+        base = {"level1": {"level2": {"level3": {"key": "base_value"}}}}
+        override = {"level1": {"level2": {"level3": {"key": "override_value"}}}}
+        merge_configs(base, override)
+
+        assert base == {"level1": {"level2": {"level3": {"key": "override_value"}}}}
+
+    def test_merge_configs_mixed_types(self) -> None:
+        """merge_configs should handle mixed data types."""
+        base = {
+            "models": {"planning": "gpt-4"},
+            "timeout": 30,
+            "enabled": True,
+            "list_value": [1, 2, 3],
+        }
+        override = {"models": {"execution": "gpt-3.5"}, "timeout": 60}
+        merge_configs(base, override)
+
+        assert base == {
+            "models": {"planning": "gpt-4", "execution": "gpt-3.5"},
+            "timeout": 60,
+            "enabled": True,
+            "list_value": [1, 2, 3],
+        }
+
+    def test_merge_configs_empty_override(self) -> None:
+        """merge_configs should handle empty override dict."""
+        base = {"key": "value"}
+        override = {}
+        merge_configs(base, override)
+
+        assert base == {"key": "value"}
+
+    def test_merge_configs_empty_base(self) -> None:
+        """merge_configs should populate empty base dict."""
+        base = {}
+        override = {"key": "value"}
+        merge_configs(base, override)
+
+        assert base == {"key": "value"}
+
+    def test_merge_configs_modifies_in_place(self) -> None:
+        """merge_configs should modify base dict in-place."""
+        base = {"key1": "value1"}
+        original_base = base
+        override = {"key2": "value2"}
+        merge_configs(base, override)
+
+        assert base is original_base
+        assert base == {"key1": "value1", "key2": "value2"}
+
+    def test_merge_configs_preserves_override_nested_structure(self) -> None:
+        """merge_configs should preserve nested structure from override."""
+        base = {"config": {"setting1": "value1"}}
+        override = {
+            "config": {"setting2": {"nested": "value"}},
+            "other": {"nested": {"deep": "value"}},
+        }
+        merge_configs(base, override)
+
+        assert base == {
+            "config": {
+                "setting1": "value1",
+                "setting2": {"nested": "value"},
+            },
+            "other": {"nested": {"deep": "value"}},
+        }
