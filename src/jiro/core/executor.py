@@ -11,6 +11,8 @@ from jiro.agents.planning import PlanningAgent
 from jiro.agents.review import ReviewAgent, ReviewResult
 from jiro.config.schema import Config
 from jiro.core.execution_plan import ExecutionPlanSchema
+from jiro.core.tdd_sequence import TddSequenceTracker
+from jiro.steps.types import StepType
 from jiro.trackers.interface import Task
 
 if TYPE_CHECKING:
@@ -709,6 +711,8 @@ class TaskExecutor:
     2. Step execution (dispatching to appropriate handlers)
     3. Review of commits
     4. Postflight checks and task completion
+
+    Enforces TDD sequence ordering for TDD steps (Red→Green→Refactor).
     """
 
     def __init__(
@@ -716,6 +720,7 @@ class TaskExecutor:
         config: Config,
         planning_agent: PlanningAgent,
         review_agent: ReviewAgent,
+        tdd_sequence_tracker: TddSequenceTracker | None = None,
     ) -> None:
         """Initialize TaskExecutor with required agents.
 
@@ -723,10 +728,12 @@ class TaskExecutor:
             config: Configuration for commands and behavior.
             planning_agent: Agent for creating execution plans.
             review_agent: Agent for reviewing commits.
+            tdd_sequence_tracker: Optional tracker for TDD sequences.
         """
         self.config = config
         self.planning_agent = planning_agent
         self.review_agent = review_agent
+        self.tdd_sequence_tracker = tdd_sequence_tracker or TddSequenceTracker()
 
     async def execute_task(self, task: Task) -> PostflightResult:
         """Execute a single task through its complete lifecycle.
@@ -787,6 +794,22 @@ class TaskExecutor:
                 )
 
                 try:
+                    # Validate TDD sequence if this is a TDD step
+                    step_type = StepType(step.step_type)
+                    is_valid, error_msg = self.tdd_sequence_tracker.validate_step_phase(
+                        task.id, step_type
+                    )
+
+                    if not is_valid:
+                        logger.error(
+                            "task_executor_tdd_sequence_violation",
+                            task_id=task.id,
+                            step_idx=step_idx,
+                            step_type=step.step_type,
+                            error=error_msg,
+                        )
+                        raise ValueError(f"TDD sequence violation: {error_msg}")
+
                     # Execute the step - for now, we just log it
                     # In a real implementation, this would dispatch to step handlers
                     logger.info(
@@ -812,6 +835,12 @@ class TaskExecutor:
                             reason=review_result.reason,
                         )
                         raise ValueError(error_msg)
+
+                    # Record TDD phase completion if applicable
+                    if step_type in (StepType.TDD_RED, StepType.TDD_GREEN, StepType.TDD_REFACTOR):
+                        self.tdd_sequence_tracker.record_step_completion(
+                            task.id, step_type, commit_sha
+                        )
 
                     commits.append(commit_sha)
 

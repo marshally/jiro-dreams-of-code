@@ -1018,7 +1018,13 @@ class TestTaskExecutor:
             task_id="task-123",
             steps=[
                 ExecutionStep(
-                    description="Create file",
+                    description="Create test file",
+                    step_type="tdd_red",
+                    files=[FileAction(path="tests/test_file.py", action="create")],
+                    verification_command="pytest tests/test_file.py -v",
+                ),
+                ExecutionStep(
+                    description="Create implementation",
                     step_type="tdd_green",
                     files=[FileAction(path="src/file.py", action="create")],
                     verification_command="pytest tests/test_file.py",
@@ -1103,9 +1109,9 @@ class TestTaskExecutor:
             task_id="task-123",
             steps=[
                 ExecutionStep(
-                    description="Create file",
-                    step_type="tdd_green",
-                    files=[FileAction(path="src/file.py", action="create")],
+                    description="Create test file",
+                    step_type="tdd_red",
+                    files=[FileAction(path="tests/test_file.py", action="create")],
                 ),
             ],
             estimated_tokens=300,

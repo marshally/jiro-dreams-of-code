@@ -10,6 +10,8 @@ import structlog
 from jiro.agents.client import AgentClient
 from jiro.assets.loader import load_template
 from jiro.config.schema import Config
+from jiro.core.review_tdd import TddReviewValidator
+from jiro.steps.types import StepType
 from jiro.trackers.interface import Task
 
 logger = structlog.get_logger()
@@ -74,8 +76,8 @@ class ReviewAgent:
             task_id=task.id,
         )
 
-        # Step 1: Run deterministic checks (tests, lint)
-        checks_passed, check_results = self._run_deterministic_checks()
+        # Step 1: Run deterministic checks (tests, lint, TDD phase validation)
+        checks_passed, check_results = self._run_deterministic_checks(commit_sha)
 
         # Step 2: If deterministic checks fail, HALT
         if not checks_passed:
@@ -148,8 +150,11 @@ class ReviewAgent:
             checks={**check_results, "llm": "APPROVED"},
         )
 
-    def _run_deterministic_checks(self) -> tuple[bool, dict]:
+    def _run_deterministic_checks(self, commit_sha: str = "") -> tuple[bool, dict]:
         """Run deterministic checks (tests and linting).
+
+        Args:
+            commit_sha: The commit SHA being reviewed (for TDD phase validation)
 
         Returns:
             A tuple of (all_passed: bool, check_results: dict)
@@ -163,6 +168,18 @@ class ReviewAgent:
         # Run linting
         lint_passed = self._run_lint()
         check_results["lint"] = "PASSED" if lint_passed else "FAILED"
+
+        # Run TDD phase validation if this is a TDD step
+        if commit_sha:
+            step_type = self._extract_step_type_from_commit(commit_sha)
+            if step_type and step_type in (
+                StepType.TDD_RED,
+                StepType.TDD_GREEN,
+                StepType.TDD_REFACTOR,
+            ):
+                tdd_valid, tdd_checks = TddReviewValidator.validate_tdd_phase(step_type, commit_sha)
+                check_results.update(tdd_checks)
+                tests_passed = tests_passed and tdd_valid
 
         all_passed = tests_passed and lint_passed
         return all_passed, check_results
@@ -288,6 +305,32 @@ class ReviewAgent:
             return False
         # Default to False if no clear decision
         return False
+
+    def _extract_step_type_from_commit(self, commit_sha: str) -> StepType | None:
+        """Extract step type from commit message.
+
+        Looks for emoji prefixes: 🔴 (red), 🟢 (green), ♻️ (refactor)
+
+        Args:
+            commit_sha: The commit SHA
+
+        Returns:
+            StepType if detected, None otherwise
+        """
+        message = self._get_commit_message(commit_sha)
+
+        # Map emoji to step type
+        emoji_map = {
+            "🔴": StepType.TDD_RED,
+            "🟢": StepType.TDD_GREEN,
+            "♻️": StepType.TDD_REFACTOR,
+        }
+
+        for emoji, step_type in emoji_map.items():
+            if message.startswith(emoji):
+                return step_type
+
+        return None
 
     def _build_review_prompt(self, commit_sha: str, task: Task) -> str:
         """Build a prompt for the LLM review.
