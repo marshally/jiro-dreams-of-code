@@ -5,9 +5,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from jiro.agents.planning import ExecutionPlan, PlanningAgent, PlanStep
+from jiro.agents.planning import PlanningAgent
 from jiro.agents.review import ReviewAgent, ReviewResult
 from jiro.config.schema import CommandsConfig, Config
+from jiro.core.execution_plan import ExecutionPlanSchema, ExecutionStep, FileAction
 from jiro.core.executor import (
     EnhancedTask,
     PostflightResult,
@@ -224,21 +225,22 @@ class TestEnhanceTaskWithPlanning:
     async def test_enhance_task_with_planning_success(self, sample_task, mock_planning_agent):
         """enhance_task_with_planning should return EnhancedTask with plan."""
         # Arrange
-        plan = ExecutionPlan(
+        plan = ExecutionPlanSchema(
             task_id="task-123",
             steps=[
-                PlanStep(
+                ExecutionStep(
                     description="Create file",
-                    files=["src/file.py"],
-                    action="create",
+                    step_type="tdd_green",
+                    files=[FileAction(path="src/file.py", action="create")],
+                    verification_command="pytest tests/test_file.py",
                 ),
-                PlanStep(
+                ExecutionStep(
                     description="Add tests",
-                    files=["tests/test_file.py"],
-                    action="create",
+                    step_type="tdd_red",
+                    files=[FileAction(path="tests/test_file.py", action="create")],
+                    verification_command="pytest tests/test_file.py",
                 ),
             ],
-            verification_command="pytest tests/",
             estimated_tokens=300,
         )
         mock_planning_agent.plan.return_value = plan
@@ -259,16 +261,16 @@ class TestEnhanceTaskWithPlanning:
     ):
         """enhance_task_with_planning should log the plan."""
         # Arrange
-        plan = ExecutionPlan(
+        plan = ExecutionPlanSchema(
             task_id="task-123",
             steps=[
-                PlanStep(
+                ExecutionStep(
                     description="Create file",
-                    files=["src/file.py"],
-                    action="create",
+                    step_type="tdd_green",
+                    files=[FileAction(path="src/file.py", action="create")],
+                    verification_command="pytest tests/",
                 )
             ],
-            verification_command="pytest tests/",
             estimated_tokens=150,
         )
         mock_planning_agent.plan.return_value = plan
@@ -317,16 +319,16 @@ class TestRunTaskPreflight:
     async def test_run_task_preflight_all_pass(self, sample_task, config, mock_planning_agent):
         """run_task_preflight should return success when all checks pass."""
         # Arrange
-        plan = ExecutionPlan(
+        plan = ExecutionPlanSchema(
             task_id="task-123",
             steps=[
-                PlanStep(
+                ExecutionStep(
                     description="Create file",
-                    files=["src/file.py"],
-                    action="create",
+                    step_type="tdd_green",
+                    files=[FileAction(path="src/file.py", action="create")],
+                    verification_command="pytest tests/",
                 )
             ],
-            verification_command="pytest tests/",
             estimated_tokens=150,
         )
         mock_planning_agent.plan.return_value = plan
@@ -363,10 +365,9 @@ class TestRunTaskPreflight:
             mock_tests.return_value = False
             mock_lint.return_value = True
 
-            plan = ExecutionPlan(
+            plan = ExecutionPlanSchema(
                 task_id="task-123",
                 steps=[],
-                verification_command="pytest tests/",
                 estimated_tokens=100,
             )
             mock_enhance.return_value = EnhancedTask(task=sample_task, execution_plan=plan)
@@ -392,10 +393,9 @@ class TestRunTaskPreflight:
             mock_tests.return_value = True
             mock_lint.return_value = False
 
-            plan = ExecutionPlan(
+            plan = ExecutionPlanSchema(
                 task_id="task-123",
                 steps=[],
-                verification_command="pytest tests/",
                 estimated_tokens=100,
             )
             mock_enhance.return_value = EnhancedTask(task=sample_task, execution_plan=plan)
@@ -439,10 +439,9 @@ class TestRunTaskPreflight:
     ):
         """run_task_preflight should log all results."""
         # Arrange
-        plan = ExecutionPlan(
+        plan = ExecutionPlanSchema(
             task_id="task-123",
             steps=[],
-            verification_command="pytest tests/",
             estimated_tokens=100,
         )
         mock_planning_agent.plan.return_value = plan
@@ -476,10 +475,9 @@ class TestEnhancedTask:
             status="open",
             created_at=datetime.now(),
         )
-        plan = ExecutionPlan(
+        plan = ExecutionPlanSchema(
             task_id="task-123",
             steps=[],
-            verification_command="pytest",
             estimated_tokens=100,
         )
 
@@ -504,10 +502,9 @@ class TestPreflightResult:
             status="open",
             created_at=datetime.now(),
         )
-        plan = ExecutionPlan(
+        plan = ExecutionPlanSchema(
             task_id="task-123",
             steps=[],
-            verification_command="pytest",
             estimated_tokens=100,
         )
         enhanced = EnhancedTask(task=task, execution_plan=plan)

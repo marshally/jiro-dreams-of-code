@@ -9,7 +9,7 @@ from jiro.agents.execution import (
     ExecutionAgent,
     ExecutionResult,
 )
-from jiro.agents.planning import ExecutionPlan, PlanStep
+from jiro.core.execution_plan import ExecutionPlanSchema, ExecutionStep, FileAction
 
 
 class TestExecutionAgentInitialization:
@@ -43,21 +43,22 @@ class TestExecutionAgent:
     def sample_plan(self):
         """Create a sample execution plan."""
         steps = [
-            PlanStep(
+            ExecutionStep(
                 description="Create User model",
-                files=["src/models/user.py"],
-                action="create",
+                step_type="tdd_green",
+                files=[FileAction(path="src/models/user.py", action="create")],
+                verification_command="pytest tests/test_user.py",
             ),
-            PlanStep(
+            ExecutionStep(
                 description="Add authentication middleware",
-                files=["src/middleware/auth.py"],
-                action="create",
+                step_type="tdd_green",
+                files=[FileAction(path="src/middleware/auth.py", action="create")],
+                verification_command="pytest tests/test_auth.py",
             ),
         ]
-        return ExecutionPlan(
+        return ExecutionPlanSchema(
             task_id="task-123",
             steps=steps,
-            verification_command="pytest tests/ -v",
             estimated_tokens=300,
         )
 
@@ -220,10 +221,15 @@ class TestExecutionAgent:
     async def test_execute_with_single_step(self, mock_client):
         """execute() should handle single-step plans."""
         # Arrange
-        single_step_plan = ExecutionPlan(
+        single_step_plan = ExecutionPlanSchema(
             task_id="task-single",
-            steps=[PlanStep(description="Single step", files=["file.py"], action="create")],
-            verification_command="pytest",
+            steps=[
+                ExecutionStep(
+                    description="Single step",
+                    step_type="tdd_green",
+                    files=[FileAction(path="file.py", action="create")],
+                )
+            ],
             estimated_tokens=100,
         )
 

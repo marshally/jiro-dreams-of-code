@@ -1,45 +1,19 @@
 """PlanningAgent for creating execution plans from tasks."""
 
 import re
-from dataclasses import dataclass
 
 import structlog
 import yaml
 
 from jiro.agents.client import AgentClient
+from jiro.core.execution_plan import (
+    ExecutionPlanSchema,
+    ExecutionStep,
+    FileAction,
+)
 from jiro.trackers.interface import Task
 
 logger = structlog.get_logger()
-
-
-@dataclass
-class PlanStep:
-    """Represents a single step in an execution plan.
-
-    Each step is independently verifiable and includes:
-    - Description of what the step accomplishes
-    - Files to be modified or created
-    - Action type (create, modify, delete)
-    - Verification command and expected output
-    """
-
-    description: str
-    files: list[str]
-    action: str
-
-
-@dataclass
-class ExecutionPlan:
-    """Structured execution plan for a task.
-
-    Contains all steps needed to complete a task, verification details,
-    and context tracking for token usage.
-    """
-
-    task_id: str
-    steps: list[PlanStep]
-    verification_command: str
-    estimated_tokens: int
 
 
 class PlanningAgent:
@@ -63,7 +37,7 @@ class PlanningAgent:
             raise TypeError("client cannot be None")
         self.client = client
 
-    async def plan(self, task: Task) -> ExecutionPlan:
+    async def plan(self, task: Task) -> ExecutionPlanSchema:
         """Create an execution plan for a task.
 
         Takes a task from the issue tracker and produces a structured
@@ -73,7 +47,7 @@ class PlanningAgent:
             task: The Task to create a plan for.
 
         Returns:
-            An ExecutionPlan object containing all steps and verification details.
+            An ExecutionPlanSchema object containing all steps and verification details.
 
         Raises:
             ValueError: If the agent execution fails.
@@ -99,19 +73,12 @@ class PlanningAgent:
             )
             raise ValueError(f"Agent execution failed: {result.error}")
 
-        # Parse the output into an ExecutionPlan
-        plan = self._parse_plan_from_output(result.output, task.id)
+        # Parse the output into an ExecutionPlanSchema
+        execution_plan = self._parse_plan_from_output(result.output, task.id)
 
         # Calculate token usage
         estimated_tokens = result.tokens_after - result.tokens_before
-
-        # Create the plan with token tracking
-        execution_plan = ExecutionPlan(
-            task_id=plan["task_id"],
-            steps=plan["steps"],
-            verification_command=plan["verification_command"],
-            estimated_tokens=estimated_tokens,
-        )
+        execution_plan.estimated_tokens = estimated_tokens
 
         logger.info(
             "planning_agent_plan_success",
@@ -131,6 +98,9 @@ class PlanningAgent:
         Returns:
             A formatted prompt for the planning agent.
         """
+        # Valid step types matching commit types
+        step_types = "docs, tdd_red, tdd_green, tdd_refactor, lint_fix, bug_fix, config, test_only, performance"
+
         prompt = f"""You are a planning agent that creates detailed execution plans for software development tasks.
 
 ## Task to Plan
@@ -152,63 +122,65 @@ Create a detailed execution plan for this task. Produce your response in YAML fo
 
 ```yaml
 task_id: "{task.id}"
-title: "{task.title}"
-summary: "One-sentence summary of what will be done"
 
 steps:
-  - id: 1
-    description: "What this step accomplishes"
-    type: "create|modify|delete|test"
+  - description: "What this step accomplishes"
+    step_type: "docs"  # One of: {step_types}
     files:
       - path: "src/path/to/file.py"
-        action: "create|modify|delete"
-    changes:
-      - "Specific change description"
-    verification:
-      command: "pytest tests/unit/test_file.py"
-      expected: "All tests pass"
-    dependencies: []  # list of step IDs this depends on
+        action: "create"  # One of: create, modify, delete
+        content_hints: "Brief description of what to add/change"
+        location: "function name() or line 42"  # Optional: where in the file
+    verification_command: "pytest tests/unit/test_file.py"  # Command to verify this step
 
-  - id: 2
-    description: "Second step"
-    # ... more steps
-
-verification:
-  final_command: "pytest tests/ -v"
-  acceptance_check: "How to verify all acceptance criteria are met"
-
-risks:
-  - description: "Potential issue"
-    mitigation: "How to address it"
-
-estimated_complexity: "low|medium|high"
+  - description: "Second step"
+    step_type: "tdd_red"
+    files:
+      - path: "tests/test_foo.py"
+        action: "create"
+        content_hints: "Add failing test for feature X"
+    verification_command: "pytest tests/test_foo.py"
 ```
+
+## Step Type Guidelines
+
+- **docs**: Documentation-only changes (README, docstrings, comments)
+- **tdd_red**: Write failing tests first (test file changes only)
+- **tdd_green**: Implement minimal code to pass tests (source file changes)
+- **tdd_refactor**: Refactor code while keeping tests passing
+- **lint_fix**: Fix linting errors (single error per step)
+- **bug_fix**: Fix a specific bug
+- **config**: Configuration file changes
+- **test_only**: Add tests to existing code
+- **performance**: Optimization changes
 
 ## Guidelines
 
 - Be specific about file paths (use exact, real paths)
 - Each step should be small enough to complete in one commit
-- Include test creation/modification in appropriate steps
-- Consider edge cases and error handling
-- Steps should be ordered by dependencies
-- Verification commands should be concrete and runnable
+- Include test creation/modification as separate tdd_red steps
+- Use tdd_green for implementation that makes tests pass
+- Steps should be ordered logically
+- Each step must have a verification_command that can be run
+- For documentation tasks, use step_type: "docs"
+- The files list should include ALL files that will be touched in that step
 
 Generate the execution plan for this task now."""
 
         return prompt
 
-    def _parse_plan_from_output(self, output: str, task_id: str) -> dict:
-        """Parse agent output into a plan dictionary.
+    def _parse_plan_from_output(self, output: str, task_id: str) -> ExecutionPlanSchema:
+        """Parse agent output into an ExecutionPlanSchema.
 
         Extracts the YAML-formatted plan from the agent's output and
-        converts it into structured data.
+        converts it into structured ExecutionPlanSchema.
 
         Args:
             output: The agent's text output containing the plan.
             task_id: The task ID for fallback reference.
 
         Returns:
-            A dictionary with task_id, steps, and verification_command.
+            An ExecutionPlanSchema with parsed steps.
 
         Raises:
             ValueError: If the output doesn't contain valid YAML plan.
@@ -229,41 +201,38 @@ Generate the execution plan for this task now."""
         # Extract task_id (use provided task_id if not in output)
         extracted_task_id = plan_data.get("task_id", task_id)
 
-        # Parse steps
+        # Parse steps into ExecutionStep objects
         steps = []
         steps_data = plan_data.get("steps", [])
         for step_data in steps_data:
             files = self._extract_files_from_step(step_data)
-            action = step_data.get("type", "modify")
+            step_type = step_data.get("step_type", "tdd_green")
+            verification_command = step_data.get("verification_command")
 
-            step = PlanStep(
+            step = ExecutionStep(
                 description=step_data.get("description", ""),
+                step_type=step_type,
                 files=files,
-                action=action,
+                verification_command=verification_command,
             )
             steps.append(step)
 
         if not steps:
             raise ValueError("Output doesn't contain any execution steps")
 
-        # Extract verification command
-        verification_data = plan_data.get("verification", {})
-        final_command = verification_data.get("final_command", "pytest tests/ -v")
+        return ExecutionPlanSchema(
+            task_id=extracted_task_id,
+            steps=steps,
+        )
 
-        return {
-            "task_id": extracted_task_id,
-            "steps": steps,
-            "verification_command": final_command,
-        }
-
-    def _extract_files_from_step(self, step_data: dict) -> list[str]:
-        """Extract file paths from a step.
+    def _extract_files_from_step(self, step_data: dict) -> list[FileAction]:
+        """Extract FileAction objects from a step.
 
         Args:
             step_data: The step data dictionary.
 
         Returns:
-            A list of file paths from the step.
+            A list of FileAction objects from the step.
         """
         files = []
         files_data = step_data.get("files", [])
@@ -273,8 +242,19 @@ Generate the execution plan for this task now."""
                 if isinstance(file_item, dict):
                     path = file_item.get("path")
                     if path:
-                        files.append(path)
+                        action = file_item.get("action", "modify")
+                        content_hints = file_item.get("content_hints")
+                        location = file_item.get("location")
+                        files.append(
+                            FileAction(
+                                path=path,
+                                action=action,
+                                content_hints=content_hints,
+                                location=location,
+                            )
+                        )
                 elif isinstance(file_item, str):
-                    files.append(file_item)
+                    # Legacy format: just a path string
+                    files.append(FileAction(path=file_item, action="modify"))
 
         return files

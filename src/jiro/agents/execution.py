@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import structlog
 
 from jiro.agents.client import AgentClient
-from jiro.agents.planning import ExecutionPlan, PlanStep
+from jiro.core.execution_plan import ExecutionPlanSchema, ExecutionStep
 
 logger = structlog.get_logger()
 
@@ -62,7 +62,7 @@ class ExecutionAgent:
             raise TypeError("client cannot be None")
         self.client = client
 
-    async def execute(self, plan: ExecutionPlan) -> ExecutionResult:
+    async def execute(self, plan: ExecutionPlanSchema) -> ExecutionResult:
         """Execute a plan step by step.
 
         Takes an ExecutionPlan and executes each step in order,
@@ -158,27 +158,42 @@ class ExecutionAgent:
 
         return execution_result
 
-    def _build_step_prompt(self, step: PlanStep, step_index: int, total_steps: int) -> str:
+    def _build_step_prompt(self, step: ExecutionStep, step_index: int, total_steps: int) -> str:
         """Build a prompt for executing a single step.
 
         Args:
-            step: The PlanStep to execute.
+            step: The ExecutionStep to execute.
             step_index: The index of this step (0-based).
             total_steps: Total number of steps in the plan.
 
         Returns:
             A formatted prompt for executing the step.
         """
+        # Build file list with action details
+        file_lines = []
+        for f in step.files:
+            line = f"- {f.path} ({f.action})"
+            if f.content_hints:
+                line += f": {f.content_hints}"
+            if f.location:
+                line += f" [at {f.location}]"
+            file_lines.append(line)
+
+        files_section = chr(10).join(file_lines) if file_lines else "No specific files"
+
         prompt = f"""You are an execution agent executing step {step_index + 1} of {total_steps}.
 
 Step Description: {step.description}
 
-Files to Modify:
-{chr(10).join(f"- {f}" for f in step.files)}
+Step Type: {step.step_type}
 
-Action Type: {step.action}
+Files:
+{files_section}
 
 Execute this step exactly as described. Do not deviate from the plan.
 Report your progress clearly."""
+
+        if step.verification_command:
+            prompt += f"\n\nVerification Command: {step.verification_command}"
 
         return prompt

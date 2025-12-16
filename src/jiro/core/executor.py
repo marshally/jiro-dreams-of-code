@@ -7,9 +7,10 @@ from typing import TYPE_CHECKING
 
 import structlog
 
-from jiro.agents.planning import ExecutionPlan, PlanningAgent
+from jiro.agents.planning import PlanningAgent
 from jiro.agents.review import ReviewAgent, ReviewResult
 from jiro.config.schema import Config
+from jiro.core.execution_plan import ExecutionPlanSchema
 from jiro.trackers.interface import Task
 
 if TYPE_CHECKING:
@@ -240,7 +241,7 @@ class EnhancedTask:
     """
 
     task: Task
-    execution_plan: ExecutionPlan
+    execution_plan: ExecutionPlanSchema
 
 
 @dataclass

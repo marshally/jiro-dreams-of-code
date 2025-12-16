@@ -6,7 +6,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from jiro.agents.base import AgentResult
-from jiro.agents.planning import ExecutionPlan, PlanningAgent, PlanStep
+from jiro.agents.planning import PlanningAgent
+from jiro.core.execution_plan import ExecutionPlanSchema, ExecutionStep, FileAction
 from jiro.trackers.interface import Task
 
 
@@ -53,48 +54,28 @@ class TestPlanningAgent:
 
     @pytest.mark.asyncio
     async def test_plan_returns_execution_plan(self, mock_client, sample_task):
-        """plan() should return an ExecutionPlan object."""
+        """plan() should return an ExecutionPlanSchema object."""
         # Arrange
-        mock_output = """task_id: task-123
-title: Implement user authentication
-summary: Add JWT-based authentication to the API
+        mock_output = """```yaml
+task_id: "task-123"
 
 steps:
-  - id: 1
-    description: Create User model with password hashing
-    type: create
+  - description: "Create User model with password hashing"
+    step_type: "tdd_green"
     files:
-      - path: src/models/user.py
-        action: create
-    changes:
-      - Create User dataclass with id, email, password_hash
-    verification:
-      command: pytest tests/unit/test_user.py
-      expected: User model tests pass
-    dependencies: []
+      - path: "src/models/user.py"
+        action: "create"
+        content_hints: "Create User dataclass with id, email, password_hash"
+    verification_command: "pytest tests/unit/test_user.py"
 
-  - id: 2
-    description: Add authentication middleware
-    type: create
+  - description: "Add authentication middleware"
+    step_type: "tdd_green"
     files:
-      - path: src/middleware/auth.py
-        action: create
-    changes:
-      - Create JWTAuth middleware class
-    verification:
-      command: pytest tests/unit/test_auth.py
-      expected: Auth middleware tests pass
-    dependencies: [1]
-
-verification:
-  final_command: pytest tests/ -v
-  acceptance_check: Protected endpoints require valid JWT
-
-risks:
-  - description: Token expiration handling
-    mitigation: Include refresh token mechanism
-
-estimated_complexity: medium"""
+      - path: "src/middleware/auth.py"
+        action: "create"
+        content_hints: "Create JWTAuth middleware class"
+    verification_command: "pytest tests/unit/test_auth.py"
+```"""
 
         mock_client.execute.return_value = AgentResult(
             success=True,
@@ -110,7 +91,7 @@ estimated_complexity: medium"""
         result = await agent.plan(sample_task)
 
         # Assert
-        assert isinstance(result, ExecutionPlan)
+        assert isinstance(result, ExecutionPlanSchema)
         assert result.task_id == "task-123"
         assert isinstance(result.steps, list)
         assert len(result.steps) == 2
@@ -119,29 +100,21 @@ estimated_complexity: medium"""
     async def test_plan_includes_files_and_actions(self, mock_client, sample_task):
         """plan() should include specific files and actions in steps."""
         # Arrange
-        mock_output = """task_id: task-123
-title: Implement user authentication
-summary: Add JWT-based authentication
+        mock_output = """```yaml
+task_id: "task-123"
 
 steps:
-  - id: 1
-    description: Create User model
-    type: create
+  - description: "Create User model"
+    step_type: "tdd_green"
     files:
-      - path: src/models/user.py
-        action: create
-      - path: tests/unit/test_user.py
-        action: create
-    changes:
-      - Create User dataclass
-    verification:
-      command: pytest tests/unit/test_user.py
-      expected: Tests pass
-    dependencies: []
-
-verification:
-  final_command: pytest tests/ -v
-  acceptance_check: User model works"""
+      - path: "src/models/user.py"
+        action: "create"
+        content_hints: "Create User dataclass"
+      - path: "tests/unit/test_user.py"
+        action: "create"
+        content_hints: "Add User model tests"
+    verification_command: "pytest tests/unit/test_user.py"
+```"""
 
         mock_client.execute.return_value = AgentResult(
             success=True,
@@ -159,36 +132,30 @@ verification:
         # Assert
         assert len(result.steps) == 1
         step = result.steps[0]
-        assert isinstance(step, PlanStep)
+        assert isinstance(step, ExecutionStep)
         assert step.description == "Create User model"
-        assert step.files == ["src/models/user.py", "tests/unit/test_user.py"]
-        assert step.action == "create"
+        assert len(step.files) == 2
+        assert step.files[0].path == "src/models/user.py"
+        assert step.files[0].action == "create"
+        assert step.files[1].path == "tests/unit/test_user.py"
+        assert step.step_type == "tdd_green"
 
     @pytest.mark.asyncio
     async def test_plan_includes_verification_command(self, mock_client, sample_task):
-        """plan() should include verification command in ExecutionPlan."""
+        """plan() should include verification command per step."""
         # Arrange
-        mock_output = """task_id: task-123
-title: Implement user authentication
-summary: Add JWT-based authentication
+        mock_output = """```yaml
+task_id: "task-123"
 
 steps:
-  - id: 1
-    description: Create User model
-    type: create
+  - description: "Create User model"
+    step_type: "tdd_green"
     files:
-      - path: src/models/user.py
-        action: create
-    changes:
-      - Create User dataclass
-    verification:
-      command: pytest tests/unit/test_user.py
-      expected: Tests pass
-    dependencies: []
-
-verification:
-  final_command: pytest tests/ -v --cov=src
-  acceptance_check: All tests pass and coverage > 80%"""
+      - path: "src/models/user.py"
+        action: "create"
+        content_hints: "Create User dataclass"
+    verification_command: "pytest tests/unit/test_user.py -v --cov=src"
+```"""
 
         mock_client.execute.return_value = AgentResult(
             success=True,
@@ -204,33 +171,24 @@ verification:
         result = await agent.plan(sample_task)
 
         # Assert
-        assert result.verification_command == "pytest tests/ -v --cov=src"
+        assert result.steps[0].verification_command == "pytest tests/unit/test_user.py -v --cov=src"
 
     @pytest.mark.asyncio
     async def test_plan_tracks_context_usage(self, mock_client, sample_task):
-        """plan() should track token usage in ExecutionPlan."""
+        """plan() should track token usage in ExecutionPlanSchema."""
         # Arrange
-        mock_output = """task_id: task-123
-title: Implement user authentication
-summary: Add JWT-based authentication
+        mock_output = """```yaml
+task_id: "task-123"
 
 steps:
-  - id: 1
-    description: Create User model
-    type: create
+  - description: "Create User model"
+    step_type: "tdd_green"
     files:
-      - path: src/models/user.py
-        action: create
-    changes:
-      - Create User dataclass
-    verification:
-      command: pytest tests/unit/test_user.py
-      expected: Tests pass
-    dependencies: []
-
-verification:
-  final_command: pytest tests/ -v
-  acceptance_check: Tests pass"""
+      - path: "src/models/user.py"
+        action: "create"
+        content_hints: "Create User dataclass"
+    verification_command: "pytest tests/unit/test_user.py"
+```"""
 
         tokens_before = 200
         tokens_after = 650
@@ -270,29 +228,20 @@ verification:
 
     @pytest.mark.asyncio
     async def test_plan_step_has_all_required_fields(self, mock_client, sample_task):
-        """PlanStep should have all required fields."""
+        """ExecutionStep should have all required fields."""
         # Arrange
-        mock_output = """task_id: task-123
-title: Implement user authentication
-summary: Add JWT-based authentication
+        mock_output = """```yaml
+task_id: "task-123"
 
 steps:
-  - id: 1
-    description: Create User model with password hashing
-    type: create
+  - description: "Create User model with password hashing"
+    step_type: "tdd_green"
     files:
-      - path: src/models/user.py
-        action: create
-    changes:
-      - Create User dataclass
-    verification:
-      command: pytest tests/unit/test_user.py
-      expected: Tests pass
-    dependencies: []
-
-verification:
-  final_command: pytest tests/ -v
-  acceptance_check: Tests pass"""
+      - path: "src/models/user.py"
+        action: "create"
+        content_hints: "Create User dataclass"
+    verification_command: "pytest tests/unit/test_user.py"
+```"""
 
         mock_client.execute.return_value = AgentResult(
             success=True,
@@ -312,33 +261,23 @@ verification:
         step = result.steps[0]
         assert step.description
         assert step.files
-        assert step.action
+        assert step.step_type
 
     @pytest.mark.asyncio
     async def test_plan_calls_client_with_task_context(self, mock_client, sample_task):
         """plan() should call client.execute with task context."""
         # Arrange
-        mock_output = """task_id: task-123
-title: Test
-summary: Test plan
+        mock_output = """```yaml
+task_id: "task-123"
 
 steps:
-  - id: 1
-    description: Test step
-    type: create
+  - description: "Test step"
+    step_type: "tdd_green"
     files:
-      - path: src/test.py
-        action: create
-    changes:
-      - Test
-    verification:
-      command: pytest tests/
-      expected: Pass
-    dependencies: []
-
-verification:
-  final_command: pytest tests/
-  acceptance_check: Pass"""
+      - path: "src/test.py"
+        action: "create"
+    verification_command: "pytest tests/"
+```"""
 
         mock_client.execute.return_value = AgentResult(
             success=True,
@@ -377,13 +316,13 @@ verification:
 
     @pytest.mark.unit
     def test_extract_files_from_step_with_dict_items(self, mock_client):
-        """_extract_files_from_step() should extract paths from dict items."""
+        """_extract_files_from_step() should extract FileAction objects from dict items."""
         # Arrange
         agent = PlanningAgent(mock_client)
         step_data = {
             "files": [
-                {"path": "src/models/user.py"},
-                {"path": "tests/unit/test_user.py"},
+                {"path": "src/models/user.py", "action": "create", "content_hints": "User model"},
+                {"path": "tests/unit/test_user.py", "action": "create"},
             ]
         }
 
@@ -391,11 +330,16 @@ verification:
         result = agent._extract_files_from_step(step_data)
 
         # Assert
-        assert result == ["src/models/user.py", "tests/unit/test_user.py"]
+        assert len(result) == 2
+        assert isinstance(result[0], FileAction)
+        assert result[0].path == "src/models/user.py"
+        assert result[0].action == "create"
+        assert result[0].content_hints == "User model"
+        assert result[1].path == "tests/unit/test_user.py"
 
     @pytest.mark.unit
     def test_extract_files_from_step_with_string_items(self, mock_client):
-        """_extract_files_from_step() should extract string paths directly."""
+        """_extract_files_from_step() should convert string paths to FileAction."""
         # Arrange
         agent = PlanningAgent(mock_client)
         step_data = {"files": ["src/models/user.py", "tests/unit/test_user.py"]}
@@ -404,7 +348,11 @@ verification:
         result = agent._extract_files_from_step(step_data)
 
         # Assert
-        assert result == ["src/models/user.py", "tests/unit/test_user.py"]
+        assert len(result) == 2
+        assert isinstance(result[0], FileAction)
+        assert result[0].path == "src/models/user.py"
+        assert result[0].action == "modify"  # Default action for legacy strings
+        assert result[1].path == "tests/unit/test_user.py"
 
     @pytest.mark.unit
     def test_extract_files_from_step_with_mixed_items(self, mock_client):
@@ -413,7 +361,7 @@ verification:
         agent = PlanningAgent(mock_client)
         step_data = {
             "files": [
-                {"path": "src/models/user.py"},
+                {"path": "src/models/user.py", "action": "create"},
                 "tests/unit/test_user.py",
             ]
         }
@@ -422,7 +370,11 @@ verification:
         result = agent._extract_files_from_step(step_data)
 
         # Assert
-        assert result == ["src/models/user.py", "tests/unit/test_user.py"]
+        assert len(result) == 2
+        assert result[0].path == "src/models/user.py"
+        assert result[0].action == "create"
+        assert result[1].path == "tests/unit/test_user.py"
+        assert result[1].action == "modify"
 
     @pytest.mark.unit
     def test_extract_files_from_step_with_empty_files(self, mock_client):
@@ -458,26 +410,15 @@ verification:
         output = """Here's your plan:
 
 ```yaml
-task_id: task-123
-title: Test Task
-summary: Test summary
+task_id: "task-123"
 
 steps:
-  - id: 1
-    description: Create file
-    type: create
+  - description: "Create file"
+    step_type: "tdd_green"
     files:
-      - path: src/test.py
-    changes:
-      - Test change
-    verification:
-      command: pytest
-      expected: Pass
-    dependencies: []
-
-verification:
-  final_command: pytest tests/
-  acceptance_check: Pass
+      - path: "src/test.py"
+        action: "create"
+    verification_command: "pytest tests/"
 ```
 
 That's your plan."""
@@ -486,42 +427,34 @@ That's your plan."""
         result = agent._parse_plan_from_output(output, "task-123")
 
         # Assert
-        assert result["task_id"] == "task-123"
-        assert len(result["steps"]) == 1
-        assert result["verification_command"] == "pytest tests/"
+        assert isinstance(result, ExecutionPlanSchema)
+        assert result.task_id == "task-123"
+        assert len(result.steps) == 1
+        assert result.steps[0].verification_command == "pytest tests/"
 
     @pytest.mark.asyncio
     async def test_parse_plan_from_output_without_yaml_block(self, mock_client):
         """_parse_plan_from_output() should handle raw YAML without markdown block."""
         # Arrange
         agent = PlanningAgent(mock_client)
-        output = """task_id: task-456
-title: Raw Plan
-summary: No markdown block
+        output = """task_id: "task-456"
 
 steps:
-  - id: 1
-    description: Create file
-    type: create
+  - description: "Create file"
+    step_type: "tdd_green"
     files:
-      - path: src/file.py
-    changes:
-      - Change
-    verification:
-      command: pytest
-      expected: Pass
-    dependencies: []
-
-verification:
-  final_command: pytest
-  acceptance_check: Pass"""
+      - path: "src/file.py"
+        action: "create"
+    verification_command: "pytest"
+"""
 
         # Act
         result = agent._parse_plan_from_output(output, "task-456")
 
         # Assert
-        assert result["task_id"] == "task-456"
-        assert len(result["steps"]) == 1
+        assert isinstance(result, ExecutionPlanSchema)
+        assert result.task_id == "task-456"
+        assert len(result.steps) == 1
 
     @pytest.mark.asyncio
     async def test_parse_plan_from_output_invalid_yaml(self, mock_client):
@@ -556,15 +489,9 @@ task_id: task-123
         # Arrange
         agent = PlanningAgent(mock_client)
         output = """```yaml
-task_id: task-123
-title: No Steps Plan
-summary: Empty steps
+task_id: "task-123"
 
 steps: []
-
-verification:
-  final_command: pytest
-  acceptance_check: Pass
 ```"""
 
         # Act & Assert
@@ -573,55 +500,36 @@ verification:
 
     @pytest.mark.asyncio
     async def test_plan_with_multiple_steps(self, mock_client, sample_task):
-        """plan() should handle multiple steps with dependencies."""
+        """plan() should handle multiple steps."""
         # Arrange
-        mock_output = """task_id: task-123
-title: Implement user authentication
-summary: Add JWT-based authentication
+        mock_output = """```yaml
+task_id: "task-123"
 
 steps:
-  - id: 1
-    description: Create User model
-    type: create
+  - description: "Create User model"
+    step_type: "tdd_green"
     files:
-      - path: src/models/user.py
-        action: create
-    changes:
-      - Create User dataclass
-    verification:
-      command: pytest tests/unit/test_user.py
-      expected: Tests pass
-    dependencies: []
+      - path: "src/models/user.py"
+        action: "create"
+        content_hints: "Create User dataclass"
+    verification_command: "pytest tests/unit/test_user.py"
 
-  - id: 2
-    description: Add auth middleware
-    type: create
+  - description: "Add auth middleware"
+    step_type: "tdd_green"
     files:
-      - path: src/middleware/auth.py
-        action: create
-    changes:
-      - Create middleware
-    verification:
-      command: pytest tests/unit/test_auth.py
-      expected: Tests pass
-    dependencies: [1]
+      - path: "src/middleware/auth.py"
+        action: "create"
+        content_hints: "Create middleware"
+    verification_command: "pytest tests/unit/test_auth.py"
 
-  - id: 3
-    description: Update API routes
-    type: modify
+  - description: "Update API routes"
+    step_type: "tdd_green"
     files:
-      - path: src/api/routes.py
-        action: modify
-    changes:
-      - Add auth decorator
-    verification:
-      command: pytest tests/unit/test_routes.py
-      expected: Tests pass
-    dependencies: [1, 2]
-
-verification:
-  final_command: pytest tests/ -v
-  acceptance_check: All tests pass"""
+      - path: "src/api/routes.py"
+        action: "modify"
+        content_hints: "Add auth decorator"
+    verification_command: "pytest tests/unit/test_routes.py"
+```"""
 
         mock_client.execute.return_value = AgentResult(
             success=True,
@@ -644,29 +552,20 @@ verification:
 
     @pytest.mark.asyncio
     async def test_plan_execution_plan_has_required_fields(self, mock_client, sample_task):
-        """ExecutionPlan should have all required fields."""
+        """ExecutionPlanSchema should have all required fields."""
         # Arrange
-        mock_output = """task_id: task-123
-title: Implement user authentication
-summary: Add JWT-based authentication
+        mock_output = """```yaml
+task_id: "task-123"
 
 steps:
-  - id: 1
-    description: Create User model
-    type: create
+  - description: "Create User model"
+    step_type: "tdd_green"
     files:
-      - path: src/models/user.py
-        action: create
-    changes:
-      - Create User dataclass
-    verification:
-      command: pytest tests/unit/test_user.py
-      expected: Tests pass
-    dependencies: []
-
-verification:
-  final_command: pytest tests/ -v
-  acceptance_check: Tests pass"""
+      - path: "src/models/user.py"
+        action: "create"
+        content_hints: "Create User dataclass"
+    verification_command: "pytest tests/unit/test_user.py"
+```"""
 
         tokens_before = 150
         tokens_after = 400
@@ -686,6 +585,5 @@ verification:
         # Assert
         assert result.task_id
         assert result.steps
-        assert result.verification_command
         assert result.estimated_tokens
         assert result.estimated_tokens == (tokens_after - tokens_before)
