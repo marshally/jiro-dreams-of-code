@@ -118,7 +118,7 @@ class TddRedCommand(Command):
 ## Task Information
 Task ID: {task.id}
 Task Title: {task.title}
-Task Description: {task.description or 'No description'}
+Task Description: {task.description or "No description"}
 
 ## Step Instructions
 {step.planning_context}
