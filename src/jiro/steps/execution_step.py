@@ -104,7 +104,7 @@ class ExecutionStep:
         """
         return discover_commit(self.step_type)
 
-    def execute(self, plan_step: PlanStep, task: Task) -> CommitResult:
+    async def execute(self, plan_step: PlanStep, task: Task) -> CommitResult:
         """Execute the full step: command → verify → commit.
 
         This method orchestrates the complete execution flow:
@@ -132,7 +132,7 @@ class ExecutionStep:
             logger.log_command_start()
             command_start = time.monotonic()
             try:
-                result = self.command.execute(step=plan_step, task=task)
+                result = await self.command.execute(step=plan_step, task=task)
                 command_duration = time.monotonic() - command_start
                 logger.log_command_success(command_duration, result)
             except Exception as e:

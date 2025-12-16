@@ -29,7 +29,7 @@ class Command(ABC):
     output_schema: ClassVar[type]
 
     @abstractmethod
-    def execute(self, *, step: PlanStep, task: Task) -> Result:
+    async def execute(self, *, step: PlanStep, task: Task) -> Result:
         """Execute the command, spawning a subagent to do the work.
 
         Args:

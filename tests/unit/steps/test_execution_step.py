@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import ClassVar
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from jiro.commands.base import Command
 from jiro.commits.base import Commit, CommitResult
 from jiro.db.models import Session
@@ -29,7 +31,7 @@ class MockCommand(Command):
     tools: ClassVar[list[type]] = []
     output_schema: ClassVar[type] = MockResult
 
-    def execute(self, *, step: PlanStep, task: Task) -> MockResult:
+    async def execute(self, *, step: PlanStep, task: Task) -> MockResult:
         return MockResult(changed_files=[Path("test.py")], test_value="executed")
 
 
@@ -227,7 +229,8 @@ class TestExecutionStepProperties:
 class TestExecutionStepExecute:
     """Tests for ExecutionStep.execute method."""
 
-    def test_execute_calls_command_verify_commit_in_order(self):
+    @pytest.mark.asyncio
+    async def test_execute_calls_command_verify_commit_in_order(self):
         """execute should call command → verify → commit in order."""
         session = Session(
             id="session-1",
@@ -253,7 +256,7 @@ class TestExecutionStepExecute:
 
         call_order = []
 
-        def mock_execute(*, step, task):
+        async def mock_execute(*, step, task):
             call_order.append("command")
             return MockResult(changed_files=[Path("test.py")])
 
@@ -279,11 +282,12 @@ class TestExecutionStepExecute:
             mock_ver.return_value.verify = mock_verify
             mock_com.return_value.create = mock_create
 
-            step.execute(plan_step=plan_step, task=task)
+            await step.execute(plan_step=plan_step, task=task)
 
         assert call_order == ["command", "verify", "commit"]
 
-    def test_execute_returns_commit_result(self):
+    @pytest.mark.asyncio
+    async def test_execute_returns_commit_result(self):
         """execute should return CommitResult."""
         session = Session(
             id="session-1",
@@ -316,12 +320,13 @@ class TestExecutionStepExecute:
             mock_ver.return_value = MockVerification()
             mock_com.return_value = MockCommit()
 
-            result = step.execute(plan_step=plan_step, task=task)
+            result = await step.execute(plan_step=plan_step, task=task)
 
         assert isinstance(result, CommitResult)
         assert result.sha == "abc123"
 
-    def test_execute_passes_e2e_time_to_commit(self):
+    @pytest.mark.asyncio
+    async def test_execute_passes_e2e_time_to_commit(self):
         """execute should measure and pass e2e_time to commit."""
         session = Session(
             id="session-1",
@@ -361,7 +366,7 @@ class TestExecutionStepExecute:
             mock_ver.return_value = MockVerification()
             mock_com.return_value.create = mock_create
 
-            step.execute(plan_step=plan_step, task=task)
+            await step.execute(plan_step=plan_step, task=task)
 
         assert captured_e2e_time is not None
         assert captured_e2e_time >= 0

@@ -6,7 +6,7 @@ each phase with proper verification and commit creation.
 """
 
 from pathlib import Path
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
 
@@ -163,7 +163,8 @@ class TestTddWorkflowIntegration:
         assert commit is not None
 
     @pytest.mark.integration
-    def test_tdd_red_step_creates_test_file_and_commits(
+    @pytest.mark.asyncio
+    async def test_tdd_red_step_creates_test_file_and_commits(
         self,
         mock_session: MagicMock,
         mock_db: MagicMock,
@@ -185,7 +186,7 @@ class TestTddWorkflowIntegration:
         )
 
         mock_command = MagicMock()
-        mock_command.execute.return_value = mock_tdd_red_result
+        mock_command.execute = AsyncMock(return_value=mock_tdd_red_result)
         mock_verify = MagicMock()
         mock_verify.verify.return_value = VerificationResult(
             success=True,
@@ -212,7 +213,7 @@ class TestTddWorkflowIntegration:
             ),
         ):
             # Execute the full workflow
-            result = step.execute(mock_plan_step, mock_task)
+            result = await step.execute(mock_plan_step, mock_task)
 
             # Verify result structure
             assert result is not None
@@ -228,7 +229,8 @@ class TestTddWorkflowIntegration:
             assert call_kwargs["verification"].success is True
 
     @pytest.mark.integration
-    def test_tdd_green_step_implements_and_commits(
+    @pytest.mark.asyncio
+    async def test_tdd_green_step_implements_and_commits(
         self,
         mock_session: MagicMock,
         mock_db: MagicMock,
@@ -253,7 +255,7 @@ class TestTddWorkflowIntegration:
         )
 
         mock_command = MagicMock()
-        mock_command.execute.return_value = mock_tdd_green_result
+        mock_command.execute = AsyncMock(return_value=mock_tdd_green_result)
         mock_verify = MagicMock()
         mock_verify.verify.return_value = VerificationResult(
             success=True,
@@ -279,7 +281,7 @@ class TestTddWorkflowIntegration:
             ),
         ):
             # Execute the full workflow
-            result = step.execute(mock_plan_step, mock_task)
+            result = await step.execute(mock_plan_step, mock_task)
 
             # Verify result structure
             assert result is not None
@@ -295,7 +297,8 @@ class TestTddWorkflowIntegration:
             assert call_kwargs["result"].changed_files == [Path("src/auth.py")]
 
     @pytest.mark.integration
-    def test_tdd_refactor_step_refactors_and_commits(
+    @pytest.mark.asyncio
+    async def test_tdd_refactor_step_refactors_and_commits(
         self,
         mock_session: MagicMock,
         mock_db: MagicMock,
@@ -320,7 +323,7 @@ class TestTddWorkflowIntegration:
         )
 
         mock_command = MagicMock()
-        mock_command.execute.return_value = mock_tdd_refactor_result
+        mock_command.execute = AsyncMock(return_value=mock_tdd_refactor_result)
         mock_verify = MagicMock()
         mock_verify.verify.return_value = VerificationResult(
             success=True,
@@ -346,7 +349,7 @@ class TestTddWorkflowIntegration:
             ),
         ):
             # Execute the full workflow
-            result = step.execute(mock_plan_step, mock_task)
+            result = await step.execute(mock_plan_step, mock_task)
 
             # Verify result structure
             assert result is not None
@@ -362,7 +365,8 @@ class TestTddWorkflowIntegration:
             assert call_kwargs["result"].checksum == "abc123def456"
 
     @pytest.mark.integration
-    def test_full_tdd_cycle_red_green_refactor(
+    @pytest.mark.asyncio
+    async def test_full_tdd_cycle_red_green_refactor(
         self,
         mock_session: MagicMock,
         mock_db: MagicMock,
@@ -389,7 +393,7 @@ class TestTddWorkflowIntegration:
         )
 
         mock_command = MagicMock()
-        mock_command.execute.return_value = mock_tdd_red_result
+        mock_command.execute = AsyncMock(return_value=mock_tdd_red_result)
         mock_verify = MagicMock()
         mock_verify.verify.return_value = VerificationResult(
             success=True,
@@ -414,7 +418,7 @@ class TestTddWorkflowIntegration:
                 ExecutionStep, "commit", new_callable=PropertyMock, return_value=mock_commit_obj
             ),
         ):
-            red_result = red_step.execute(mock_plan_step, mock_task)
+            red_result = await red_step.execute(mock_plan_step, mock_task)
             commits.append(red_result)
 
         # Step 2: GREEN
@@ -426,7 +430,7 @@ class TestTddWorkflowIntegration:
         )
 
         mock_command = MagicMock()
-        mock_command.execute.return_value = mock_tdd_green_result
+        mock_command.execute = AsyncMock(return_value=mock_tdd_green_result)
         mock_verify = MagicMock()
         mock_verify.verify.return_value = VerificationResult(
             success=True,
@@ -451,7 +455,7 @@ class TestTddWorkflowIntegration:
                 ExecutionStep, "commit", new_callable=PropertyMock, return_value=mock_commit_obj
             ),
         ):
-            green_result = green_step.execute(mock_plan_step, mock_task)
+            green_result = await green_step.execute(mock_plan_step, mock_task)
             commits.append(green_result)
 
         # Step 3: REFACTOR
@@ -463,7 +467,7 @@ class TestTddWorkflowIntegration:
         )
 
         mock_command = MagicMock()
-        mock_command.execute.return_value = mock_tdd_refactor_result
+        mock_command.execute = AsyncMock(return_value=mock_tdd_refactor_result)
         mock_verify = MagicMock()
         mock_verify.verify.return_value = VerificationResult(
             success=True,
@@ -488,7 +492,7 @@ class TestTddWorkflowIntegration:
                 ExecutionStep, "commit", new_callable=PropertyMock, return_value=mock_commit_obj
             ),
         ):
-            refactor_result = refactor_step.execute(mock_plan_step, mock_task)
+            refactor_result = await refactor_step.execute(mock_plan_step, mock_task)
             commits.append(refactor_result)
 
         # Verify all steps executed
@@ -501,7 +505,8 @@ class TestTddWorkflowIntegration:
         assert commits[2].sha == "refactor789"
 
     @pytest.mark.integration
-    def test_tdd_red_verification_failure_raises_error(
+    @pytest.mark.asyncio
+    async def test_tdd_red_verification_failure_raises_error(
         self,
         mock_session: MagicMock,
         mock_db: MagicMock,
@@ -523,7 +528,7 @@ class TestTddWorkflowIntegration:
         )
 
         mock_command = MagicMock()
-        mock_command.execute.return_value = mock_tdd_red_result
+        mock_command.execute = AsyncMock(return_value=mock_tdd_red_result)
         mock_verify = MagicMock()
         mock_verify.verify.side_effect = VerificationError(
             step_type=StepType.TDD_RED,
@@ -547,7 +552,7 @@ class TestTddWorkflowIntegration:
         ):
             # Verification should raise
             with pytest.raises(VerificationError) as exc_info:
-                step.execute(mock_plan_step, mock_task)
+                await step.execute(mock_plan_step, mock_task)
 
             # Commit should not be called
             mock_commit_obj.create.assert_not_called()
@@ -558,7 +563,8 @@ class TestTddWorkflowIntegration:
             assert "failed" in str(error).lower()
 
     @pytest.mark.integration
-    def test_tdd_green_verification_failure_raises_error(
+    @pytest.mark.asyncio
+    async def test_tdd_green_verification_failure_raises_error(
         self,
         mock_session: MagicMock,
         mock_db: MagicMock,
@@ -581,7 +587,7 @@ class TestTddWorkflowIntegration:
         )
 
         mock_command = MagicMock()
-        mock_command.execute.return_value = mock_tdd_green_result
+        mock_command.execute = AsyncMock(return_value=mock_tdd_green_result)
         mock_verify = MagicMock()
         mock_verify.verify.side_effect = VerificationError(
             step_type=StepType.TDD_GREEN,
@@ -605,7 +611,7 @@ class TestTddWorkflowIntegration:
         ):
             # Verification should raise
             with pytest.raises(VerificationError) as exc_info:
-                step.execute(mock_plan_step, mock_task)
+                await step.execute(mock_plan_step, mock_task)
 
             # Commit should not be called
             mock_commit_obj.create.assert_not_called()
@@ -616,7 +622,8 @@ class TestTddWorkflowIntegration:
             assert "does not pass" in error.rule_violated
 
     @pytest.mark.integration
-    def test_tdd_refactor_verification_failure_raises_error(
+    @pytest.mark.asyncio
+    async def test_tdd_refactor_verification_failure_raises_error(
         self,
         mock_session: MagicMock,
         mock_db: MagicMock,
@@ -639,7 +646,7 @@ class TestTddWorkflowIntegration:
         )
 
         mock_command = MagicMock()
-        mock_command.execute.return_value = mock_tdd_refactor_result
+        mock_command.execute = AsyncMock(return_value=mock_tdd_refactor_result)
         mock_verify = MagicMock()
         mock_verify.verify.side_effect = VerificationError(
             step_type=StepType.TDD_REFACTOR,
@@ -663,7 +670,7 @@ class TestTddWorkflowIntegration:
         ):
             # Verification should raise
             with pytest.raises(VerificationError) as exc_info:
-                step.execute(mock_plan_step, mock_task)
+                await step.execute(mock_plan_step, mock_task)
 
             # Commit should not be called
             mock_commit_obj.create.assert_not_called()
@@ -673,7 +680,8 @@ class TestTddWorkflowIntegration:
             assert error.step_type == StepType.TDD_REFACTOR
 
     @pytest.mark.integration
-    def test_commits_have_correct_emojis(
+    @pytest.mark.asyncio
+    async def test_commits_have_correct_emojis(
         self,
         mock_session: MagicMock,
         mock_db: MagicMock,
@@ -699,7 +707,7 @@ class TestTddWorkflowIntegration:
 
         red_emoji = "🔴"
         mock_command = MagicMock()
-        mock_command.execute.return_value = mock_tdd_red_result
+        mock_command.execute = AsyncMock(return_value=mock_tdd_red_result)
         mock_verify = MagicMock()
         mock_verify.verify.return_value = VerificationResult(
             success=True,
@@ -721,7 +729,7 @@ class TestTddWorkflowIntegration:
                 ExecutionStep, "commit", new_callable=PropertyMock, return_value=mock_commit_obj
             ),
         ):
-            result = red_step.execute(mock_plan_step, mock_task)
+            result = await red_step.execute(mock_plan_step, mock_task)
             assert red_emoji in result.message
 
         # Test GREEN emoji
@@ -734,7 +742,7 @@ class TestTddWorkflowIntegration:
 
         green_emoji = "🟢"
         mock_command = MagicMock()
-        mock_command.execute.return_value = mock_tdd_green_result
+        mock_command.execute = AsyncMock(return_value=mock_tdd_green_result)
         mock_verify = MagicMock()
         mock_verify.verify.return_value = VerificationResult(
             success=True,
@@ -758,7 +766,7 @@ class TestTddWorkflowIntegration:
                 ExecutionStep, "commit", new_callable=PropertyMock, return_value=mock_commit_obj
             ),
         ):
-            result = green_step.execute(mock_plan_step, mock_task)
+            result = await green_step.execute(mock_plan_step, mock_task)
             assert green_emoji in result.message
 
         # Test REFACTOR emoji
@@ -771,7 +779,7 @@ class TestTddWorkflowIntegration:
 
         refactor_emoji = "♻️"
         mock_command = MagicMock()
-        mock_command.execute.return_value = mock_tdd_refactor_result
+        mock_command.execute = AsyncMock(return_value=mock_tdd_refactor_result)
         mock_verify = MagicMock()
         mock_verify.verify.return_value = VerificationResult(
             success=True,
@@ -795,11 +803,12 @@ class TestTddWorkflowIntegration:
                 ExecutionStep, "commit", new_callable=PropertyMock, return_value=mock_commit_obj
             ),
         ):
-            result = refactor_step.execute(mock_plan_step, mock_task)
+            result = await refactor_step.execute(mock_plan_step, mock_task)
             assert refactor_emoji in result.message
 
     @pytest.mark.integration
-    def test_execution_time_tracking(
+    @pytest.mark.asyncio
+    async def test_execution_time_tracking(
         self,
         mock_session: MagicMock,
         mock_db: MagicMock,
@@ -820,7 +829,7 @@ class TestTddWorkflowIntegration:
         )
 
         mock_command = MagicMock()
-        mock_command.execute.return_value = mock_tdd_red_result
+        mock_command.execute = AsyncMock(return_value=mock_tdd_red_result)
         mock_verify = MagicMock()
         mock_verify.verify.return_value = VerificationResult(
             success=True,
@@ -842,7 +851,7 @@ class TestTddWorkflowIntegration:
                 ExecutionStep, "commit", new_callable=PropertyMock, return_value=mock_commit_obj
             ),
         ):
-            step.execute(mock_plan_step, mock_task)
+            await step.execute(mock_plan_step, mock_task)
 
             # Verify e2e_time was passed to commit
             mock_commit_obj.create.assert_called_once()
@@ -852,7 +861,8 @@ class TestTddWorkflowIntegration:
             assert call_kwargs["e2e_time"] > 0
 
     @pytest.mark.integration
-    def test_verification_result_passed_to_commit(
+    @pytest.mark.asyncio
+    async def test_verification_result_passed_to_commit(
         self,
         mock_session: MagicMock,
         mock_db: MagicMock,
@@ -880,7 +890,7 @@ class TestTddWorkflowIntegration:
         )
 
         mock_command = MagicMock()
-        mock_command.execute.return_value = mock_tdd_red_result
+        mock_command.execute = AsyncMock(return_value=mock_tdd_red_result)
         mock_verify = MagicMock()
         mock_verify.verify.return_value = verification_result
         mock_commit_obj = MagicMock()
@@ -897,7 +907,7 @@ class TestTddWorkflowIntegration:
                 ExecutionStep, "commit", new_callable=PropertyMock, return_value=mock_commit_obj
             ),
         ):
-            step.execute(mock_plan_step, mock_task)
+            await step.execute(mock_plan_step, mock_task)
 
             # Verify verification result was passed to commit
             mock_commit_obj.create.assert_called_once()
