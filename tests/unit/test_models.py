@@ -9,6 +9,7 @@ from jiro.db.models import (
     Commit,
     CommitStatus,
     CommitType,
+    ExecutionPlan,
     Prompt,
     Session,
     SessionStatus,
@@ -701,3 +702,120 @@ class TestCommitType:
                 created_at=datetime.now(),
             )
             assert commit.commit_type == commit_type
+
+
+class TestExecutionPlan:
+    """Tests for ExecutionPlan dataclass."""
+
+    @pytest.mark.unit
+    def test_required_fields(self) -> None:
+        """ExecutionPlan should require core fields."""
+        plan = ExecutionPlan(
+            id="plan-123",
+            task_id="task-456",
+            plan_json='{"steps": []}',
+            created_at=datetime(2024, 1, 15, 10, 30, 0),
+        )
+        assert plan.id == "plan-123"
+        assert plan.task_id == "task-456"
+        assert plan.plan_json == '{"steps": []}'
+        assert plan.created_at == datetime(2024, 1, 15, 10, 30, 0)
+
+    @pytest.mark.unit
+    def test_optional_fields_default_to_none(self) -> None:
+        """Optional fields should default to None."""
+        plan = ExecutionPlan(
+            id="plan-123",
+            task_id="task-456",
+            plan_json='{"steps": []}',
+            created_at=datetime.now(),
+        )
+        assert plan.session_id is None
+
+    @pytest.mark.unit
+    def test_all_fields(self) -> None:
+        """ExecutionPlan should accept all fields."""
+        plan = ExecutionPlan(
+            id="plan-123",
+            task_id="task-456",
+            plan_json='{"steps": ["step1", "step2"]}',
+            created_at=datetime(2024, 1, 15, 10, 30, 0),
+            session_id="sess-789",
+        )
+        assert plan.session_id == "sess-789"
+
+    @pytest.mark.unit
+    def test_from_row(self) -> None:
+        """from_row should deserialize from database row."""
+        row = {
+            "id": "plan-123",
+            "task_id": "task-456",
+            "plan_json": '{"steps": ["step1"]}',
+            "created_at": "2024-01-15T10:30:00",
+            "session_id": "sess-789",
+        }
+        plan = ExecutionPlan.from_row(row)
+        assert plan.id == "plan-123"
+        assert plan.task_id == "task-456"
+        assert plan.plan_json == '{"steps": ["step1"]}'
+        assert plan.created_at == datetime(2024, 1, 15, 10, 30, 0)
+        assert plan.session_id == "sess-789"
+
+    @pytest.mark.unit
+    def test_from_row_without_session(self) -> None:
+        """from_row should handle missing session_id."""
+        row = {
+            "id": "plan-123",
+            "task_id": "task-456",
+            "plan_json": '{"steps": []}',
+            "created_at": "2024-01-15T10:30:00",
+        }
+        plan = ExecutionPlan.from_row(row)
+        assert plan.session_id is None
+
+    @pytest.mark.unit
+    def test_to_row(self) -> None:
+        """to_row should serialize to database row."""
+        plan = ExecutionPlan(
+            id="plan-123",
+            task_id="task-456",
+            plan_json='{"steps": ["step1", "step2"]}',
+            created_at=datetime(2024, 1, 15, 10, 30, 0),
+            session_id="sess-789",
+        )
+        row = plan.to_row()
+        assert row["id"] == "plan-123"
+        assert row["task_id"] == "task-456"
+        assert row["plan_json"] == '{"steps": ["step1", "step2"]}'
+        assert row["created_at"] == "2024-01-15T10:30:00"
+        assert row["session_id"] == "sess-789"
+
+    @pytest.mark.unit
+    def test_to_row_without_session(self) -> None:
+        """to_row should handle None session_id."""
+        plan = ExecutionPlan(
+            id="plan-123",
+            task_id="task-456",
+            plan_json='{"steps": []}',
+            created_at=datetime(2024, 1, 15, 10, 30, 0),
+        )
+        row = plan.to_row()
+        assert row["session_id"] is None
+
+    @pytest.mark.unit
+    def test_roundtrip(self) -> None:
+        """to_row then from_row should produce equivalent object."""
+        original = ExecutionPlan(
+            id="plan-123",
+            task_id="task-456",
+            plan_json='{"steps": ["step1"], "files": ["src/foo.py"]}',
+            created_at=datetime(2024, 1, 15, 10, 30, 0),
+            session_id="sess-789",
+        )
+        row = original.to_row()
+        restored = ExecutionPlan.from_row(row)
+        assert restored.id == original.id
+        assert restored.task_id == original.task_id
+        assert restored.plan_json == original.plan_json
+        assert restored.created_at == original.created_at
+        assert restored.session_id == original.session_id

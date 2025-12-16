@@ -2,7 +2,7 @@
 
 from sqlite_utils import Database
 
-from jiro.db.models import Commit, Prompt, Session, TaskExecution
+from jiro.db.models import Commit, ExecutionPlan, Prompt, Session, TaskExecution
 
 
 class SessionRepository:
@@ -311,3 +311,66 @@ class CommitRepository:
             )
         )
         return [Commit.from_row(row) for row in rows]
+
+
+class ExecutionPlanRepository:
+    """Repository for ExecutionPlan CRUD operations."""
+
+    def __init__(self, db: Database) -> None:
+        """Initialize repository with database connection.
+
+        Args:
+            db: sqlite-utils Database instance.
+        """
+        self.db = db
+
+    def create(self, plan: ExecutionPlan) -> ExecutionPlan:
+        """Create a new execution plan in the database.
+
+        Args:
+            plan: ExecutionPlan instance to create.
+
+        Returns:
+            The created ExecutionPlan instance.
+        """
+        row = plan.to_row()
+        self.db["execution_plans"].insert(row)
+        return plan
+
+    def get(self, plan_id: str) -> ExecutionPlan | None:
+        """Retrieve an execution plan by ID.
+
+        Args:
+            plan_id: ID of the execution plan to retrieve.
+
+        Returns:
+            ExecutionPlan instance if found, None otherwise.
+        """
+        rows = list(self.db["execution_plans"].rows_where("id = ?", [plan_id]))
+        if not rows:
+            return None
+        return ExecutionPlan.from_row(rows[0])
+
+    def get_by_session(self, session_id: str) -> list[ExecutionPlan]:
+        """Retrieve all execution plans for a specific session.
+
+        Args:
+            session_id: Session ID to filter by.
+
+        Returns:
+            List of ExecutionPlan instances for the session.
+        """
+        rows = list(self.db["execution_plans"].rows_where("session_id = ?", [session_id]))
+        return [ExecutionPlan.from_row(row) for row in rows]
+
+    def get_by_task(self, task_id: str) -> list[ExecutionPlan]:
+        """Retrieve all execution plans for a specific task.
+
+        Args:
+            task_id: Task ID to filter by.
+
+        Returns:
+            List of ExecutionPlan instances for the task.
+        """
+        rows = list(self.db["execution_plans"].rows_where("task_id = ?", [task_id]))
+        return [ExecutionPlan.from_row(row) for row in rows]

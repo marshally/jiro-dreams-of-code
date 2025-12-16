@@ -105,6 +105,20 @@ def ensure_schema(db: Database) -> None:
         if_not_exists=True,
     )
 
+    # Execution plans
+    db["execution_plans"].create(
+        {
+            "id": str,
+            "task_id": str,
+            "session_id": str,
+            "plan_json": str,
+            "created_at": str,
+        },
+        pk="id",
+        foreign_keys=[("session_id", "sessions", "id")],
+        if_not_exists=True,
+    )
+
     # Create indexes for common queries
     _create_indexes(db)
 
@@ -123,6 +137,8 @@ def _create_indexes(db: Database) -> None:
         ("idx_task_executions_task", "task_executions", "task_id"),
         ("idx_commits_session", "commits", "session_id"),
         ("idx_commits_task", "commits", "task_id"),
+        ("idx_execution_plans_session", "execution_plans", "session_id"),
+        ("idx_execution_plans_task", "execution_plans", "task_id"),
     ]
 
     for index_name, table, column in indexes:
