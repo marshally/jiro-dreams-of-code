@@ -11,7 +11,7 @@ from jiro.config.schema import (
     ModelsConfig,
     PreflightConfig,
 )
-from jiro.core.paths import get_config_path
+from jiro.core.paths import get_config_path, get_local_config_path
 
 
 def _flatten_config_for_save(config: Config) -> dict:
@@ -65,10 +65,12 @@ def save_config(config: Config, project_root: Path, project_name: str) -> None:
 
 
 def load_config(project_root: Path, project_name: str) -> Config:
-    """Load configuration from project scope directory.
+    """Load configuration from local and project scope directories.
 
-    Loads config from ~/.jiro-dreams-of-code/$PROJECT/config.yaml.
-    Returns Config dataclass with YAML values and defaults for missing values.
+    Loads config in order of precedence:
+    1. Local config from .jiro-dreams-of-code.yaml in project root (highest priority)
+    2. Project scope config from ~/.jiro-dreams-of-code/$PROJECT/config.yaml
+    3. Defaults for any missing values
 
     Args:
         project_root: The root directory of the project.
@@ -77,16 +79,25 @@ def load_config(project_root: Path, project_name: str) -> Config:
     Returns:
         Config dataclass with loaded values and defaults.
     """
-    # Get config file path using stealth mode
-    config_path = get_config_path(project_root, stealth=True, project_name=project_name)
-
-    # Load YAML if file exists
+    # Start with empty config data
     config_data = {}
-    if config_path.exists():
-        with open(config_path) as f:
+
+    # First load project scope config from ~/.jiro-dreams-of-code/$PROJECT/config.yaml
+    project_config_path = get_config_path(project_root, stealth=True, project_name=project_name)
+    if project_config_path.exists():
+        with open(project_config_path) as f:
             loaded_data = yaml.safe_load(f)
             if loaded_data:
                 config_data = loaded_data
+
+    # Then load local config from .jiro-dreams-of-code.yaml in project root (overrides project scope)
+    local_config_path = get_local_config_path(project_root)
+    if local_config_path.exists():
+        with open(local_config_path) as f:
+            loaded_data = yaml.safe_load(f)
+            if loaded_data:
+                # Merge local config into config_data (local values override project scope)
+                _merge_config_dicts(config_data, loaded_data)
 
     # Build nested configs with defaults
     models_data = config_data.get("models", {})
@@ -119,3 +130,22 @@ def load_config(project_root: Path, project_name: str) -> Config:
         conventions=conventions,
         preflight=preflight,
     )
+
+
+def _merge_config_dicts(base: dict, override: dict) -> None:
+    """Merge override dictionary into base dictionary in-place.
+
+    For nested dictionaries, values from override take precedence.
+    This is used to merge local config over project scope config.
+
+    Args:
+        base: The base dictionary to merge into (modified in-place).
+        override: The override dictionary whose values take precedence.
+    """
+    for key, value in override.items():
+        if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+            # Recursively merge nested dicts
+            _merge_config_dicts(base[key], value)
+        else:
+            # Override takes precedence
+            base[key] = value

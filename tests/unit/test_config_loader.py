@@ -185,3 +185,94 @@ models:
 
         assert result.models.planning == "project-specific-model"
         assert result.models.execution == "claude-3-5-haiku-20241022"
+
+    def test_load_config_with_local_config_file(self, tmp_path: Path) -> None:
+        """load_config should load values from local .jiro-dreams-of-code.yaml in project root."""
+        # Create local config file in project root
+        local_config_file = tmp_path / ".jiro-dreams-of-code.yaml"
+        local_config_file.write_text(
+            """
+models:
+  planning: "local-planning-model"
+  execution: "local-execution-model"
+commands:
+  test: "local-test-command"
+"""
+        )
+
+        result = load_config(tmp_path, "test-project")
+
+        # Verify local config values are loaded
+        assert result.models.planning == "local-planning-model"
+        assert result.models.execution == "local-execution-model"
+        assert result.commands.test == "local-test-command"
+
+        # Verify defaults for missing keys
+        assert result.models.review == "claude-sonnet-4-20250514"
+        assert result.commands.lint == "ruff check"
+
+    def test_load_config_prefers_local_over_project_scope(self, tmp_path: Path) -> None:
+        """load_config should prefer local config over project scope config."""
+        # Create project scope config
+        config_dir = tmp_path / ".jiro-dreams-of-code" / "test-project"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        config_file = config_dir / "config.yaml"
+        config_file.write_text(
+            """
+models:
+  planning: "project-planning-model"
+commands:
+  test: "project-test-command"
+"""
+        )
+
+        # Create local config file
+        local_config_file = tmp_path / ".jiro-dreams-of-code.yaml"
+        local_config_file.write_text(
+            """
+models:
+  planning: "local-planning-model"
+"""
+        )
+
+        # Mock home directory to use tmp_path
+        with patch("jiro.config.loader.Path.home", return_value=tmp_path):
+            result = load_config(tmp_path, "test-project")
+
+        # Verify local config takes precedence
+        assert result.models.planning == "local-planning-model"
+        # Project scope config value should not be used when local config exists
+        assert result.commands.test == "project-test-command"
+
+    def test_load_config_with_local_config_empty_file(self, tmp_path: Path) -> None:
+        """load_config should handle empty local config file gracefully."""
+        # Create empty local config file
+        local_config_file = tmp_path / ".jiro-dreams-of-code.yaml"
+        local_config_file.write_text("")
+
+        result = load_config(tmp_path, "test-project")
+
+        # Verify all defaults are used
+        assert result.models.planning == "claude-opus-4-20250514"
+        assert result.commands.test == "pytest"
+        assert result.conventions.test_file_pattern == "test_{name}.py"
+
+    def test_load_config_without_local_config_uses_project_scope(self, tmp_path: Path) -> None:
+        """load_config should use project scope config when local config is absent."""
+        # Create project scope config
+        config_dir = tmp_path / ".jiro-dreams-of-code" / "test-project"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        config_file = config_dir / "config.yaml"
+        config_file.write_text(
+            """
+models:
+  planning: "project-planning-model"
+"""
+        )
+
+        # Mock home directory to use tmp_path
+        with patch("jiro.config.loader.Path.home", return_value=tmp_path):
+            result = load_config(tmp_path, "test-project")
+
+        # Verify project scope config is used
+        assert result.models.planning == "project-planning-model"

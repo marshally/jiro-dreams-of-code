@@ -97,3 +97,15 @@ def get_logs_dir(
         Path to the logs directory.
     """
     return get_jiro_dir(project_root, stealth, project_name) / "logs"
+
+
+def get_local_config_path(project_root: Path) -> Path:
+    """Get the local config file path in the project root.
+
+    Args:
+        project_root: The root directory of the project.
+
+    Returns:
+        Path to the .jiro-dreams-of-code.yaml file in project root.
+    """
+    return project_root / ".jiro-dreams-of-code.yaml"
