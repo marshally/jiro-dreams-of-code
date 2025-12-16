@@ -10,6 +10,7 @@ from rich.table import Table
 
 from jiro import __version__
 from jiro.cli.assets import app as assets_app
+from jiro.cli.auth import app as auth_app
 from jiro.cli.config import app as config_app
 from jiro.cli.doctor import fix_missing_config, run_doctor
 from jiro.cli.dream import app as dream_app
@@ -162,6 +163,9 @@ app.add_typer(web_app, name="web")
 
 # Wire assets subcommand from assets module
 app.add_typer(assets_app, name="assets")
+
+# Wire auth subcommand from auth module
+app.add_typer(auth_app, name="auth")
 
 
 if __name__ == "__main__":
