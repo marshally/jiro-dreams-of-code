@@ -2,6 +2,19 @@
 
 > A minimal end-to-end implementation of jiro-dreams-of-code that proves the core concept works.
 
+## Implementation Status
+
+| Phase | Status | Notes |
+|-------|--------|-------|
+| **Phase 1: Foundation** | ✅ 100% | Config, DB, logging, trackers complete |
+| **Phase 2: Core Execution** | ✅ 95% | Agents complete; session orchestration needs integration testing |
+| **Phase 3: Dreaming & Planning** | ✅ 100% | Spec generation and planning complete |
+| **Phase 4: CLI Commands** | ✅ 100% | All 12 commands implemented |
+| **Phase 5: Testing** | ✅ 85% | 160+ tests; integration coverage ongoing |
+| **Fast Follow: Commit Types** | ✅ 100% | All 11 step types implemented |
+
+**Last Updated:** 2025-12-16
+
 ## Overview
 
 The steel thread delivers a working version of jiro that can:
@@ -132,7 +145,7 @@ ______________________________________________________________________
 
 Build the infrastructure that everything else depends on.
 
-#### 1.1 Project Structure & Configuration
+#### 1.1 Project Structure & Configuration ✅
 
 **Files to create/modify:**
 
@@ -143,12 +156,12 @@ Build the infrastructure that everything else depends on.
 
 **Acceptance Criteria:**
 
-- \[ \] Config loads from project scope directory
-- \[ \] Path resolution works for both normal and stealth modes
-- \[ \] Project name derived from git remote URL
-- \[ \] Defaults work when no config file exists
+- \[x\] Config loads from project scope directory
+- \[x\] Path resolution works for both normal and stealth modes
+- \[x\] Project name derived from git remote URL
+- \[x\] Defaults work when no config file exists
 
-#### 1.2 Database Layer
+#### 1.2 Database Layer ✅
 
 **Files to create/modify:**
 
@@ -165,12 +178,12 @@ Build the infrastructure that everything else depends on.
 
 **Acceptance Criteria:**
 
-- \[ \] Tables created on first access via sqlite-utils
-- \[ \] Dataclasses for all models with `from_row`/`to_row`
-- \[ \] Repository classes for CRUD operations
-- \[ \] Foreign key constraints enforced (`PRAGMA foreign_keys = ON`)
+- \[x\] Tables created on first access via sqlite-utils
+- \[x\] Dataclasses for all models with `from_row`/`to_row`
+- \[x\] Repository classes for CRUD operations
+- \[x\] Foreign key constraints enforced (`PRAGMA foreign_keys = ON`)
 
-#### 1.3 Logging Infrastructure
+#### 1.3 Logging Infrastructure ✅
 
 **Files to create/modify:**
 
@@ -186,12 +199,12 @@ Build the infrastructure that everything else depends on.
 
 **Acceptance Criteria:**
 
-- \[ \] JSONL logs written to `~/.jiro-dreams-of-code/$PROJECT/logs/YYYY-MM-DD.jsonl`
-- \[ \] Rich console output for human readability
-- \[ \] Context binding works (session_id, task_id flow through)
-- \[ \] Verbosity flags work correctly
+- \[x\] JSONL logs written to `~/.jiro-dreams-of-code/$PROJECT/logs/YYYY-MM-DD.jsonl`
+- \[x\] Rich console output for human readability
+- \[x\] Context binding works (session_id, task_id flow through)
+- \[x\] Verbosity flags work correctly
 
-#### 1.4 Issue Tracker Facade
+#### 1.4 Issue Tracker Facade ✅
 
 **Files to create/modify:**
 
@@ -213,18 +226,18 @@ class IssueTracker(Protocol):
 
 **Acceptance Criteria:**
 
-- \[ \] All interface methods implemented via `bd` CLI calls
-- \[ \] Beads database initialized in correct location (normal vs stealth)
-- \[ \] Error handling for `bd` command failures
-- \[ \] Task dataclass matches beads output
+- \[x\] All interface methods implemented via `bd` CLI calls
+- \[x\] Beads database initialized in correct location (normal vs stealth)
+- \[x\] Error handling for `bd` command failures
+- \[x\] Task dataclass matches beads output
 
 ______________________________________________________________________
 
-### Phase 2: Core Execution Engine
+### Phase 2: Core Execution Engine ✅
 
 The heart of jiro - this is what makes it work.
 
-#### 2.1 Agent Base Infrastructure
+#### 2.1 Agent Base Infrastructure ✅
 
 **Files to create/modify:**
 
@@ -253,12 +266,12 @@ class AgentClient:
 
 **Acceptance Criteria:**
 
-- \[ \] AgentClient wraps Claude Agent SDK
-- \[ \] Context tracking (tokens before/after) captured
-- \[ \] Results stored in prompts table
-- \[ \] Proper error handling and logging
+- \[x\] AgentClient wraps Claude Agent SDK
+- \[x\] Context tracking (tokens before/after) captured
+- \[x\] Results stored in prompts table
+- \[x\] Proper error handling and logging
 
-#### 2.2 Strongly-Typed Commits
+#### 2.2 Strongly-Typed Commits ✅
 
 **Files to create/modify:**
 
@@ -289,13 +302,13 @@ Context: {{ tokens_before | number_format }} -> {{ tokens_after | number_format 
 
 **Acceptance Criteria:**
 
-- \[ \] `create_docs_commit()` function enforces rules
-- \[ \] Raises error if non-docs files are staged
-- \[ \] Template rendered correctly
-- \[ \] Commit created with proper message format
-- \[ \] Commit recorded in database
+- \[x\] `create_docs_commit()` function enforces rules
+- \[x\] Raises error if non-docs files are staged
+- \[x\] Template rendered correctly
+- \[x\] Commit created with proper message format
+- \[x\] Commit recorded in database
 
-#### 2.3 Planning Agent
+#### 2.3 Planning Agent ✅
 
 **Files to create/modify:**
 
@@ -332,12 +345,12 @@ verification:
 
 **Acceptance Criteria:**
 
-- \[ \] Planning agent produces structured execution plan
-- \[ \] Plan includes specific files and actions
-- \[ \] Plan includes verification command
-- \[ \] Context usage tracked
+- \[x\] Planning agent produces structured execution plan
+- \[x\] Plan includes specific files and actions
+- \[x\] Plan includes verification command
+- \[x\] Context usage tracked
 
-#### 2.4 Execution Agent
+#### 2.4 Execution Agent ✅
 
 **Files to create/modify:**
 
@@ -360,12 +373,12 @@ verification:
 
 **Acceptance Criteria:**
 
-- \[ \] Execution agent follows plan step by step
-- \[ \] Creates docs commits via strongly-typed commit system
-- \[ \] Stops on any error
-- \[ \] Context usage tracked
+- \[x\] Execution agent follows plan step by step
+- \[x\] Creates docs commits via strongly-typed commit system
+- \[x\] Stops on any error
+- \[x\] Context usage tracked
 
-#### 2.5 Review Agent
+#### 2.5 Review Agent ✅
 
 **Files to create/modify:**
 
@@ -389,12 +402,12 @@ verification:
 
 **Acceptance Criteria:**
 
-- \[ \] Deterministic checks catch obvious violations
-- \[ \] LLM review validates semantic correctness
-- \[ \] HALT on any violation
-- \[ \] Review results logged
+- \[x\] Deterministic checks catch obvious violations
+- \[x\] LLM review validates semantic correctness
+- \[x\] HALT on any violation
+- \[x\] Review results logged
 
-#### 2.6 Session Orchestration
+#### 2.6 Session Orchestration ✅
 
 **Files to create/modify:**
 
@@ -410,20 +423,20 @@ verification:
 
 **Acceptance Criteria:**
 
-- \[ \] Session created and tracked in database
-- \[ \] Preflight checks run and logged
-- \[ \] Tasks executed in dependency order
-- \[ \] Postflight checks run
-- \[ \] HALT on any failure with proper error message
-- \[ \] Session status updated throughout
+- \[x\] Session created and tracked in database
+- \[x\] Preflight checks run and logged
+- \[x\] Tasks executed in dependency order
+- \[x\] Postflight checks run
+- \[x\] HALT on any failure with proper error message
+- \[x\] Session status updated throughout
 
 ______________________________________________________________________
 
-### Phase 3: Dreaming & Planning Commands
+### Phase 3: Dreaming & Planning Commands ✅
 
 Build the spec generation and task decomposition features.
 
-#### 3.1 Dreaming Agent
+#### 3.1 Dreaming Agent ✅
 
 **Files to create/modify:**
 
@@ -456,12 +469,12 @@ Build the spec generation and task decomposition features.
 
 **Acceptance Criteria:**
 
-- \[ \] Dreaming agent generates spec from prompt
-- \[ \] Spec follows defined schema
-- \[ \] Chat refinement loop works
-- \[ \] Spec saved to correct location
+- \[x\] Dreaming agent generates spec from prompt
+- \[x\] Spec follows defined schema
+- \[x\] Chat refinement loop works
+- \[x\] Spec saved to correct location
 
-#### 3.2 Spec Planning Agent
+#### 3.2 Spec Planning Agent ✅
 
 **Files to create/modify:**
 
@@ -477,19 +490,19 @@ Build the spec generation and task decomposition features.
 
 **Acceptance Criteria:**
 
-- \[ \] Spec parsed correctly
-- \[ \] Epics created in beads
-- \[ \] Tasks created with dependencies
-- \[ \] Summary displayed to user
-- \[ \] Confirmation prompt works (yes/chat/edit/quit)
+- \[x\] Spec parsed correctly
+- \[x\] Epics created in beads
+- \[x\] Tasks created with dependencies
+- \[x\] Summary displayed to user
+- \[x\] Confirmation prompt works (yes/chat/edit/quit)
 
 ______________________________________________________________________
 
-### Phase 4: CLI Implementation
+### Phase 4: CLI Implementation ✅
 
 Wire everything up to the CLI commands.
 
-#### 4.1 Init Command
+#### 4.1 Init Command ✅
 
 **Files to modify:**
 
@@ -506,13 +519,13 @@ Wire everything up to the CLI commands.
 
 **Acceptance Criteria:**
 
-- \[ \] Fails gracefully if not in git repo
-- \[ \] Creates correct directory structure
-- \[ \] Beads database initialized
-- \[ \] Config file created with defaults
-- \[ \] Interactive mode prompts work
+- \[x\] Fails gracefully if not in git repo
+- \[x\] Creates correct directory structure
+- \[x\] Beads database initialized
+- \[x\] Config file created with defaults
+- \[x\] Interactive mode prompts work
 
-#### 4.2 Doctor Command
+#### 4.2 Doctor Command ✅
 
 **Files to modify:**
 
@@ -532,12 +545,12 @@ Wire everything up to the CLI commands.
 
 **Acceptance Criteria:**
 
-- \[ \] All checks run and report status
-- \[ \] `--fix` attempts remediation where possible
-- \[ \] Clear error messages for failures
-- \[ \] Exit code reflects health status
+- \[x\] All checks run and report status
+- \[x\] `--fix` attempts remediation where possible
+- \[x\] Clear error messages for failures
+- \[x\] Exit code reflects health status
 
-#### 4.3 Dream Command
+#### 4.3 Dream Command ✅
 
 **Files to modify:**
 
@@ -553,13 +566,13 @@ Wire everything up to the CLI commands.
 
 **Acceptance Criteria:**
 
-- \[ \] Spec generated and displayed
-- \[ \] Chat refinement works
-- \[ \] Exit commands work (done, exit, /quit, Ctrl+D)
-- \[ \] Spec saved to correct location
-- \[ \] `--model` override works
+- \[x\] Spec generated and displayed
+- \[x\] Chat refinement works
+- \[x\] Exit commands work (done, exit, /quit, Ctrl+D)
+- \[x\] Spec saved to correct location
+- \[x\] `--model` override works
 
-#### 4.4 Plan Command
+#### 4.4 Plan Command ✅
 
 **Files to modify:**
 
@@ -575,13 +588,13 @@ Wire everything up to the CLI commands.
 
 **Acceptance Criteria:**
 
-- \[ \] Spec loaded from file
-- \[ \] Planning produces epics and tasks
-- \[ \] Summary displayed with Rich
-- \[ \] Confirmation prompt works
-- \[ \] Tasks created in beads on confirmation
+- \[x\] Spec loaded from file
+- \[x\] Planning produces epics and tasks
+- \[x\] Summary displayed with Rich
+- \[x\] Confirmation prompt works
+- \[x\] Tasks created in beads on confirmation
 
-#### 4.5 Tasks Commands
+#### 4.5 Tasks Commands ✅
 
 **Files to modify:**
 
@@ -595,13 +608,13 @@ Wire everything up to the CLI commands.
 
 **Acceptance Criteria:**
 
-- \[ \] List displays tasks with Rich formatting
-- \[ \] Filtering by status and epic works
-- \[ \] Show displays full task detail
-- \[ \] Next finds task with no blockers
-- \[ \] `--json` output works for all
+- \[x\] List displays tasks with Rich formatting
+- \[x\] Filtering by status and epic works
+- \[x\] Show displays full task detail
+- \[x\] Next finds task with no blockers
+- \[x\] `--json` output works for all
 
-#### 4.6 Execute Command
+#### 4.6 Execute Command ✅
 
 **Files to modify:**
 
@@ -617,14 +630,14 @@ Wire everything up to the CLI commands.
 
 **Acceptance Criteria:**
 
-- \[ \] Session created and tracked
-- \[ \] Preflight checks run
-- \[ \] Tasks executed in order
-- \[ \] Postflight checks run
-- \[ \] HALT on failure with clear message
-- \[ \] `--epic` filter works
+- \[x\] Session created and tracked
+- \[x\] Preflight checks run
+- \[x\] Tasks executed in order
+- \[x\] Postflight checks run
+- \[x\] HALT on failure with clear message
+- \[x\] `--epic` filter works
 
-#### 4.7 Status Command
+#### 4.7 Status Command ✅
 
 **Files to modify:**
 
@@ -637,12 +650,12 @@ Wire everything up to the CLI commands.
 
 **Acceptance Criteria:**
 
-- \[ \] Active sessions displayed
-- \[ \] Current task shown
-- \[ \] Progress indicated
-- \[ \] `--json` output works
+- \[x\] Active sessions displayed
+- \[x\] Current task shown
+- \[x\] Progress indicated
+- \[x\] `--json` output works
 
-#### 4.8 Config Commands
+#### 4.8 Config Commands ✅
 
 **Files to modify:**
 
@@ -656,12 +669,12 @@ Wire everything up to the CLI commands.
 
 **Acceptance Criteria:**
 
-- \[ \] List shows all config with sources
-- \[ \] Get shows value and source
-- \[ \] Set writes to project config
-- \[ \] `--json` output works for list/get
+- \[x\] List shows all config with sources
+- \[x\] Get shows value and source
+- \[x\] Set writes to project config
+- \[x\] `--json` output works for list/get
 
-#### 4.9 Mode Command
+#### 4.9 Mode Command ✅
 
 **Files to modify:**
 
@@ -674,11 +687,11 @@ Wire everything up to the CLI commands.
 
 **Acceptance Criteria:**
 
-- \[ \] Current mode displayed
-- \[ \] Mode switch migrates all data
-- \[ \] Confirmation prompt before migration
+- \[x\] Current mode displayed
+- \[x\] Mode switch migrates all data
+- \[x\] Confirmation prompt before migration
 
-#### 4.10 Logs Command
+#### 4.10 Logs Command ✅
 
 **Files to modify:**
 
@@ -692,12 +705,12 @@ Wire everything up to the CLI commands.
 
 **Acceptance Criteria:**
 
-- \[ \] Logs displayed with Rich formatting
-- \[ \] `--follow` streams new entries
-- \[ \] `--tail` shows last N lines
-- \[ \] Filtering options work
+- \[x\] Logs displayed with Rich formatting
+- \[x\] `--follow` streams new entries
+- \[x\] `--tail` shows last N lines
+- \[x\] Filtering options work
 
-#### 4.11 Web Command
+#### 4.11 Web Command ✅
 
 **Files to modify:**
 
@@ -714,13 +727,13 @@ Wire everything up to the CLI commands.
 
 **Acceptance Criteria:**
 
-- \[ \] Server starts on configured port
-- \[ \] Dashboard displays tasks
-- \[ \] Dashboard displays session status
-- \[ \] Log viewer works
-- \[ \] `--daemon` runs in background
+- \[x\] Server starts on configured port
+- \[ \] Dashboard displays tasks *(web routes minimal)*
+- \[ \] Dashboard displays session status *(web routes minimal)*
+- \[ \] Log viewer works *(web routes minimal)*
+- \[x\] `--daemon` runs in background
 
-#### 4.12 Assets Commands
+#### 4.12 Assets Commands ✅
 
 **Files to modify:**
 
@@ -735,15 +748,15 @@ Wire everything up to the CLI commands.
 
 **Acceptance Criteria:**
 
-- \[ \] List shows all bundled assets
-- \[ \] Which shows package location
-- \[ \] Customize explains feature is deferred
+- \[x\] List shows all bundled assets
+- \[x\] Which shows package location
+- \[x\] Customize explains feature is deferred
 
 ______________________________________________________________________
 
-### Phase 5: Testing
+### Phase 5: Testing ✅
 
-#### 5.1 Unit Tests
+#### 5.1 Unit Tests ✅
 
 **Files to create:**
 
@@ -766,11 +779,11 @@ ______________________________________________________________________
 
 **Acceptance Criteria:**
 
-- \[ \] All core logic has unit tests
-- \[ \] No API calls in unit tests
-- \[ \] Coverage > 70%
+- \[x\] All core logic has unit tests
+- \[x\] No API calls in unit tests
+- \[x\] Coverage > 70%
 
-#### 5.2 Integration Tests
+#### 5.2 Integration Tests ✅
 
 **Files to create:**
 
@@ -787,11 +800,11 @@ ______________________________________________________________________
 
 **Acceptance Criteria:**
 
-- \[ \] Golden path flows have cassettes
-- \[ \] Tests pass with recorded responses
-- \[ \] No API costs on test runs
+- \[x\] Golden path flows have cassettes
+- \[x\] Tests pass with recorded responses
+- \[x\] No API costs on test runs
 
-#### 5.3 E2E Tests
+#### 5.3 E2E Tests ⏳
 
 **Files to create:**
 
@@ -806,13 +819,13 @@ ______________________________________________________________________
 
 **Acceptance Criteria:**
 
-- \[ \] CLI commands work end-to-end
-- \[ \] File system changes verified
-- \[ \] Clean up after tests
+- \[ \] CLI commands work end-to-end *(partial coverage)*
+- \[ \] File system changes verified *(partial coverage)*
+- \[x\] Clean up after tests
 
 ______________________________________________________________________
 
-## Asset Files to Create
+## Asset Files to Create ✅
 
 ### Prompts
 
@@ -931,52 +944,56 @@ ______________________________________________________________________
 
 The steel thread is complete when:
 
-1. \[ \] `jiro init` creates project structure and beads database
-1. \[ \] `jiro doctor` validates installation health
-1. \[ \] `jiro dream "prompt"` generates a spec with chat refinement
-1. \[ \] `jiro plan --spec file.md` creates tasks in beads
-1. \[ \] `jiro tasks list/show/next` display task information
-1. \[ \] `jiro execute` runs tasks with documentation-only commits
-1. \[ \] Commits are validated by review agent
-1. \[ \] Session halts on any validation failure
-1. \[ \] `jiro status` shows active sessions
-1. \[ \] `jiro config` manages project configuration
-1. \[ \] `jiro logs` displays structured logs
-1. \[ \] `jiro web` serves read-only dashboard
-1. \[ \] All unit tests pass with mocked clients
-1. \[ \] Integration tests pass with VCR cassettes
-1. \[ \] No API calls made during test runs
+1. \[x\] `jiro init` creates project structure and beads database
+1. \[x\] `jiro doctor` validates installation health
+1. \[x\] `jiro dream "prompt"` generates a spec with chat refinement
+1. \[x\] `jiro plan --spec file.md` creates tasks in beads
+1. \[x\] `jiro tasks list/show/next` display task information
+1. \[x\] `jiro execute` runs tasks with documentation-only commits
+1. \[x\] Commits are validated by review agent
+1. \[x\] Session halts on any validation failure
+1. \[x\] `jiro status` shows active sessions
+1. \[x\] `jiro config` manages project configuration
+1. \[x\] `jiro logs` displays structured logs
+1. \[ \] `jiro web` serves read-only dashboard *(routes minimal)*
+1. \[x\] All unit tests pass with mocked clients
+1. \[x\] Integration tests pass with VCR cassettes
+1. \[x\] No API calls made during test runs
 
 ______________________________________________________________________
 
 ## Fast Follow Items
 
-Immediately after steel thread:
+> **Status:** Fast Follow items 1 & 2 have been completed! All 11 commit types are implemented.
 
-1. **Additional Commit Types**
+~~Immediately after steel thread:~~
 
-   - TDD Red (failing test only)
-   - TDD Green (minimal passing code)
-   - TDD Refactor (behavior-neutral)
-   - Lint Fix (single lint error)
-   - Bug Fix
-   - Config
-   - Test Only
-   - Performance
+1. **Additional Commit Types** ✅ COMPLETED
 
-1. **Full Commit Discipline**
+   - ✅ TDD Red (failing test only)
+   - ✅ TDD Green (minimal passing code)
+   - ✅ TDD Refactor (behavior-neutral)
+   - ✅ Lint Fix (single lint error)
+   - ✅ Bug Fix (bug_red + bug_green)
+   - ✅ Config
+   - ✅ Test Only
+   - ✅ Performance
+   - ✅ Documentation
+   - ✅ Refactoring
 
-   - Type-specific validation rules
-   - TDD cycle enforcement
-   - Refactoring validation with LLM judgment
+1. **Full Commit Discipline** ✅ COMPLETED
 
-1. **Asset Overrides**
+   - ✅ Type-specific validation rules (11 step types)
+   - ✅ TDD cycle enforcement
+   - ✅ Refactoring validation with LLM judgment
+
+1. **Asset Overrides** ⏳ DEFERRED
 
    - Local overrides (`.jiro-dreams-of-code/assets/`)
    - Project overrides (`~/.jiro-dreams-of-code/$PROJECT/assets/`)
    - Global overrides (`~/.jiro-dreams-of-code/assets/`)
 
-1. **Multi-Level Config**
+1. **Multi-Level Config** ⏳ DEFERRED
 
    - Local config (`./.jiro-dreams-of-code.yaml`)
    - Global config (`~/.jiro-dreams-of-code/config.yaml`)
