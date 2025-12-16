@@ -13,7 +13,7 @@ from jiro.config.schema import Config
 
 app = typer.Typer(
     name="config",
-    help="Get/set configuration values",
+    help="View and manage multi-level configuration (global, project, local)",
     no_args_is_help=True,
 )
 
@@ -214,15 +214,26 @@ def config_list(
     local: Annotated[bool, typer.Option("--local", help="Show local config")] = False,
 ) -> None:
     """
-    List all configuration values.
+    List all configuration values with their sources.
 
-    Shows effective configuration with source scope.
+    Shows the effective configuration (merged from global > project > local > defaults)
+    and indicates where each value comes from. This helps understand configuration
+    precedence when debugging configuration issues.
+
+    Precedence order (highest to lowest):
+      1. Local config (.jiro-dreams-of-code.yaml in current directory)
+      2. Project config (~/.jiro-dreams-of-code/$PROJECT_NAME/config.yaml)
+      3. Global config (~/.jiro-dreams-of-code/config.yaml)
+      4. Built-in defaults
+
+    See docs/CONFIGURATION.md for detailed configuration documentation.
 
     Examples:
-        jiro config list
-        jiro config list --json
-        jiro config list --global
-        jiro config list --project
+        jiro config list                    # Show effective config with sources
+        jiro config list --json             # Output as JSON
+        jiro config list --global           # Show only global config
+        jiro config list --project          # Show only project config
+        jiro config list --local            # Show only local config
     """
     config, sources = _get_config_with_sources()
 
@@ -239,14 +250,30 @@ def config_get(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """
-    Get a configuration value.
+    Get a single configuration value with its source.
 
-    Shows the effective value and which scope it comes from.
+    Shows the effective value (after merging all config levels) and which scope
+    it comes from (local, project, global, or default). Useful for debugging
+    configuration issues and understanding precedence.
+
+    Available configuration sections and keys:
+      models:
+        - planning: Model for spec/plan generation (default: claude-opus-4-20250514)
+        - execution: Model for agent execution (default: claude-3-5-haiku-20241022)
+        - review: Model for code review (default: claude-sonnet-4-20250514)
+      commands:
+        - test: Test runner command (default: pytest)
+        - lint: Linting command (default: ruff check)
+        - lint_fix: Linting with fixes (default: ruff check --fix)
+      conventions:
+        - test_file_pattern: Test file pattern (default: test_{name}.py)
+      preflight:
+        - skip_if_recent_minutes: Skip checks if recent (default: 60)
 
     Examples:
-        jiro config get commands.test
-        jiro config get models.execution
-        jiro config get models.planning --json
+        jiro config get commands.test                    # Show value and source
+        jiro config get models.execution                 # Check execution model
+        jiro config get models.planning --json           # Output as JSON
     """
     config, sources = _get_config_with_sources()
     flattened = _flatten_config(config, sources)
@@ -332,11 +359,25 @@ def config_set(
     local: Annotated[bool, typer.Option("--local", help="Set in local config")] = False,
 ) -> None:
     """
-    Set a configuration value.
+    Set a configuration value at a specific scope level.
+
+    By default, saves to project config (~/.jiro-dreams-of-code/$PROJECT_NAME/config.yaml).
+
+    Use scope flags to control where the value is saved:
+      --global    Save to ~/.jiro-dreams-of-code/config.yaml (applies to all projects)
+      --project   Save to ~/.jiro-dreams-of-code/$PROJECT_NAME/config.yaml (team standard)
+      --local     Save to .jiro-dreams-of-code.yaml (current directory, not committed)
+
+    Configuration precedence (highest to lowest):
+      1. Local (.jiro-dreams-of-code.yaml) - Personal overrides
+      2. Project (~/.jiro-dreams-of-code/$PROJECT_NAME/config.yaml) - Team standards
+      3. Global (~/.jiro-dreams-of-code/config.yaml) - Your defaults across all projects
+      4. Built-in defaults
 
     Examples:
-        jiro config set commands.test "pytest" --local
-        jiro config set models.execution "claude-sonnet-4-5-20250929" --global
+        jiro config set commands.test "npm test" --local                    # Personal override
+        jiro config set models.execution "claude-3-5-haiku-20241022" --project  # Team standard
+        jiro config set models.planning "claude-opus-4-20250514" --global   # Personal default
     """
     # Get the current configuration
     config = _get_config()

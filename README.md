@@ -58,7 +58,8 @@ Specs generated during `jiro dream` are saved in `.jiro-dreams-of-code/specs/` (
 
 ## Documentation
 
-See [TECHNICAL_SPEC.md](docs/TECHNICAL_SPEC.md) for complete documentation.
+- [TECHNICAL_SPEC.md](docs/TECHNICAL_SPEC.md) - Complete system specification and user guide
+- [CONFIGURATION.md](docs/CONFIGURATION.md) - Configuration system, file locations, and best practices
 
 ## Requirements
 
