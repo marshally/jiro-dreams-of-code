@@ -34,6 +34,7 @@ dependencies = [
     "structlog>=24.0",
     "prompt_toolkit>=3.0",
     "keyring>=24.0",
+    "jira>=3.10",
 ]
 
 [project.optional-dependencies]
@@ -124,6 +125,8 @@ module = [
     "prompt_toolkit.*",
     "keyring",
     "keyring.*",
+    "jira",
+    "jira.*",
 ]
 ignore_missing_imports = true
 
