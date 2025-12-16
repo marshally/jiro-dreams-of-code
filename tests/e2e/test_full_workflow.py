@@ -150,6 +150,7 @@ class TestFullWorkflowE2E:
             patch("jiro.cli.dream.load_config") as mock_load_config,
             patch("jiro.cli.dream.get_database") as mock_get_db,
             patch("jiro.cli.dream.DreamingAgent") as mock_agent_class,
+            patch("jiro.cli.dream._create_multiline_session") as mock_session_factory,
         ):
             mock_config = MagicMock()
             mock_config.models.planning = "claude-opus-4"
@@ -162,11 +163,16 @@ class TestFullWorkflowE2E:
             mock_agent.dream = AsyncMock(return_value=mock_spec)
             mock_agent_class.return_value = mock_agent
 
-            with patch("builtins.input", return_value="done"):
-                dream_result = cli_runner.invoke(app, ["dream", "build a sample feature"])
+            # Mock prompt_toolkit session to return "done" on first prompt
+            mock_session = MagicMock()
+            mock_session.prompt_async = AsyncMock(return_value="done")
+            mock_session_factory.return_value = mock_session
+
+            dream_result = cli_runner.invoke(app, ["dream", "build a sample feature"])
 
             assert dream_result.exit_code == 0
-            assert "Sample Feature" in dream_result.stdout
+            # Rich console outputs to stderr, but CliRunner combines into .output
+            assert "Sample Feature" in dream_result.output
 
         # Step 3: Test execute command with mocked orchestrator
         with (
