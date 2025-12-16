@@ -332,6 +332,56 @@ class ReviewAgent:
 
         return None
 
+    def _get_commit_type_context(self, step_type: StepType | None) -> str:
+        """Get LLM review context specific to commit type.
+
+        Provides type-specific validation guidance to the LLM.
+
+        Args:
+            step_type: The detected step type (TDD phase or None)
+
+        Returns:
+            Context string with type-specific validation questions
+        """
+        if step_type == StepType.TDD_GREEN:
+            return """## TDD Green Phase Validation
+
+This is a TDD green phase commit. In addition to scope creep detection, validate:
+
+1. **Code Minimalism**: Is the implementation minimal and focused on making tests pass?
+   - No over-engineering or premature optimization
+   - No additional features not required by the tests
+   - Simple, direct solution to the test requirements
+
+2. **No Unnecessary Complexity**: Does the code avoid unnecessary:
+   - Generic abstractions when specific solutions work
+   - Multiple implementations when one is sufficient
+   - Edge case handling not covered by tests
+
+If the code is over-engineered or includes unnecessary complexity, mark as failed."""
+
+        elif step_type == StepType.TDD_REFACTOR:
+            return """## TDD Refactor Phase Validation
+
+This is a TDD refactor phase commit. In addition to scope creep detection, validate:
+
+1. **Behavior Neutrality**: Are there ANY functional changes to the code logic?
+   - The refactor should NOT change behavior
+   - Only improve code structure, naming, or efficiency
+   - All tests should pass with the same results
+
+2. **No Hidden Functional Changes**: Look carefully for:
+   - Subtle logic changes disguised as refactoring
+   - Changed algorithm implementations
+   - Modified return values or side effects
+   - Conditional logic alterations
+
+If there are any functional changes (behavior-altering modifications), mark as failed."""
+
+        else:
+            # Default context for non-TDD commits
+            return ""
+
     def _build_review_prompt(self, commit_sha: str, task: Task) -> str:
         """Build a prompt for the LLM review.
 
@@ -353,6 +403,10 @@ class ReviewAgent:
         # Get commit message and diff
         commit_message = self._get_commit_message(commit_sha)
         diff = self._get_commit_diff(commit_sha)
+
+        # Extract commit type from commit message
+        step_type = self._extract_step_type_from_commit(commit_sha)
+        commit_type_context = self._get_commit_type_context(step_type)
 
         # Truncate diff if too large (LLM context limits)
         max_diff_lines = 500
@@ -382,6 +436,8 @@ SHA: {commit_sha}
 ```diff
 {diff}
 ```
+
+{commit_type_context}
 
 Please analyze these changes and respond with valid JSON following the output format specified above."""
 

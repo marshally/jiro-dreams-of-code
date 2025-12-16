@@ -922,3 +922,145 @@ class TestPromptBuilding:
             # Assert
             assert "truncated" in prompt
             assert "600 lines omitted" in prompt or "lines omitted" in prompt
+
+
+class TestTDDTypeContext:
+    """Tests for TDD-specific commit type validation context."""
+
+    @pytest.fixture
+    def mock_client(self):
+        """Create a mock AgentClient."""
+        client = MagicMock()
+        client.execute = AsyncMock()
+        return client
+
+    @pytest.fixture
+    def sample_config(self):
+        """Create a sample config."""
+        return Config()
+
+    @pytest.mark.unit
+    def test_get_commit_type_context_tdd_green(self, mock_client, sample_config):
+        """_get_commit_type_context() should include green phase validation rules."""
+        # Arrange
+        from jiro.steps.types import StepType
+
+        agent = ReviewAgent(mock_client, sample_config)
+
+        # Act
+        context = agent._get_commit_type_context(StepType.TDD_GREEN)
+
+        # Assert
+        assert "TDD Green Phase Validation" in context
+        assert "Code Minimalism" in context
+        assert "over-engineering" in context
+        assert "No Unnecessary Complexity" in context
+
+    @pytest.mark.unit
+    def test_get_commit_type_context_tdd_refactor(self, mock_client, sample_config):
+        """_get_commit_type_context() should include refactor phase validation rules."""
+        # Arrange
+        from jiro.steps.types import StepType
+
+        agent = ReviewAgent(mock_client, sample_config)
+
+        # Act
+        context = agent._get_commit_type_context(StepType.TDD_REFACTOR)
+
+        # Assert
+        assert "TDD Refactor Phase Validation" in context
+        assert "Behavior Neutrality" in context
+        assert "functional changes" in context
+        assert "No Hidden Functional Changes" in context
+
+    @pytest.mark.unit
+    def test_get_commit_type_context_non_tdd(self, mock_client, sample_config):
+        """_get_commit_type_context() should return empty string for non-TDD commits."""
+        # Arrange
+        from jiro.steps.types import StepType
+
+        agent = ReviewAgent(mock_client, sample_config)
+
+        # Act
+        context = agent._get_commit_type_context(StepType.DOCUMENTATION)
+
+        # Assert
+        assert context == ""
+
+    @pytest.mark.unit
+    def test_get_commit_type_context_none(self, mock_client, sample_config):
+        """_get_commit_type_context() should handle None step type."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+
+        # Act
+        context = agent._get_commit_type_context(None)
+
+        # Assert
+        assert context == ""
+
+    @pytest.mark.unit
+    def test_build_review_prompt_includes_tdd_green_context(self, mock_client, sample_config):
+        """_build_review_prompt() should include green phase context in prompt."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+        task = Task(
+            id="task-green",
+            title="Implement feature",
+            task_type="feature",
+            status="open",
+            created_at=datetime.now(),
+            description="Make failing test pass",
+        )
+
+        with (
+            patch.object(agent, "_get_commit_message") as mock_msg,
+            patch.object(agent, "_get_commit_diff") as mock_diff,
+            patch.object(agent, "_extract_step_type_from_commit") as mock_step,
+        ):
+            from jiro.steps.types import StepType
+
+            mock_msg.return_value = "🟢 Implement user authentication"
+            mock_diff.return_value = "--- a/src/auth.py\n+++ b/src/auth.py\n+def authenticate():"
+            mock_step.return_value = StepType.TDD_GREEN
+
+            # Act
+            prompt = agent._build_review_prompt("abc123", task)
+
+            # Assert
+            assert "TDD Green Phase Validation" in prompt
+            assert "Code Minimalism" in prompt
+
+    @pytest.mark.unit
+    def test_build_review_prompt_includes_tdd_refactor_context(self, mock_client, sample_config):
+        """_build_review_prompt() should include refactor phase context in prompt."""
+        # Arrange
+        agent = ReviewAgent(mock_client, sample_config)
+        task = Task(
+            id="task-refactor",
+            title="Refactor code",
+            task_type="refactor",
+            status="open",
+            created_at=datetime.now(),
+            description="Improve code structure",
+        )
+
+        with (
+            patch.object(agent, "_get_commit_message") as mock_msg,
+            patch.object(agent, "_get_commit_diff") as mock_diff,
+            patch.object(agent, "_extract_step_type_from_commit") as mock_step,
+        ):
+            from jiro.steps.types import StepType
+
+            mock_msg.return_value = "♻️ Refactor authentication module"
+            mock_diff.return_value = (
+                "--- a/src/auth.py\n+++ b/src/auth.py\n-def old_auth():\n+def authenticate():"
+            )
+            mock_step.return_value = StepType.TDD_REFACTOR
+
+            # Act
+            prompt = agent._build_review_prompt("def456", task)
+
+            # Assert
+            assert "TDD Refactor Phase Validation" in prompt
+            assert "Behavior Neutrality" in prompt
