@@ -47,9 +47,10 @@ class TestTddRedCommandClassAttributes:
 class TestTddRedCommandExecute:
     """Test the execute method."""
 
-    def test_execute_raises_not_implemented(self):
-        """execute() should raise NotImplementedError (placeholder)."""
-        cmd = TddRedCommand()
+    @pytest.mark.asyncio
+    async def test_execute_raises_error_when_client_not_set(self):
+        """execute() should raise ValueError when client is not configured."""
+        cmd = TddRedCommand()  # No client provided
 
         # Create minimal task and step
         task = Task(
@@ -65,8 +66,8 @@ class TestTddRedCommandExecute:
             planning_context="Create a test for login validation",
         )
 
-        with pytest.raises(NotImplementedError, match="not yet implemented"):
-            cmd.execute(step=step, task=task)
+        with pytest.raises(ValueError, match="AgentClient not configured"):
+            await cmd.execute(step=step, task=task)
 
     def test_execute_has_keyword_only_arguments(self):
         """execute() should use keyword-only arguments."""
@@ -87,6 +88,8 @@ class TestTddRedCommandExecute:
         )
 
         # Should require keyword arguments, not positional
+        # Since execute is async, calling without await returns a coroutine
+        # Attempting to call with positional args should raise TypeError
         with pytest.raises(TypeError):
             cmd.execute(step, task)  # type: ignore[call-arg]
 
