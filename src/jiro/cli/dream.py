@@ -43,15 +43,15 @@ def _enhanced_keyboard_mode() -> Generator[None, None, None]:
     This allows the terminal to send distinct escape sequences for modified keys
     like Shift+Enter, without requiring manual terminal configuration.
 
-    Sends escape sequences to enable modifyOtherKeys level 2 on entry and
-    disables it on exit. Terminals that don't support this will simply ignore
-    the sequences.
+    Uses level 1 (not level 2) to preserve Ctrl+C and Ctrl+D behavior.
+    Level 1 only modifies keys that produce characters, leaving control
+    sequences intact.
 
     Reference: https://invisible-island.net/xterm/ctlseqs/ctlseqs.html
     """
-    # Enable modifyOtherKeys level 2 (all keys)
-    # CSI > 4 ; 2 m
-    sys.stderr.write("\x1b[>4;2m")
+    # Enable modifyOtherKeys level 1 (character keys only, preserves Ctrl+C/D)
+    # CSI > 4 ; 1 m
+    sys.stderr.write("\x1b[>4;1m")
     sys.stderr.flush()
     try:
         yield
