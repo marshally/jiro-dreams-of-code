@@ -53,6 +53,27 @@ class SlackConfig:
 
 
 @dataclass
+class EmailConfig:
+    """Configuration for Email notifications."""
+
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    sender_email: str | None = None
+    recipients: list[str] = field(default_factory=list)
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    notify_on: list[str] = field(
+        default_factory=lambda: [
+            "session_started",
+            "task_completed",
+            "session_completed",
+            "session_failed",
+            "intervention_required",
+        ]
+    )
+
+
+@dataclass
 class Config:
     """Main configuration for jiro."""
 
@@ -61,3 +82,4 @@ class Config:
     conventions: ConventionsConfig = field(default_factory=ConventionsConfig)
     preflight: PreflightConfig = field(default_factory=PreflightConfig)
     slack: SlackConfig = field(default_factory=SlackConfig)
+    email: EmailConfig = field(default_factory=EmailConfig)
