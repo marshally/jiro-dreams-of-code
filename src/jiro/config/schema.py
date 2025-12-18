@@ -36,6 +36,23 @@ class PreflightConfig:
 
 
 @dataclass
+class SlackConfig:
+    """Configuration for Slack notifications."""
+
+    webhook_url: str | None = None
+    channel: str | None = None
+    notify_on: list[str] = field(
+        default_factory=lambda: [
+            "session_started",
+            "task_completed",
+            "session_completed",
+            "session_failed",
+            "intervention_required",
+        ]
+    )
+
+
+@dataclass
 class Config:
     """Main configuration for jiro."""
 
@@ -43,3 +60,4 @@ class Config:
     commands: CommandsConfig = field(default_factory=CommandsConfig)
     conventions: ConventionsConfig = field(default_factory=ConventionsConfig)
     preflight: PreflightConfig = field(default_factory=PreflightConfig)
+    slack: SlackConfig = field(default_factory=SlackConfig)
