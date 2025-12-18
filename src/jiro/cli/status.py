@@ -10,6 +10,7 @@ from rich.table import Table
 
 from jiro.db.database import get_database
 from jiro.db.repository import PromptRepository, SessionRepository, TaskExecutionRepository
+from jiro.formatters.toon import ToonFormatter
 
 if TYPE_CHECKING:
     from sqlite_utils import Database
@@ -166,7 +167,19 @@ def status(
             # Use plain print to avoid Rich wrapping
             print(json.dumps(output))
         elif toon:
-            console.print("[yellow]TOON format not implemented yet[/yellow]")
+            # Build TOON output
+            formatter = ToonFormatter()
+            sessions_data = []
+            for session in sessions:
+                task_executions = task_repo.get_by_session(session.id)
+                total_tokens = prompt_repo.get_total_tokens(session.id)
+                session_json = _format_session_json(session, task_executions, total_tokens)
+                sessions_data.append(session_json)
+
+            if not sessions_data:
+                print("[sessions]\n[/sessions]")
+            else:
+                print(formatter.format_list(sessions_data, "session"))
         else:
             # Display as Rich formatted output
             _display_session_table(sessions, task_repo, prompt_repo)

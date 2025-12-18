@@ -9,6 +9,7 @@ from rich.console import Console
 from rich.table import Table
 
 from jiro.config.loader import load_config
+from jiro.formatters.toon import ToonFormatter
 from jiro.trackers.beads import BeadsTracker
 from jiro.trackers.interface import Task, TaskStatus
 
@@ -169,7 +170,9 @@ def tasks_list(
             json_output_data = [_format_task_json(task) for task in tasks]
             console.print(json.dumps(json_output_data))
         elif toon:
-            console.print("[yellow]TOON format not implemented yet[/yellow]")
+            # Output as TOON format
+            formatter = ToonFormatter()
+            print(formatter.format_tasks(tasks))
         else:
             # Display as Rich table
             _display_tasks_table(tasks)
@@ -206,7 +209,9 @@ def tasks_show(
             json_output_data = _format_task_json(task)
             console.print(json.dumps(json_output_data))
         elif toon:
-            console.print("[yellow]TOON format not implemented yet[/yellow]")
+            # Output as TOON format
+            formatter = ToonFormatter()
+            print(formatter.format_task(task))
         else:
             # Display as Rich formatted output
             _display_task_detail(task)
@@ -254,7 +259,9 @@ def tasks_next(
             json_output_data = _format_task_json(task)
             print(json.dumps(json_output_data))
         elif toon:
-            console.print("[yellow]TOON format not implemented yet[/yellow]")
+            # Output as TOON format
+            formatter = ToonFormatter()
+            print(formatter.format_task(task))
         else:
             # Display as Rich formatted output
             _display_task_detail(task)
