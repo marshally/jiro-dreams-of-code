@@ -786,8 +786,8 @@ class SessionOrchestrator:
     def execute_task(self, task: Any, session_id: str) -> None:
         """Execute a single task.
 
-        Creates a TaskExecution record and orchestrates the full task lifecycle
-        through preflight, execution, and postflight phases.
+        Orchestrates the full task lifecycle through initialization, execution,
+        and result handling.
 
         Args:
             task: Task to execute.
@@ -795,7 +795,6 @@ class SessionOrchestrator:
 
         Raises:
             HaltError: If task execution fails or review halts execution.
-            Exception: If task execution fails.
         """
         self.logger.info(
             "task_execution_start",
@@ -803,7 +802,33 @@ class SessionOrchestrator:
             session_id=session_id,
         )
 
-        # Create a TaskExecution record
+        task_exec = self._create_task_execution_record(task, session_id)
+
+        try:
+            executor = self._initialize_agents_and_executor()
+            postflight_result = self._run_task_with_executor(executor, task)
+            self._handle_postflight_result(task, task_exec, session_id, postflight_result)
+            self.logger.info(
+                "task_execution_complete",
+                task_id=task.id,
+                session_id=session_id,
+                status="success",
+            )
+        except HaltError:
+            raise
+        except Exception as e:
+            self._handle_task_execution_error(task, task_exec, session_id, e)
+
+    def _create_task_execution_record(self, task: Any, session_id: str) -> TaskExecution:
+        """Create a TaskExecution record for tracking.
+
+        Args:
+            task: Task to create record for.
+            session_id: ID of the current session.
+
+        Returns:
+            Created TaskExecution record.
+        """
         task_exec_id = str(uuid.uuid4().hex)
         task_exec = TaskExecution(
             id=task_exec_id,
@@ -814,99 +839,143 @@ class SessionOrchestrator:
             session_id=session_id,
         )
         self.task_repo.create(task_exec)
+        return task_exec
 
+    def _initialize_agents_and_executor(self) -> TaskExecutor:
+        """Initialize agents, tracker, and executor for task execution.
+
+        Returns:
+            Configured TaskExecutor instance.
+        """
+        client = AgentClient(config=self.config, repository=None)  # type: ignore[arg-type]
+        planning_agent = PlanningAgent(client)
+        review_agent = ReviewAgent(client, self.config)
+        tracker = BeadsTracker(Path.cwd())
+
+        return TaskExecutor(
+            config=self.config,
+            planning_agent=planning_agent,
+            review_agent=review_agent,
+            tracker=tracker,
+        )
+
+    def _run_task_with_executor(self, executor: TaskExecutor, task: Any) -> Any:
+        """Execute task asynchronously using the executor.
+
+        Args:
+            executor: TaskExecutor instance.
+            task: Task to execute.
+
+        Returns:
+            Postflight result from task execution.
+        """
         try:
-            # Initialize agents and tracker for this task execution
-            client = AgentClient(config=self.config, repository=None)  # type: ignore[arg-type]
-            planning_agent = PlanningAgent(client)
-            review_agent = ReviewAgent(client, self.config)
-            tracker = BeadsTracker(Path.cwd())
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
 
-            # Create executor
-            executor = TaskExecutor(
-                config=self.config,
-                planning_agent=planning_agent,
-                review_agent=review_agent,
-                tracker=tracker,
-            )
+        return loop.run_until_complete(executor.execute_task(task))
 
-            # Execute the task (this is async, so we need to run it)
-            try:
-                loop = asyncio.get_event_loop()
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
+    def _handle_postflight_result(
+        self,
+        task: Any,
+        task_exec: TaskExecution,
+        session_id: str,
+        postflight_result: Any,
+    ) -> None:
+        """Process postflight result and validate task execution.
 
-            postflight_result = loop.run_until_complete(executor.execute_task(task))
+        Updates task execution record with results and raises HaltError if
+        review or postflight checks failed.
 
-            # Update task execution with results
-            task_exec.phase = "postflight"
-            if (
-                postflight_result.review_passed
-                and postflight_result.tests_passed
-                and postflight_result.lint_passed
-            ):
-                task_exec.status = "success"
-            else:
-                task_exec.status = "failed"
-                error_parts = []
-                if not postflight_result.review_passed:
-                    error_parts.append("Review failed")
-                if not postflight_result.tests_passed:
-                    error_parts.append("Tests failed")
-                if not postflight_result.lint_passed:
-                    error_parts.append("Lint failed")
-                task_exec.halt_reason = "; ".join(error_parts)
+        Args:
+            task: Task that was executed.
+            task_exec: TaskExecution record to update.
+            session_id: ID of the current session.
+            postflight_result: Result from task execution.
 
-            task_exec.ended_at = datetime.now()
-            self.task_repo.update(task_exec)
+        Raises:
+            HaltError: If review or postflight checks failed.
+        """
+        task_exec.phase = "postflight"
 
-            # If postflight failed, halt
-            if not postflight_result.review_passed:
-                error_msg = f"Task {task.id} review failed: {postflight_result.error}"
-                self.logger.error(
-                    "task_execution_review_failed",
-                    task_id=task.id,
-                    session_id=session_id,
-                    error=postflight_result.error,
-                )
-                raise HaltError(error_msg)
-
-            if task_exec.status == "failed":
-                error_msg = f"Task {task.id} postflight checks failed: {task_exec.halt_reason}"
-                self.logger.error(
-                    "task_execution_postflight_failed",
-                    task_id=task.id,
-                    session_id=session_id,
-                    reason=task_exec.halt_reason,
-                )
-                raise HaltError(error_msg)
-
-            self.logger.info(
-                "task_execution_complete",
-                task_id=task.id,
-                session_id=session_id,
-                status="success",
-            )
-
-        except HaltError:
-            # Re-raise halt errors
-            raise
-        except Exception as e:
-            # Update task execution with error
-            task_exec.phase = "executing"
+        # Determine overall status
+        if (
+            postflight_result.review_passed
+            and postflight_result.tests_passed
+            and postflight_result.lint_passed
+        ):
+            task_exec.status = "success"
+        else:
             task_exec.status = "failed"
-            task_exec.halt_reason = str(e)
-            task_exec.ended_at = datetime.now()
-            self.task_repo.update(task_exec)
+            error_parts = []
+            if not postflight_result.review_passed:
+                error_parts.append("Review failed")
+            if not postflight_result.tests_passed:
+                error_parts.append("Tests failed")
+            if not postflight_result.lint_passed:
+                error_parts.append("Lint failed")
+            task_exec.halt_reason = "; ".join(error_parts)
 
+        task_exec.ended_at = datetime.now()
+        self.task_repo.update(task_exec)
+
+        # Check for review failure
+        if not postflight_result.review_passed:
+            error_msg = f"Task {task.id} review failed: {postflight_result.error}"
             self.logger.error(
-                "task_execution_failed",
+                "task_execution_review_failed",
                 task_id=task.id,
                 session_id=session_id,
-                error=str(e),
+                error=postflight_result.error,
             )
-            raise HaltError(f"Task execution failed: {str(e)}") from e
+            raise HaltError(error_msg)
+
+        # Check for postflight failure
+        if task_exec.status == "failed":
+            error_msg = f"Task {task.id} postflight checks failed: {task_exec.halt_reason}"
+            self.logger.error(
+                "task_execution_postflight_failed",
+                task_id=task.id,
+                session_id=session_id,
+                reason=task_exec.halt_reason,
+            )
+            raise HaltError(error_msg)
+
+    def _handle_task_execution_error(
+        self,
+        task: Any,
+        task_exec: TaskExecution,
+        session_id: str,
+        error: Exception,
+    ) -> None:
+        """Handle errors during task execution.
+
+        Updates task execution record with error information and logs the failure.
+
+        Args:
+            task: Task that failed.
+            task_exec: TaskExecution record to update.
+            session_id: ID of the current session.
+            error: Exception that occurred.
+
+        Raises:
+            HaltError: Always raises HaltError wrapping the original error.
+        """
+        task_exec.phase = "executing"
+        task_exec.status = "failed"
+        task_exec.halt_reason = str(error)
+        task_exec.ended_at = datetime.now()
+        self.task_repo.update(task_exec)
+
+        self.logger.error(
+            "task_execution_failed",
+            task_id=task.id,
+            session_id=session_id,
+            error=str(error),
+        )
+        raise HaltError(f"Task execution failed: {str(error)}") from error
 
     def halt(self, session: Session, halt_reason: str) -> None:
         """Halt the session and record the reason.
