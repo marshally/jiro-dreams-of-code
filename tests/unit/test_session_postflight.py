@@ -263,7 +263,7 @@ class TestRunPostflight:
             patch("jiro.core.session.run_full_tests") as mock_tests,
             patch("jiro.core.session.run_full_lint") as mock_lint,
             patch("jiro.core.session.push_to_origin") as mock_push,
-            patch("jiro.core.session.structlog.get_logger") as mock_logger,
+            patch("jiro.core.session.logger") as mock_logger,
         ):
             mock_tests.return_value = True
             mock_lint.return_value = True
@@ -271,8 +271,8 @@ class TestRunPostflight:
 
             run_postflight(config)
 
-            # Verify logging was called
-            mock_logger.assert_called()
+            # Verify logging was called (module-level logger is used)
+            mock_logger.info.assert_called()
 
     def test_run_postflight_with_multiple_failures(self) -> None:
         """run_postflight should handle multiple check failures."""

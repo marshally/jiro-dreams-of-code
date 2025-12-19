@@ -21,6 +21,8 @@ from jiro.db.repository import SessionRepository, TaskExecutionRepository
 from jiro.trackers.beads import BeadsTracker
 from jiro.trackers.interface import Task
 
+logger = structlog.get_logger()
+
 
 class HaltError(Exception):
     """Exception raised when a session is halted.
@@ -280,8 +282,6 @@ def run_preflight(config: Config) -> PreflightResult:
     Returns:
         PreflightResult containing results of all checks and overall status.
     """
-    logger = structlog.get_logger()
-
     checks: dict[str, CheckResult] = {}
     errors: list[str] = []
 
@@ -415,8 +415,6 @@ def run_postflight(config: Config) -> PostflightResult:
     Returns:
         PostflightResult containing results of all checks and overall status.
     """
-    logger = structlog.get_logger()
-
     checks: dict[str, CheckResult] = {}
     errors: list[str] = []
 
@@ -502,7 +500,7 @@ class SessionOrchestrator:
         self.config = config
         self.session_repo = session_repo
         self.task_repo = task_repo
-        self.logger = structlog.get_logger()
+        self.logger = logger  # Use module-level logger
 
     def run(self, epic_id: str | None = None) -> SessionResult:
         """Execute a full session.

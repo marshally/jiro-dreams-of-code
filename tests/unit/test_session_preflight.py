@@ -378,7 +378,7 @@ class TestRunPreflight:
             patch("jiro.core.session.check_up_to_date") as mock_update,
             patch("jiro.core.session.check_tests_pass") as mock_tests,
             patch("jiro.core.session.check_lint_pass") as mock_lint,
-            patch("jiro.core.session.structlog.get_logger") as mock_logger,
+            patch("jiro.core.session.logger") as mock_logger,
         ):
             mock_clean.return_value = True
             mock_branch.return_value = True
@@ -388,5 +388,5 @@ class TestRunPreflight:
 
             run_preflight(config)
 
-            # Verify logging was called
-            mock_logger.assert_called()
+            # Verify logging was called (module-level logger is used)
+            mock_logger.info.assert_called()
