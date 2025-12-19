@@ -2,6 +2,7 @@
 
 import subprocess
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -226,6 +227,39 @@ def check_lint_pass(config: Config) -> bool:
         return False
 
 
+def run_check(
+    name: str,
+    check_fn: Callable[[], bool],
+    error_message: str,
+    checks: dict[str, CheckResult],
+    errors: list[str],
+) -> None:
+    """Run a single check and record the result.
+
+    Executes a check function and records the result in the checks dict.
+    If the check fails or raises an exception, adds an error message to the errors list.
+
+    Args:
+        name: The name of the check.
+        check_fn: Callable that performs the check and returns a boolean.
+        error_message: Default error message if the check fails.
+        checks: Dictionary to store the CheckResult.
+        errors: List to accumulate error messages.
+    """
+    try:
+        passed = check_fn()
+        checks[name] = CheckResult(
+            name=name,
+            passed=passed,
+            error=None if passed else error_message,
+        )
+        if not passed:
+            errors.append(f"{name}: {error_message}")
+    except Exception as e:
+        checks[name] = CheckResult(name=name, passed=False, error=str(e))
+        errors.append(f"{name}: {str(e)}")
+
+
 def run_preflight(config: Config) -> PreflightResult:
     """Run all preflight checks.
 
@@ -243,95 +277,42 @@ def run_preflight(config: Config) -> PreflightResult:
     checks: dict[str, CheckResult] = {}
     errors: list[str] = []
 
-    # Run check_git_clean
-    try:
-        git_clean = check_git_clean()
-        checks["git_clean"] = CheckResult(
-            name="git_clean",
-            passed=git_clean,
-            error=None if git_clean else "Uncommitted changes detected",
-        )
-        if not git_clean:
-            errors.append("git_clean: Uncommitted changes detected")
-    except Exception as e:
-        checks["git_clean"] = CheckResult(
-            name="git_clean",
-            passed=False,
-            error=str(e),
-        )
-        errors.append(f"git_clean: {str(e)}")
-
-    # Run check_correct_branch
-    try:
-        correct_branch = check_correct_branch(config)
-        checks["correct_branch"] = CheckResult(
-            name="correct_branch",
-            passed=correct_branch,
-            error=None if correct_branch else "Not on correct branch",
-        )
-        if not correct_branch:
-            errors.append("correct_branch: Not on correct branch")
-    except Exception as e:
-        checks["correct_branch"] = CheckResult(
-            name="correct_branch",
-            passed=False,
-            error=str(e),
-        )
-        errors.append(f"correct_branch: {str(e)}")
-
-    # Run check_up_to_date
-    try:
-        up_to_date = check_up_to_date()
-        checks["up_to_date"] = CheckResult(
-            name="up_to_date",
-            passed=up_to_date,
-            error=None if up_to_date else "Not up to date with origin",
-        )
-        if not up_to_date:
-            errors.append("up_to_date: Not up to date with origin")
-    except Exception as e:
-        checks["up_to_date"] = CheckResult(
-            name="up_to_date",
-            passed=False,
-            error=str(e),
-        )
-        errors.append(f"up_to_date: {str(e)}")
-
-    # Run check_tests_pass
-    try:
-        tests_pass = check_tests_pass(config)
-        checks["tests_pass"] = CheckResult(
-            name="tests_pass",
-            passed=tests_pass,
-            error=None if tests_pass else "Tests failed",
-        )
-        if not tests_pass:
-            errors.append("tests_pass: Tests failed")
-    except Exception as e:
-        checks["tests_pass"] = CheckResult(
-            name="tests_pass",
-            passed=False,
-            error=str(e),
-        )
-        errors.append(f"tests_pass: {str(e)}")
-
-    # Run check_lint_pass
-    try:
-        lint_pass = check_lint_pass(config)
-        checks["lint_pass"] = CheckResult(
-            name="lint_pass",
-            passed=lint_pass,
-            error=None if lint_pass else "Linting failed",
-        )
-        if not lint_pass:
-            errors.append("lint_pass: Linting failed")
-    except Exception as e:
-        checks["lint_pass"] = CheckResult(
-            name="lint_pass",
-            passed=False,
-            error=str(e),
-        )
-        errors.append(f"lint_pass: {str(e)}")
+    # Run each preflight check
+    run_check(
+        "git_clean",
+        check_git_clean,
+        "Uncommitted changes detected",
+        checks,
+        errors,
+    )
+    run_check(
+        "correct_branch",
+        lambda: check_correct_branch(config),
+        "Not on correct branch",
+        checks,
+        errors,
+    )
+    run_check(
+        "up_to_date",
+        check_up_to_date,
+        "Not up to date with origin",
+        checks,
+        errors,
+    )
+    run_check(
+        "tests_pass",
+        lambda: check_tests_pass(config),
+        "Tests failed",
+        checks,
+        errors,
+    )
+    run_check(
+        "lint_pass",
+        lambda: check_lint_pass(config),
+        "Linting failed",
+        checks,
+        errors,
+    )
 
     # Determine overall result
     all_passed = all(check.passed for check in checks.values())
@@ -431,59 +412,28 @@ def run_postflight(config: Config) -> PostflightResult:
     checks: dict[str, CheckResult] = {}
     errors: list[str] = []
 
-    # Run run_full_tests
-    try:
-        full_tests = run_full_tests(config)
-        checks["full_tests"] = CheckResult(
-            name="full_tests",
-            passed=full_tests,
-            error=None if full_tests else "Full test suite failed",
-        )
-        if not full_tests:
-            errors.append("full_tests: Full test suite failed")
-    except Exception as e:
-        checks["full_tests"] = CheckResult(
-            name="full_tests",
-            passed=False,
-            error=str(e),
-        )
-        errors.append(f"full_tests: {str(e)}")
-
-    # Run run_full_lint
-    try:
-        full_lint = run_full_lint(config)
-        checks["full_lint"] = CheckResult(
-            name="full_lint",
-            passed=full_lint,
-            error=None if full_lint else "Full lint failed",
-        )
-        if not full_lint:
-            errors.append("full_lint: Full lint failed")
-    except Exception as e:
-        checks["full_lint"] = CheckResult(
-            name="full_lint",
-            passed=False,
-            error=str(e),
-        )
-        errors.append(f"full_lint: {str(e)}")
-
-    # Run push_to_origin
-    try:
-        push_success = push_to_origin()
-        checks["push_to_origin"] = CheckResult(
-            name="push_to_origin",
-            passed=push_success,
-            error=None if push_success else "Push to origin failed",
-        )
-        if not push_success:
-            errors.append("push_to_origin: Push to origin failed")
-    except Exception as e:
-        checks["push_to_origin"] = CheckResult(
-            name="push_to_origin",
-            passed=False,
-            error=str(e),
-        )
-        errors.append(f"push_to_origin: {str(e)}")
+    # Run each postflight check
+    run_check(
+        "full_tests",
+        lambda: run_full_tests(config),
+        "Full test suite failed",
+        checks,
+        errors,
+    )
+    run_check(
+        "full_lint",
+        lambda: run_full_lint(config),
+        "Full lint failed",
+        checks,
+        errors,
+    )
+    run_check(
+        "push_to_origin",
+        push_to_origin,
+        "Push to origin failed",
+        checks,
+        errors,
+    )
 
     # Determine overall result
     all_passed = all(check.passed for check in checks.values())
