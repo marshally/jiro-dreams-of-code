@@ -13,28 +13,12 @@ from jiro.config.schema import Config
 from jiro.core.execution_plan import ExecutionPlanSchema
 from jiro.core.tdd_sequence import TddSequenceTracker
 from jiro.steps.types import StepType
-from jiro.trackers.interface import Task
+from jiro.trackers.interface import IssueTracker, Task
 
 if TYPE_CHECKING:
-    from jiro.trackers.beads import BeadsTracker
+    pass
 
 logger = structlog.get_logger()
-
-
-def get_tracker() -> "BeadsTracker":
-    """Get the issue tracker instance.
-
-    This is a placeholder that will be replaced with actual tracker retrieval.
-
-    Returns:
-        An IssueTracker instance.
-    """
-    # This will be injected by the calling code
-    from pathlib import Path
-
-    from jiro.trackers.beads import BeadsTracker
-
-    return BeadsTracker(Path.cwd())
 
 
 def find_relevant_test_files(task: Task) -> list[str]:
@@ -519,18 +503,18 @@ def record_results(task: Task, result: PostflightResult) -> None:
     )
 
 
-def close_task_in_tracker(task: Task) -> None:
+def close_task_in_tracker(task: Task, tracker: IssueTracker) -> None:
     """Close task in the issue tracker.
 
     Updates the task status to closed in the issue tracker backend.
 
     Args:
         task: The task to close.
+        tracker: The issue tracker to use for closing the task.
     """
     logger.info("close_task_in_tracker_start", task_id=task.id)
 
     try:
-        tracker = get_tracker()
         tracker.close_task(task.id, reason="Task completed successfully")
 
         logger.info("close_task_in_tracker_success", task_id=task.id)
@@ -543,7 +527,11 @@ def close_task_in_tracker(task: Task) -> None:
 
 
 async def run_task_postflight(
-    task: Task, commits: list[str], config: Config, review_agent: ReviewAgent | None = None
+    task: Task,
+    commits: list[str],
+    config: Config,
+    tracker: IssueTracker,
+    review_agent: ReviewAgent | None = None,
 ) -> PostflightResult:
     """Run all postflight checks for a completed task.
 
@@ -560,6 +548,7 @@ async def run_task_postflight(
         task: The task to run postflight checks for.
         commits: List of commit SHAs from task completion.
         config: Configuration for test and lint commands.
+        tracker: The issue tracker for closing tasks.
         review_agent: Optional ReviewAgent instance for testing.
 
     Returns:
@@ -612,7 +601,7 @@ async def run_task_postflight(
 
         # Step 5: Close task in tracker (only if all checks passed)
         if review_passed and tests_passed and lint_passed:
-            close_task_in_tracker(task)
+            close_task_in_tracker(task, tracker)
             task_closed = True
 
     except Exception as e:
@@ -720,19 +709,22 @@ class TaskExecutor:
         config: Config,
         planning_agent: PlanningAgent,
         review_agent: ReviewAgent,
+        tracker: IssueTracker,
         tdd_sequence_tracker: TddSequenceTracker | None = None,
     ) -> None:
-        """Initialize TaskExecutor with required agents.
+        """Initialize TaskExecutor with required agents and dependencies.
 
         Args:
             config: Configuration for commands and behavior.
             planning_agent: Agent for creating execution plans.
             review_agent: Agent for reviewing commits.
+            tracker: Issue tracker for managing task state.
             tdd_sequence_tracker: Optional tracker for TDD sequences.
         """
         self.config = config
         self.planning_agent = planning_agent
         self.review_agent = review_agent
+        self.tracker = tracker
         self.tdd_sequence_tracker = tdd_sequence_tracker or TddSequenceTracker()
 
     async def execute_task(self, task: Task) -> PostflightResult:
@@ -868,7 +860,7 @@ class TaskExecutor:
 
             # Step 3: Run postflight checks
             postflight_result = await run_task_postflight(
-                task, commits, self.config, review_agent=self.review_agent
+                task, commits, self.config, self.tracker, review_agent=self.review_agent
             )
 
             logger.info(
@@ -888,3 +880,35 @@ class TaskExecutor:
                 error=str(e),
             )
             raise
+
+
+def create_task_executor(
+    config: Config,
+    planning_agent: PlanningAgent,
+    review_agent: ReviewAgent,
+    tracker: IssueTracker,
+    tdd_sequence_tracker: TddSequenceTracker | None = None,
+) -> TaskExecutor:
+    """Factory function to create a TaskExecutor instance.
+
+    This is a convenience function for creating TaskExecutor instances
+    with all required dependencies. Useful for reducing boilerplate in
+    calling code.
+
+    Args:
+        config: Configuration for commands and behavior.
+        planning_agent: Agent for creating execution plans.
+        review_agent: Agent for reviewing commits.
+        tracker: Issue tracker for managing task state.
+        tdd_sequence_tracker: Optional tracker for TDD sequences.
+
+    Returns:
+        A configured TaskExecutor instance.
+    """
+    return TaskExecutor(
+        config=config,
+        planning_agent=planning_agent,
+        review_agent=review_agent,
+        tracker=tracker,
+        tdd_sequence_tracker=tdd_sequence_tracker,
+    )

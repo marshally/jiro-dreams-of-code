@@ -793,12 +793,14 @@ class SessionOrchestrator:
         import asyncio
         import uuid
         from datetime import datetime
+        from pathlib import Path
 
         from jiro.agents.client import AgentClient
         from jiro.agents.planning import PlanningAgent
         from jiro.agents.review import ReviewAgent
         from jiro.core.executor import TaskExecutor
         from jiro.db.models import TaskExecution
+        from jiro.trackers.beads import BeadsTracker
 
         self.logger.info(
             "task_execution_start",
@@ -819,16 +821,18 @@ class SessionOrchestrator:
         self.task_repo.create(task_exec)
 
         try:
-            # Initialize agents for this task execution
+            # Initialize agents and tracker for this task execution
             client = AgentClient(config=self.config, repository=None)  # type: ignore[arg-type]
             planning_agent = PlanningAgent(client)
             review_agent = ReviewAgent(client, self.config)
+            tracker = BeadsTracker(Path.cwd())
 
             # Create executor
             executor = TaskExecutor(
                 config=self.config,
                 planning_agent=planning_agent,
                 review_agent=review_agent,
+                tracker=tracker,
             )
 
             # Execute the task (this is async, so we need to run it)

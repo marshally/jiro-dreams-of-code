@@ -789,15 +789,13 @@ class TestCloseTaskInTracker:
 
     def test_close_task_in_tracker_success(self, sample_task, mock_tracker):
         """close_task_in_tracker should call tracker.close_task."""
-        # Arrange
-        with patch("jiro.core.executor.get_tracker", return_value=mock_tracker):
-            # Act
-            close_task_in_tracker(sample_task)
+        # Act
+        close_task_in_tracker(sample_task, mock_tracker)
 
-            # Assert
-            mock_tracker.close_task.assert_called_once_with(
-                sample_task.id, reason="Task completed successfully"
-            )
+        # Assert
+        mock_tracker.close_task.assert_called_once_with(
+            sample_task.id, reason="Task completed successfully"
+        )
 
 
 class TestRunTaskPostflight:
@@ -858,7 +856,6 @@ class TestRunTaskPostflight:
             patch("jiro.core.executor.run_relevant_lint_post") as mock_lint,
             patch("jiro.core.executor.record_results"),
             patch("jiro.core.executor.close_task_in_tracker"),
-            patch("jiro.core.executor.get_tracker", return_value=mock_tracker),
         ):
             # Make the async mock return the review result
             mock_review.return_value = review_result
@@ -867,7 +864,7 @@ class TestRunTaskPostflight:
 
             # Act
             result = await run_task_postflight(
-                sample_task, commits, config, review_agent=mock_review_agent
+                sample_task, commits, config, mock_tracker, review_agent=mock_review_agent
             )
 
             # Assert
@@ -894,7 +891,6 @@ class TestRunTaskPostflight:
             patch("jiro.core.executor.review_commits") as mock_review,
             patch("jiro.core.executor.run_relevant_tests_post") as mock_tests,
             patch("jiro.core.executor.run_relevant_lint_post") as mock_lint,
-            patch("jiro.core.executor.get_tracker", return_value=mock_tracker),
         ):
             mock_review.return_value = review_result
             mock_tests.return_value = False
@@ -902,7 +898,7 @@ class TestRunTaskPostflight:
 
             # Act
             result = await run_task_postflight(
-                sample_task, commits, config, review_agent=mock_review_agent
+                sample_task, commits, config, mock_tracker, review_agent=mock_review_agent
             )
 
             # Assert
@@ -989,26 +985,35 @@ class TestTaskExecutor:
         agent.review = AsyncMock()
         return agent
 
+    @pytest.fixture
+    def mock_tracker(self):
+        """Create a mock tracker."""
+        tracker = MagicMock(spec=IssueTracker)
+        tracker.close_task = MagicMock()
+        return tracker
+
     @pytest.mark.asyncio
     async def test_task_executor_initialization(
-        self, config, mock_planning_agent, mock_review_agent
+        self, config, mock_planning_agent, mock_review_agent, mock_tracker
     ):
-        """TaskExecutor should initialize with agents and config."""
+        """TaskExecutor should initialize with agents, config, and tracker."""
         from jiro.core.executor import TaskExecutor
 
         executor = TaskExecutor(
             config=config,
             planning_agent=mock_planning_agent,
             review_agent=mock_review_agent,
+            tracker=mock_tracker,
         )
 
         assert executor.config == config
         assert executor.planning_agent == mock_planning_agent
         assert executor.review_agent == mock_review_agent
+        assert executor.tracker == mock_tracker
 
     @pytest.mark.asyncio
     async def test_task_executor_execute_task_success(
-        self, sample_task, config, mock_planning_agent, mock_review_agent
+        self, sample_task, config, mock_planning_agent, mock_review_agent, mock_tracker
     ):
         """execute_task should complete successfully with valid inputs."""
         from jiro.core.executor import TaskExecutor
@@ -1046,6 +1051,7 @@ class TestTaskExecutor:
             config=config,
             planning_agent=mock_planning_agent,
             review_agent=mock_review_agent,
+            tracker=mock_tracker,
         )
 
         with (
@@ -1072,7 +1078,7 @@ class TestTaskExecutor:
 
     @pytest.mark.asyncio
     async def test_task_executor_execute_task_preflight_fails(
-        self, sample_task, config, mock_planning_agent, mock_review_agent
+        self, sample_task, config, mock_planning_agent, mock_review_agent, mock_tracker
     ):
         """execute_task should raise when preflight fails."""
         from jiro.core.executor import TaskExecutor
@@ -1084,6 +1090,7 @@ class TestTaskExecutor:
             config=config,
             planning_agent=mock_planning_agent,
             review_agent=mock_review_agent,
+            tracker=mock_tracker,
         )
 
         with (
@@ -1099,7 +1106,7 @@ class TestTaskExecutor:
 
     @pytest.mark.asyncio
     async def test_task_executor_execute_task_review_fails(
-        self, sample_task, config, mock_planning_agent, mock_review_agent
+        self, sample_task, config, mock_planning_agent, mock_review_agent, mock_tracker
     ):
         """execute_task should halt when review fails."""
         from jiro.core.executor import TaskExecutor
@@ -1130,6 +1137,7 @@ class TestTaskExecutor:
             config=config,
             planning_agent=mock_planning_agent,
             review_agent=mock_review_agent,
+            tracker=mock_tracker,
         )
 
         with (
@@ -1145,7 +1153,7 @@ class TestTaskExecutor:
 
     @pytest.mark.asyncio
     async def test_task_executor_execute_task_multiple_steps(
-        self, sample_task, config, mock_planning_agent, mock_review_agent
+        self, sample_task, config, mock_planning_agent, mock_review_agent, mock_tracker
     ):
         """execute_task should process multiple steps in sequence."""
         from jiro.core.executor import TaskExecutor
@@ -1186,6 +1194,7 @@ class TestTaskExecutor:
             config=config,
             planning_agent=mock_planning_agent,
             review_agent=mock_review_agent,
+            tracker=mock_tracker,
         )
 
         with (
