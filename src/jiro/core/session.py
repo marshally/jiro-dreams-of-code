@@ -46,8 +46,8 @@ class CheckResult:
 
 
 @dataclass
-class PreflightResult:
-    """Result of running all preflight checks.
+class CheckPhaseResult:
+    """Base result for preflight/postflight phases.
 
     Attributes:
         passed: Whether all checks passed.
@@ -61,18 +61,21 @@ class PreflightResult:
 
 
 @dataclass
-class PostflightResult:
-    """Result of running all postflight checks.
+class PreflightResult(CheckPhaseResult):
+    """Result of running all preflight checks.
 
-    Attributes:
-        passed: Whether all checks passed.
-        checks: Dictionary mapping check names to CheckResult objects.
-        errors: List of error messages from failed checks.
+    Inherits from CheckPhaseResult with fields for passed status,
+    individual check results, and error messages.
     """
 
-    passed: bool
-    checks: dict[str, CheckResult] = field(default_factory=dict)
-    errors: list[str] = field(default_factory=list)
+
+@dataclass
+class PostflightResult(CheckPhaseResult):
+    """Result of running all postflight checks.
+
+    Inherits from CheckPhaseResult with fields for passed status,
+    individual check results, and error messages.
+    """
 
 
 def check_git_clean() -> bool:
