@@ -1,6 +1,5 @@
 """Health checks for jiro installation and configuration."""
 
-import os
 import subprocess
 import sys
 from dataclasses import dataclass, field

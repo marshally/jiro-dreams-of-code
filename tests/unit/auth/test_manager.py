@@ -1,7 +1,7 @@
 """Tests for auth manager module."""
 
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -31,9 +31,7 @@ class TestStoreApiKey:
         """Store API key strips surrounding whitespace."""
         with patch("jiro.auth.manager.keyring.set_password") as mock_set:
             store_api_key("  sk-test-key  \n")
-            mock_set.assert_called_once_with(
-                "jiro-dreams-of-code", "anthropic", "sk-test-key"
-            )
+            mock_set.assert_called_once_with("jiro-dreams-of-code", "anthropic", "sk-test-key")
 
     @pytest.mark.unit
     def test_store_api_key_empty_raises_error(self) -> None:
@@ -59,24 +57,26 @@ class TestStoreApiKey:
     @pytest.mark.unit
     def test_store_api_key_logs_success(self) -> None:
         """Store API key logs successful storage."""
-        with patch("jiro.auth.manager.keyring.set_password"):
-            with patch("jiro.auth.manager.logger.info") as mock_log:
-                store_api_key("sk-test-key")
-                mock_log.assert_called_once()
-                call_kwargs = mock_log.call_args[1]
-                assert call_kwargs.get("service") == "jiro-dreams-of-code"
+        with (
+            patch("jiro.auth.manager.keyring.set_password"),
+            patch("jiro.auth.manager.logger.info") as mock_log,
+        ):
+            store_api_key("sk-test-key")
+            mock_log.assert_called_once()
+            call_kwargs = mock_log.call_args[1]
+            assert call_kwargs.get("service") == "jiro-dreams-of-code"
 
     @pytest.mark.unit
     def test_store_api_key_logs_failure(self) -> None:
         """Store API key logs warning when keyring is unavailable."""
-        with patch(
-            "jiro.auth.manager.keyring.set_password", side_effect=Exception("Keyring error")
+        with (
+            patch("jiro.auth.manager.keyring.set_password", side_effect=Exception("Keyring error")),
+            patch("jiro.auth.manager.logger.warning") as mock_log,
         ):
-            with patch("jiro.auth.manager.logger.warning") as mock_log:
-                store_api_key("sk-test-key")
-                mock_log.assert_called_once()
-                call_kwargs = mock_log.call_args[1]
-                assert "error" in call_kwargs
+            store_api_key("sk-test-key")
+            mock_log.assert_called_once()
+            call_kwargs = mock_log.call_args[1]
+            assert "error" in call_kwargs
 
 
 class TestGetApiKey:
@@ -85,80 +85,88 @@ class TestGetApiKey:
     @pytest.mark.unit
     def test_get_api_key_from_keyring(self) -> None:
         """Get API key from keyring when available."""
-        with patch(
-            "jiro.auth.manager.keyring.get_password", return_value="sk-keyring-key"
+        with (
+            patch("jiro.auth.manager.keyring.get_password", return_value="sk-keyring-key"),
+            patch.dict(os.environ, {}, clear=True),
         ):
-            with patch.dict(os.environ, {}, clear=True):
-                result = get_api_key()
-                assert result == "sk-keyring-key"
+            result = get_api_key()
+            assert result == "sk-keyring-key"
 
     @pytest.mark.unit
     def test_get_api_key_from_environment_fallback(self) -> None:
         """Get API key from environment when keyring unavailable."""
-        with patch("jiro.auth.manager.keyring.get_password", return_value=None):
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-env-key"}):
-                result = get_api_key()
-                assert result == "sk-env-key"
+        with (
+            patch("jiro.auth.manager.keyring.get_password", return_value=None),
+            patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-env-key"}),
+        ):
+            result = get_api_key()
+            assert result == "sk-env-key"
 
     @pytest.mark.unit
     def test_get_api_key_prefers_keyring_over_env(self) -> None:
         """Get API key prefers keyring over environment variable."""
-        with patch(
-            "jiro.auth.manager.keyring.get_password", return_value="sk-keyring-key"
+        with (
+            patch("jiro.auth.manager.keyring.get_password", return_value="sk-keyring-key"),
+            patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-env-key"}),
         ):
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-env-key"}):
-                result = get_api_key()
-                assert result == "sk-keyring-key"
+            result = get_api_key()
+            assert result == "sk-keyring-key"
 
     @pytest.mark.unit
     def test_get_api_key_strips_env_whitespace(self) -> None:
         """Get API key strips whitespace from environment variable."""
-        with patch("jiro.auth.manager.keyring.get_password", return_value=None):
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "  sk-env-key  "}):
-                result = get_api_key()
-                assert result == "sk-env-key"
+        with (
+            patch("jiro.auth.manager.keyring.get_password", return_value=None),
+            patch.dict(os.environ, {"ANTHROPIC_API_KEY": "  sk-env-key  "}),
+        ):
+            result = get_api_key()
+            assert result == "sk-env-key"
 
     @pytest.mark.unit
     def test_get_api_key_returns_none_when_not_found(self) -> None:
         """Get API key returns None when not found in keyring or environment."""
-        with patch("jiro.auth.manager.keyring.get_password", return_value=None):
-            with patch.dict(os.environ, {}, clear=True):
-                result = get_api_key()
-                assert result is None
+        with (
+            patch("jiro.auth.manager.keyring.get_password", return_value=None),
+            patch.dict(os.environ, {}, clear=True),
+        ):
+            result = get_api_key()
+            assert result is None
 
     @pytest.mark.unit
     def test_get_api_key_ignores_keyring_errors(self) -> None:
         """Get API key ignores keyring errors and uses environment fallback."""
-        with patch(
-            "jiro.auth.manager.keyring.get_password", side_effect=Exception("Keyring error")
+        with (
+            patch("jiro.auth.manager.keyring.get_password", side_effect=Exception("Keyring error")),
+            patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-env-key"}),
         ):
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-env-key"}):
-                result = get_api_key()
-                assert result == "sk-env-key"
+            result = get_api_key()
+            assert result == "sk-env-key"
 
     @pytest.mark.unit
     def test_get_api_key_logs_source_keyring(self) -> None:
         """Get API key logs when retrieved from keyring."""
-        with patch(
-            "jiro.auth.manager.keyring.get_password", return_value="sk-keyring-key"
+        with (
+            patch("jiro.auth.manager.keyring.get_password", return_value="sk-keyring-key"),
+            patch.dict(os.environ, {}, clear=True),
+            patch("jiro.auth.manager.logger.debug") as mock_log,
         ):
-            with patch.dict(os.environ, {}, clear=True):
-                with patch("jiro.auth.manager.logger.debug") as mock_log:
-                    get_api_key()
-                    mock_log.assert_called_once()
-                    call_kwargs = mock_log.call_args[1]
-                    assert call_kwargs.get("service") == "jiro-dreams-of-code"
+            get_api_key()
+            mock_log.assert_called_once()
+            call_kwargs = mock_log.call_args[1]
+            assert call_kwargs.get("service") == "jiro-dreams-of-code"
 
     @pytest.mark.unit
     def test_get_api_key_logs_source_environment(self) -> None:
         """Get API key logs when retrieved from environment."""
-        with patch("jiro.auth.manager.keyring.get_password", return_value=None):
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-env-key"}):
-                with patch("jiro.auth.manager.logger.debug") as mock_log:
-                    get_api_key()
-                    mock_log.assert_called_once()
-                    call_kwargs = mock_log.call_args[1]
-                    assert call_kwargs.get("variable") == "ANTHROPIC_API_KEY"
+        with (
+            patch("jiro.auth.manager.keyring.get_password", return_value=None),
+            patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-env-key"}),
+            patch("jiro.auth.manager.logger.debug") as mock_log,
+        ):
+            get_api_key()
+            mock_log.assert_called_once()
+            call_kwargs = mock_log.call_args[1]
+            assert call_kwargs.get("variable") == "ANTHROPIC_API_KEY"
 
 
 class TestRemoveApiKey:
@@ -195,25 +203,29 @@ class TestRemoveApiKey:
     @pytest.mark.unit
     def test_remove_api_key_logs_success(self) -> None:
         """Remove API key logs successful removal."""
-        with patch("jiro.auth.manager.keyring.delete_password"):
-            with patch("jiro.auth.manager.logger.info") as mock_log:
-                remove_api_key()
-                mock_log.assert_called_once()
-                call_kwargs = mock_log.call_args[1]
-                assert call_kwargs.get("service") == "jiro-dreams-of-code"
+        with (
+            patch("jiro.auth.manager.keyring.delete_password"),
+            patch("jiro.auth.manager.logger.info") as mock_log,
+        ):
+            remove_api_key()
+            mock_log.assert_called_once()
+            call_kwargs = mock_log.call_args[1]
+            assert call_kwargs.get("service") == "jiro-dreams-of-code"
 
     @pytest.mark.unit
     def test_remove_api_key_logs_not_found(self) -> None:
         """Remove API key logs when key not found."""
         import keyring.errors
 
-        with patch(
-            "jiro.auth.manager.keyring.delete_password",
-            side_effect=keyring.errors.PasswordDeleteError(),
+        with (
+            patch(
+                "jiro.auth.manager.keyring.delete_password",
+                side_effect=keyring.errors.PasswordDeleteError(),
+            ),
+            patch("jiro.auth.manager.logger.debug") as mock_log,
         ):
-            with patch("jiro.auth.manager.logger.debug") as mock_log:
-                remove_api_key()
-                mock_log.assert_called_once()
+            remove_api_key()
+            mock_log.assert_called_once()
 
 
 class TestIsKeyStored:
@@ -245,9 +257,9 @@ class TestIsKeyStored:
     @pytest.mark.unit
     def test_is_key_stored_logs_error(self) -> None:
         """Is key stored logs error when keyring check fails."""
-        with patch(
-            "jiro.auth.manager.keyring.get_password", side_effect=Exception("Keyring error")
+        with (
+            patch("jiro.auth.manager.keyring.get_password", side_effect=Exception("Keyring error")),
+            patch("jiro.auth.manager.logger.debug") as mock_log,
         ):
-            with patch("jiro.auth.manager.logger.debug") as mock_log:
-                is_key_stored()
-                mock_log.assert_called_once()
+            is_key_stored()
+            mock_log.assert_called_once()

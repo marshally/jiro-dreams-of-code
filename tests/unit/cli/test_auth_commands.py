@@ -1,6 +1,6 @@
 """Tests for auth CLI commands."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 import typer
@@ -102,21 +102,25 @@ class TestAuthLogoutCommand:
     @pytest.mark.unit
     def test_auth_logout_success(self, cli_runner: CliRunner) -> None:
         """Auth logout should remove API key when user confirms."""
-        with patch("jiro.cli.auth.is_key_stored", return_value=True):
-            with patch("jiro.cli.auth.remove_api_key", return_value=True):
-                result = cli_runner.invoke(app, ["auth", "logout"], input="y\n")
-                assert result.exit_code == 0
-                assert "removed" in result.stdout
+        with (
+            patch("jiro.cli.auth.is_key_stored", return_value=True),
+            patch("jiro.cli.auth.remove_api_key", return_value=True),
+        ):
+            result = cli_runner.invoke(app, ["auth", "logout"], input="y\n")
+            assert result.exit_code == 0
+            assert "removed" in result.stdout
 
     @pytest.mark.unit
     def test_auth_logout_user_cancels(self, cli_runner: CliRunner) -> None:
         """Auth logout should not remove key if user cancels."""
-        with patch("jiro.cli.auth.is_key_stored", return_value=True):
-            with patch("jiro.cli.auth.remove_api_key") as mock_remove:
-                result = cli_runner.invoke(app, ["auth", "logout"], input="n\n")
-                assert result.exit_code == 0
-                assert "Cancelled" in result.stdout
-                mock_remove.assert_not_called()
+        with (
+            patch("jiro.cli.auth.is_key_stored", return_value=True),
+            patch("jiro.cli.auth.remove_api_key") as mock_remove,
+        ):
+            result = cli_runner.invoke(app, ["auth", "logout"], input="n\n")
+            assert result.exit_code == 0
+            assert "Cancelled" in result.stdout
+            mock_remove.assert_not_called()
 
     @pytest.mark.unit
     def test_auth_logout_no_key_stored(self, cli_runner: CliRunner) -> None:
@@ -129,11 +133,13 @@ class TestAuthLogoutCommand:
     @pytest.mark.unit
     def test_auth_logout_failure(self, cli_runner: CliRunner) -> None:
         """Auth logout should show error if removal fails."""
-        with patch("jiro.cli.auth.is_key_stored", return_value=True):
-            with patch("jiro.cli.auth.remove_api_key", return_value=False):
-                result = cli_runner.invoke(app, ["auth", "logout"], input="y\n")
-                assert result.exit_code == 1
-                assert "Failed" in result.stdout
+        with (
+            patch("jiro.cli.auth.is_key_stored", return_value=True),
+            patch("jiro.cli.auth.remove_api_key", return_value=False),
+        ):
+            result = cli_runner.invoke(app, ["auth", "logout"], input="y\n")
+            assert result.exit_code == 1
+            assert "Failed" in result.stdout
 
     @pytest.mark.unit
     def test_auth_logout_exception_handling(self, cli_runner: CliRunner) -> None:
@@ -157,30 +163,36 @@ class TestAuthStatusCommand:
     @pytest.mark.unit
     def test_auth_status_key_stored_and_available(self, cli_runner: CliRunner) -> None:
         """Auth status should show key stored in keyring."""
-        with patch("jiro.cli.auth.is_key_stored", return_value=True):
-            with patch("jiro.cli.auth.get_api_key", return_value="sk-test-key"):
-                result = cli_runner.invoke(app, ["auth", "status"])
-                assert result.exit_code == 0
-                assert "keyring" in result.stdout
-                assert "available" in result.stdout or "✓" in result.stdout
+        with (
+            patch("jiro.cli.auth.is_key_stored", return_value=True),
+            patch("jiro.cli.auth.get_api_key", return_value="sk-test-key"),
+        ):
+            result = cli_runner.invoke(app, ["auth", "status"])
+            assert result.exit_code == 0
+            assert "keyring" in result.stdout
+            assert "available" in result.stdout or "✓" in result.stdout
 
     @pytest.mark.unit
     def test_auth_status_no_key_stored(self, cli_runner: CliRunner) -> None:
         """Auth status should show warning when no key is stored."""
-        with patch("jiro.cli.auth.is_key_stored", return_value=False):
-            with patch("jiro.cli.auth.get_api_key", return_value=None):
-                result = cli_runner.invoke(app, ["auth", "status"])
-                assert result.exit_code == 0
-                assert "No API key" in result.stdout or "not found" in result.stdout.lower()
+        with (
+            patch("jiro.cli.auth.is_key_stored", return_value=False),
+            patch("jiro.cli.auth.get_api_key", return_value=None),
+        ):
+            result = cli_runner.invoke(app, ["auth", "status"])
+            assert result.exit_code == 0
+            assert "No API key" in result.stdout or "not found" in result.stdout.lower()
 
     @pytest.mark.unit
     def test_auth_status_key_in_environment(self, cli_runner: CliRunner) -> None:
         """Auth status should show key available from environment."""
-        with patch("jiro.cli.auth.is_key_stored", return_value=False):
-            with patch("jiro.cli.auth.get_api_key", return_value="sk-env-key"):
-                result = cli_runner.invoke(app, ["auth", "status"])
-                assert result.exit_code == 0
-                assert "available" in result.stdout or "✓" in result.stdout
+        with (
+            patch("jiro.cli.auth.is_key_stored", return_value=False),
+            patch("jiro.cli.auth.get_api_key", return_value="sk-env-key"),
+        ):
+            result = cli_runner.invoke(app, ["auth", "status"])
+            assert result.exit_code == 0
+            assert "available" in result.stdout or "✓" in result.stdout
 
     @pytest.mark.unit
     def test_auth_status_exception_handling(self, cli_runner: CliRunner) -> None:

@@ -57,7 +57,7 @@ def get_api_key() -> str | None:
     """
     # Try keyring first
     try:
-        key = keyring.get_password(KEYRING_SERVICE, KEYRING_USERNAME)
+        key: str | None = keyring.get_password(KEYRING_SERVICE, KEYRING_USERNAME)
         if key:
             logger.debug("api_key_from_keyring", service=KEYRING_SERVICE)
             return key
