@@ -989,3 +989,481 @@ This is a test feature.
         assert "What users?" in prompt
         assert "External customers" in prompt
         assert "[READY_TO_GENERATE]" in prompt  # Instructions included
+
+
+class TestDreamingAgentCheckpoint:
+    """Tests for DreamingAgent.interview() checkpoint callback."""
+
+    @pytest.fixture
+    def mock_client(self):
+        """Create a mock AgentClient."""
+        client = MagicMock()
+        client.execute = AsyncMock()
+        return client
+
+    @pytest.fixture
+    def valid_spec_output(self):
+        """Return a valid spec output string."""
+        return """# Feature: Test Feature
+
+## Overview
+
+This is a test feature.
+
+## Requirements
+
+- Requirement 1
+- Requirement 2
+- Requirement 3
+
+## Acceptance Criteria
+
+- [ ] Criterion 1
+- [ ] Criterion 2
+- [ ] Criterion 3
+
+## Out of Scope
+
+- Out of scope 1
+- Out of scope 2
+"""
+
+    @pytest.mark.asyncio
+    async def test_checkpoint_called_after_first_question(self, mock_client, valid_spec_output):
+        """on_checkpoint should be called after first agent question."""
+        # Arrange
+        mock_client.execute.side_effect = [
+            AgentResult(
+                success=True, output="Question 1?", tokens_before=100, tokens_after=150, error=None
+            ),
+            AgentResult(
+                success=True,
+                output="[READY_TO_GENERATE]\nReady",
+                tokens_before=150,
+                tokens_after=200,
+                error=None,
+            ),
+            AgentResult(
+                success=True,
+                output=valid_spec_output,
+                tokens_before=200,
+                tokens_after=400,
+                error=None,
+            ),
+        ]
+
+        agent = DreamingAgent(mock_client)
+        checkpoints = []
+
+        # Act
+        await agent.interview(
+            get_user_input=lambda: "answer",
+            on_checkpoint=lambda conv: checkpoints.append(list(conv)),
+        )
+
+        # Assert - first checkpoint should have only the first question
+        assert len(checkpoints) >= 1
+        assert len(checkpoints[0]) == 1  # First question only
+        assert checkpoints[0][0].role == "assistant"
+        assert checkpoints[0][0].content == "Question 1?"
+
+    @pytest.mark.asyncio
+    async def test_checkpoint_called_after_user_response(self, mock_client, valid_spec_output):
+        """on_checkpoint should be called after each user response."""
+        # Arrange
+        mock_client.execute.side_effect = [
+            AgentResult(
+                success=True, output="Question 1?", tokens_before=100, tokens_after=150, error=None
+            ),
+            AgentResult(
+                success=True,
+                output="[READY_TO_GENERATE]\nReady",
+                tokens_before=150,
+                tokens_after=200,
+                error=None,
+            ),
+            AgentResult(
+                success=True,
+                output=valid_spec_output,
+                tokens_before=200,
+                tokens_after=400,
+                error=None,
+            ),
+        ]
+
+        agent = DreamingAgent(mock_client)
+        checkpoints = []
+
+        # Act
+        await agent.interview(
+            get_user_input=lambda: "My answer",
+            on_checkpoint=lambda conv: checkpoints.append(list(conv)),
+        )
+
+        # Assert - second checkpoint should include user response
+        assert len(checkpoints) >= 2
+        # First checkpoint: 1 assistant message
+        # Second checkpoint: 1 assistant + 1 user message
+        assert len(checkpoints[1]) == 2
+        assert checkpoints[1][1].role == "user"
+        assert checkpoints[1][1].content == "My answer"
+
+    @pytest.mark.asyncio
+    async def test_checkpoint_called_after_each_agent_response(
+        self, mock_client, valid_spec_output
+    ):
+        """on_checkpoint should be called after each agent follow-up question."""
+        # Arrange
+        mock_client.execute.side_effect = [
+            AgentResult(
+                success=True, output="Question 1?", tokens_before=100, tokens_after=150, error=None
+            ),
+            AgentResult(
+                success=True, output="Question 2?", tokens_before=150, tokens_after=200, error=None
+            ),
+            AgentResult(
+                success=True,
+                output="[READY_TO_GENERATE]\nReady",
+                tokens_before=200,
+                tokens_after=250,
+                error=None,
+            ),
+            AgentResult(
+                success=True,
+                output=valid_spec_output,
+                tokens_before=250,
+                tokens_after=450,
+                error=None,
+            ),
+        ]
+
+        agent = DreamingAgent(mock_client)
+        answers = iter(["Answer 1", "Answer 2"])
+        checkpoints = []
+
+        # Act
+        await agent.interview(
+            get_user_input=lambda: next(answers),
+            on_checkpoint=lambda conv: checkpoints.append(list(conv)),
+        )
+
+        # Assert - should have checkpoints for:
+        # 1. After first question (1 msg)
+        # 2. After first answer (2 msgs)
+        # 3. After second question (3 msgs)
+        # 4. After second answer (4 msgs)
+        assert len(checkpoints) == 4
+        assert len(checkpoints[2]) == 3  # Q1, A1, Q2
+        assert checkpoints[2][2].role == "assistant"
+        assert checkpoints[2][2].content == "Question 2?"
+
+    @pytest.mark.asyncio
+    async def test_checkpoint_not_called_without_callback(self, mock_client, valid_spec_output):
+        """interview() should work without on_checkpoint callback."""
+        # Arrange
+        mock_client.execute.side_effect = [
+            AgentResult(
+                success=True, output="Question?", tokens_before=100, tokens_after=150, error=None
+            ),
+            AgentResult(
+                success=True,
+                output="[READY_TO_GENERATE]\nReady",
+                tokens_before=150,
+                tokens_after=200,
+                error=None,
+            ),
+            AgentResult(
+                success=True,
+                output=valid_spec_output,
+                tokens_before=200,
+                tokens_after=400,
+                error=None,
+            ),
+        ]
+
+        agent = DreamingAgent(mock_client)
+
+        # Act - should not raise
+        result = await agent.interview(get_user_input=lambda: "answer")
+
+        # Assert
+        assert isinstance(result, InterviewResult)
+
+
+class TestDreamingAgentResume:
+    """Tests for DreamingAgent.interview() resume functionality."""
+
+    @pytest.fixture
+    def mock_client(self):
+        """Create a mock AgentClient."""
+        client = MagicMock()
+        client.execute = AsyncMock()
+        return client
+
+    @pytest.fixture
+    def valid_spec_output(self):
+        """Return a valid spec output string."""
+        return """# Feature: Test Feature
+
+## Overview
+
+This is a test feature.
+
+## Requirements
+
+- Requirement 1
+- Requirement 2
+- Requirement 3
+
+## Acceptance Criteria
+
+- [ ] Criterion 1
+- [ ] Criterion 2
+- [ ] Criterion 3
+
+## Out of Scope
+
+- Out of scope 1
+- Out of scope 2
+"""
+
+    @pytest.mark.asyncio
+    async def test_resume_skips_first_question(self, mock_client, valid_spec_output):
+        """interview() with initial_conversation should skip first question."""
+        # Arrange - only need follow-up responses, not first question
+        mock_client.execute.side_effect = [
+            AgentResult(
+                success=True,
+                output="[READY_TO_GENERATE]\nReady",
+                tokens_before=150,
+                tokens_after=200,
+                error=None,
+            ),
+            AgentResult(
+                success=True,
+                output=valid_spec_output,
+                tokens_before=200,
+                tokens_after=400,
+                error=None,
+            ),
+        ]
+
+        agent = DreamingAgent(mock_client)
+        initial_conversation = [
+            InterviewMessage(role="assistant", content="What to build?"),
+            InterviewMessage(role="user", content="A todo app"),
+        ]
+
+        # Act
+        await agent.interview(
+            get_user_input=lambda: "More details",
+            initial_conversation=initial_conversation,
+        )
+
+        # Assert - should not have called execute for first question
+        # First call should be for follow-up, not first question
+        assert mock_client.execute.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_resume_preserves_conversation_history(self, mock_client, valid_spec_output):
+        """interview() should preserve conversation from initial_conversation."""
+        # Arrange
+        mock_client.execute.side_effect = [
+            AgentResult(
+                success=True,
+                output="[READY_TO_GENERATE]\nReady",
+                tokens_before=150,
+                tokens_after=200,
+                error=None,
+            ),
+            AgentResult(
+                success=True,
+                output=valid_spec_output,
+                tokens_before=200,
+                tokens_after=400,
+                error=None,
+            ),
+        ]
+
+        agent = DreamingAgent(mock_client)
+        initial_conversation = [
+            InterviewMessage(role="assistant", content="What to build?"),
+            InterviewMessage(role="user", content="A todo app"),
+            InterviewMessage(role="assistant", content="What features?"),
+            InterviewMessage(role="user", content="Add, delete tasks"),
+        ]
+
+        # Act
+        result = await agent.interview(
+            get_user_input=lambda: "Done",
+            initial_conversation=initial_conversation,
+        )
+
+        # Assert - conversation should include initial messages plus new ones
+        assert len(result.conversation) >= 4
+        assert result.conversation[0].content == "What to build?"
+        assert result.conversation[1].content == "A todo app"
+        assert result.conversation[2].content == "What features?"
+        assert result.conversation[3].content == "Add, delete tasks"
+
+    @pytest.mark.asyncio
+    async def test_resume_continues_question_count(self, mock_client, valid_spec_output):
+        """interview() should continue question count from initial_conversation."""
+        # Arrange - 2 questions already asked, ask 1 more
+        mock_client.execute.side_effect = [
+            AgentResult(
+                success=True, output="Question 3?", tokens_before=150, tokens_after=200, error=None
+            ),
+            AgentResult(
+                success=True,
+                output="[READY_TO_GENERATE]\nReady",
+                tokens_before=200,
+                tokens_after=250,
+                error=None,
+            ),
+            AgentResult(
+                success=True,
+                output=valid_spec_output,
+                tokens_before=250,
+                tokens_after=450,
+                error=None,
+            ),
+        ]
+
+        agent = DreamingAgent(mock_client)
+        initial_conversation = [
+            InterviewMessage(role="assistant", content="Question 1?"),
+            InterviewMessage(role="user", content="Answer 1"),
+            InterviewMessage(role="assistant", content="Question 2?"),
+            InterviewMessage(role="user", content="Answer 2"),
+        ]
+        answers = iter(["Answer 3", "Answer 4"])
+
+        # Act
+        result = await agent.interview(
+            get_user_input=lambda: next(answers),
+            initial_conversation=initial_conversation,
+        )
+
+        # Assert - should have all questions and answers
+        assistant_msgs = [m for m in result.conversation if m.role == "assistant"]
+        assert len(assistant_msgs) == 3  # 2 initial + 1 new
+
+    @pytest.mark.asyncio
+    async def test_resume_with_empty_initial_conversation(self, mock_client, valid_spec_output):
+        """interview() with empty initial_conversation should start fresh."""
+        # Arrange - empty list means start fresh
+        mock_client.execute.side_effect = [
+            AgentResult(
+                success=True, output="Question?", tokens_before=100, tokens_after=150, error=None
+            ),
+            AgentResult(
+                success=True,
+                output="[READY_TO_GENERATE]\nReady",
+                tokens_before=150,
+                tokens_after=200,
+                error=None,
+            ),
+            AgentResult(
+                success=True,
+                output=valid_spec_output,
+                tokens_before=200,
+                tokens_after=400,
+                error=None,
+            ),
+        ]
+
+        agent = DreamingAgent(mock_client)
+
+        # Act
+        await agent.interview(
+            get_user_input=lambda: "answer",
+            initial_conversation=[],
+        )
+
+        # Assert - should have asked first question
+        assert mock_client.execute.call_count == 3  # First Q, follow-up, spec gen
+
+    @pytest.mark.asyncio
+    async def test_resume_does_not_modify_initial_conversation(
+        self, mock_client, valid_spec_output
+    ):
+        """interview() should not modify the original initial_conversation list."""
+        # Arrange
+        mock_client.execute.side_effect = [
+            AgentResult(
+                success=True, output="Follow-up?", tokens_before=150, tokens_after=200, error=None
+            ),
+            AgentResult(
+                success=True,
+                output="[READY_TO_GENERATE]\nReady",
+                tokens_before=200,
+                tokens_after=250,
+                error=None,
+            ),
+            AgentResult(
+                success=True,
+                output=valid_spec_output,
+                tokens_before=250,
+                tokens_after=450,
+                error=None,
+            ),
+        ]
+
+        agent = DreamingAgent(mock_client)
+        initial_conversation = [
+            InterviewMessage(role="assistant", content="Question?"),
+            InterviewMessage(role="user", content="Answer"),
+        ]
+        original_length = len(initial_conversation)
+
+        # Act
+        answers = iter(["More", "Done"])
+        await agent.interview(
+            get_user_input=lambda: next(answers),
+            initial_conversation=initial_conversation,
+        )
+
+        # Assert - original list should not be modified
+        assert len(initial_conversation) == original_length
+
+    @pytest.mark.asyncio
+    async def test_resume_checkpoint_continues_from_initial(self, mock_client, valid_spec_output):
+        """on_checkpoint should include initial_conversation in checkpoints."""
+        # Arrange
+        mock_client.execute.side_effect = [
+            AgentResult(
+                success=True,
+                output="[READY_TO_GENERATE]\nReady",
+                tokens_before=150,
+                tokens_after=200,
+                error=None,
+            ),
+            AgentResult(
+                success=True,
+                output=valid_spec_output,
+                tokens_before=200,
+                tokens_after=400,
+                error=None,
+            ),
+        ]
+
+        agent = DreamingAgent(mock_client)
+        initial_conversation = [
+            InterviewMessage(role="assistant", content="Question?"),
+            InterviewMessage(role="user", content="Answer"),
+        ]
+        checkpoints = []
+
+        # Act
+        await agent.interview(
+            get_user_input=lambda: "More",
+            initial_conversation=initial_conversation,
+            on_checkpoint=lambda conv: checkpoints.append(list(conv)),
+        )
+
+        # Assert - first checkpoint should include initial conversation plus new message
+        assert len(checkpoints) >= 1
+        # After user input, checkpoint should have 3 messages
+        assert checkpoints[0][0].content == "Question?"
+        assert checkpoints[0][1].content == "Answer"
