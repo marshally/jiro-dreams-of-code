@@ -131,12 +131,12 @@ def check_correct_branch(config: Config) -> bool:
 
         # Get target branch from config
         # If config has target_branch, use it; otherwise assume it's fine
-        target_branch = getattr(config.preflight, "target_branch", None)
+        target_branch: str | None = getattr(config.preflight, "target_branch", None)
         if target_branch is None:
             # No target branch specified, so always pass
             return True
 
-        return bool(current_branch == target_branch)
+        return current_branch == target_branch
     except Exception:
         return False
 
