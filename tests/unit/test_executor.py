@@ -18,9 +18,7 @@ from jiro.core.executor import (
     record_results,
     review_commits,
     run_relevant_lint,
-    run_relevant_lint_post,
     run_relevant_tests,
-    run_relevant_tests_post,
     run_task_postflight,
     run_task_preflight,
 )
@@ -619,8 +617,8 @@ class TestReviewCommits:
         assert result is not None
 
 
-class TestRunRelevantTestsPost:
-    """Tests for run_relevant_tests_post function."""
+class TestRunRelevantTestsPostflight:
+    """Tests for run_relevant_tests function with postflight phase."""
 
     @pytest.fixture
     def sample_task(self):
@@ -645,39 +643,39 @@ class TestRunRelevantTestsPost:
 
     @patch("jiro.core.executor.subprocess.run")
     @patch("jiro.core.executor.find_relevant_test_files")
-    def test_run_relevant_tests_post_success(
+    def test_run_relevant_tests_postflight_success(
         self, mock_find_tests, mock_subprocess, sample_task, config
     ):
-        """run_relevant_tests_post should return True when tests pass."""
+        """run_relevant_tests with postflight phase should return True when tests pass."""
         # Arrange
         mock_find_tests.return_value = ["tests/unit/test_file.py"]
         mock_subprocess.return_value = MagicMock(returncode=0)
 
         # Act
-        result = run_relevant_tests_post(sample_task, config)
+        result = run_relevant_tests(sample_task, config, phase="postflight")
 
         # Assert
         assert result is True
 
     @patch("jiro.core.executor.subprocess.run")
     @patch("jiro.core.executor.find_relevant_test_files")
-    def test_run_relevant_tests_post_failure(
+    def test_run_relevant_tests_postflight_failure(
         self, mock_find_tests, mock_subprocess, sample_task, config
     ):
-        """run_relevant_tests_post should return False when tests fail."""
+        """run_relevant_tests with postflight phase should return False when tests fail."""
         # Arrange
         mock_find_tests.return_value = ["tests/unit/test_file.py"]
         mock_subprocess.return_value = MagicMock(returncode=1)
 
         # Act
-        result = run_relevant_tests_post(sample_task, config)
+        result = run_relevant_tests(sample_task, config, phase="postflight")
 
         # Assert
         assert result is False
 
 
-class TestRunRelevantLintPost:
-    """Tests for run_relevant_lint_post function."""
+class TestRunRelevantLintPostflight:
+    """Tests for run_relevant_lint function with postflight phase."""
 
     @pytest.fixture
     def sample_task(self):
@@ -702,32 +700,32 @@ class TestRunRelevantLintPost:
 
     @patch("jiro.core.executor.subprocess.run")
     @patch("jiro.core.executor.find_relevant_source_files")
-    def test_run_relevant_lint_post_success(
+    def test_run_relevant_lint_postflight_success(
         self, mock_find_files, mock_subprocess, sample_task, config
     ):
-        """run_relevant_lint_post should return True when lint passes."""
+        """run_relevant_lint with postflight phase should return True when lint passes."""
         # Arrange
         mock_find_files.return_value = ["src/file.py"]
         mock_subprocess.return_value = MagicMock(returncode=0)
 
         # Act
-        result = run_relevant_lint_post(sample_task, config)
+        result = run_relevant_lint(sample_task, config, phase="postflight")
 
         # Assert
         assert result is True
 
     @patch("jiro.core.executor.subprocess.run")
     @patch("jiro.core.executor.find_relevant_source_files")
-    def test_run_relevant_lint_post_failure(
+    def test_run_relevant_lint_postflight_failure(
         self, mock_find_files, mock_subprocess, sample_task, config
     ):
-        """run_relevant_lint_post should return False when lint fails."""
+        """run_relevant_lint with postflight phase should return False when lint fails."""
         # Arrange
         mock_find_files.return_value = ["src/file.py"]
         mock_subprocess.return_value = MagicMock(returncode=1)
 
         # Act
-        result = run_relevant_lint_post(sample_task, config)
+        result = run_relevant_lint(sample_task, config, phase="postflight")
 
         # Assert
         assert result is False
@@ -852,8 +850,8 @@ class TestRunTaskPostflight:
 
         with (
             patch("jiro.core.executor.review_commits") as mock_review,
-            patch("jiro.core.executor.run_relevant_tests_post") as mock_tests,
-            patch("jiro.core.executor.run_relevant_lint_post") as mock_lint,
+            patch("jiro.core.executor.run_relevant_tests") as mock_tests,
+            patch("jiro.core.executor.run_relevant_lint") as mock_lint,
             patch("jiro.core.executor.record_results"),
             patch("jiro.core.executor.close_task_in_tracker"),
         ):
@@ -889,8 +887,8 @@ class TestRunTaskPostflight:
 
         with (
             patch("jiro.core.executor.review_commits") as mock_review,
-            patch("jiro.core.executor.run_relevant_tests_post") as mock_tests,
-            patch("jiro.core.executor.run_relevant_lint_post") as mock_lint,
+            patch("jiro.core.executor.run_relevant_tests") as mock_tests,
+            patch("jiro.core.executor.run_relevant_lint") as mock_lint,
         ):
             mock_review.return_value = review_result
             mock_tests.return_value = False
@@ -1057,15 +1055,11 @@ class TestTaskExecutor:
         with (
             patch("jiro.core.executor.run_relevant_tests") as mock_tests,
             patch("jiro.core.executor.run_relevant_lint") as mock_lint,
-            patch("jiro.core.executor.run_relevant_tests_post") as mock_tests_post,
-            patch("jiro.core.executor.run_relevant_lint_post") as mock_lint_post,
             patch("jiro.core.executor.record_results"),
             patch("jiro.core.executor.close_task_in_tracker"),
         ):
             mock_tests.return_value = True
             mock_lint.return_value = True
-            mock_tests_post.return_value = True
-            mock_lint_post.return_value = True
 
             # Act
             result = await executor.execute_task(sample_task)
@@ -1200,15 +1194,11 @@ class TestTaskExecutor:
         with (
             patch("jiro.core.executor.run_relevant_tests") as mock_tests,
             patch("jiro.core.executor.run_relevant_lint") as mock_lint,
-            patch("jiro.core.executor.run_relevant_tests_post") as mock_tests_post,
-            patch("jiro.core.executor.run_relevant_lint_post") as mock_lint_post,
             patch("jiro.core.executor.record_results"),
             patch("jiro.core.executor.close_task_in_tracker"),
         ):
             mock_tests.return_value = True
             mock_lint.return_value = True
-            mock_tests_post.return_value = True
-            mock_lint_post.return_value = True
 
             # Act
             result = await executor.execute_task(sample_task)

@@ -3,7 +3,7 @@
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import structlog
 
@@ -82,8 +82,12 @@ def find_relevant_source_files(task: Task) -> list[str]:
     return source_files
 
 
-def run_relevant_tests(task: Task, config: Config) -> bool:
-    """Run relevant tests for a task.
+def run_relevant_tests(
+    task: Task,
+    config: Config,
+    phase: Literal["preflight", "postflight"] = "preflight",
+) -> bool:
+    """Run relevant tests for a task in either preflight or postflight phase.
 
     Finds and runs test files relevant to the task. Returns True if tests
     pass or if no tests are found.
@@ -91,6 +95,7 @@ def run_relevant_tests(task: Task, config: Config) -> bool:
     Args:
         task: The task to run tests for.
         config: Configuration including test command.
+        phase: Phase of execution ("preflight" or "postflight") for logging differentiation.
 
     Returns:
         True if tests pass or no tests found, False if tests fail.
@@ -98,11 +103,11 @@ def run_relevant_tests(task: Task, config: Config) -> bool:
     test_files = find_relevant_test_files(task)
 
     if not test_files:
-        logger.info("run_relevant_tests_no_tests_found", task_id=task.id)
+        logger.info(f"run_relevant_tests_{phase}_no_tests_found", task_id=task.id)
         return True
 
     logger.info(
-        "run_relevant_tests_start",
+        f"run_relevant_tests_{phase}_start",
         task_id=task.id,
         test_count=len(test_files),
     )
@@ -121,14 +126,14 @@ def run_relevant_tests(task: Task, config: Config) -> bool:
 
         if result.returncode == 0:
             logger.info(
-                "run_relevant_tests_success",
+                f"run_relevant_tests_{phase}_success",
                 task_id=task.id,
                 test_count=len(test_files),
             )
             return True
         else:
             logger.warning(
-                "run_relevant_tests_failed",
+                f"run_relevant_tests_{phase}_failed",
                 task_id=task.id,
                 stderr=result.stderr,
             )
@@ -136,22 +141,26 @@ def run_relevant_tests(task: Task, config: Config) -> bool:
 
     except subprocess.TimeoutExpired:
         logger.error(
-            "run_relevant_tests_timeout",
+            f"run_relevant_tests_{phase}_timeout",
             task_id=task.id,
             timeout=60,
         )
         return False
     except Exception as e:
         logger.error(
-            "run_relevant_tests_error",
+            f"run_relevant_tests_{phase}_error",
             task_id=task.id,
             error=str(e),
         )
         return False
 
 
-def run_relevant_lint(task: Task, config: Config) -> bool:
-    """Run linter on relevant source files.
+def run_relevant_lint(
+    task: Task,
+    config: Config,
+    phase: Literal["preflight", "postflight"] = "preflight",
+) -> bool:
+    """Run linter on relevant source files in either phase.
 
     Finds and lints source files relevant to the task. Returns True if lint
     passes or if no files are found.
@@ -159,6 +168,7 @@ def run_relevant_lint(task: Task, config: Config) -> bool:
     Args:
         task: The task to lint files for.
         config: Configuration including lint command.
+        phase: Phase of execution ("preflight" or "postflight") for logging differentiation.
 
     Returns:
         True if lint passes or no files found, False if lint fails.
@@ -166,11 +176,11 @@ def run_relevant_lint(task: Task, config: Config) -> bool:
     source_files = find_relevant_source_files(task)
 
     if not source_files:
-        logger.info("run_relevant_lint_no_files_found", task_id=task.id)
+        logger.info(f"run_relevant_lint_{phase}_no_files_found", task_id=task.id)
         return True
 
     logger.info(
-        "run_relevant_lint_start",
+        f"run_relevant_lint_{phase}_start",
         task_id=task.id,
         file_count=len(source_files),
     )
@@ -189,14 +199,14 @@ def run_relevant_lint(task: Task, config: Config) -> bool:
 
         if result.returncode == 0:
             logger.info(
-                "run_relevant_lint_success",
+                f"run_relevant_lint_{phase}_success",
                 task_id=task.id,
                 file_count=len(source_files),
             )
             return True
         else:
             logger.warning(
-                "run_relevant_lint_failed",
+                f"run_relevant_lint_{phase}_failed",
                 task_id=task.id,
                 stderr=result.stderr,
             )
@@ -204,14 +214,14 @@ def run_relevant_lint(task: Task, config: Config) -> bool:
 
     except subprocess.TimeoutExpired:
         logger.error(
-            "run_relevant_lint_timeout",
+            f"run_relevant_lint_{phase}_timeout",
             task_id=task.id,
             timeout=60,
         )
         return False
     except Exception as e:
         logger.error(
-            "run_relevant_lint_error",
+            f"run_relevant_lint_{phase}_error",
             task_id=task.id,
             error=str(e),
         )
@@ -333,142 +343,6 @@ async def review_commits(task: Task, commits: list[str], agent: ReviewAgent) -> 
     return result
 
 
-def run_relevant_tests_post(task: Task, config: Config) -> bool:
-    """Run relevant tests after task completion.
-
-    Finds and runs test files relevant to the task. Returns True if tests
-    pass or if no tests are found.
-
-    Args:
-        task: The task to run tests for.
-        config: Configuration including test command.
-
-    Returns:
-        True if tests pass or no tests found, False if tests fail.
-    """
-    test_files = find_relevant_test_files(task)
-
-    if not test_files:
-        logger.info("run_relevant_tests_post_no_tests_found", task_id=task.id)
-        return True
-
-    logger.info(
-        "run_relevant_tests_post_start",
-        task_id=task.id,
-        test_count=len(test_files),
-    )
-
-    # Build the test command
-    test_cmd = f"{config.commands.test} {' '.join(test_files)}"
-
-    try:
-        result = subprocess.run(
-            test_cmd,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-
-        if result.returncode == 0:
-            logger.info(
-                "run_relevant_tests_post_success",
-                task_id=task.id,
-                test_count=len(test_files),
-            )
-            return True
-        else:
-            logger.warning(
-                "run_relevant_tests_post_failed",
-                task_id=task.id,
-                stderr=result.stderr,
-            )
-            return False
-
-    except subprocess.TimeoutExpired:
-        logger.error(
-            "run_relevant_tests_post_timeout",
-            task_id=task.id,
-            timeout=60,
-        )
-        return False
-    except Exception as e:
-        logger.error(
-            "run_relevant_tests_post_error",
-            task_id=task.id,
-            error=str(e),
-        )
-        return False
-
-
-def run_relevant_lint_post(task: Task, config: Config) -> bool:
-    """Run linter on relevant source files after task completion.
-
-    Finds and lints source files relevant to the task. Returns True if lint
-    passes or if no files are found.
-
-    Args:
-        task: The task to lint files for.
-        config: Configuration including lint command.
-
-    Returns:
-        True if lint passes or no files found, False if lint fails.
-    """
-    source_files = find_relevant_source_files(task)
-
-    if not source_files:
-        logger.info("run_relevant_lint_post_no_files_found", task_id=task.id)
-        return True
-
-    logger.info(
-        "run_relevant_lint_post_start",
-        task_id=task.id,
-        file_count=len(source_files),
-    )
-
-    # Build the lint command
-    lint_cmd = f"{config.commands.lint} {' '.join(source_files)}"
-
-    try:
-        result = subprocess.run(
-            lint_cmd,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-
-        if result.returncode == 0:
-            logger.info(
-                "run_relevant_lint_post_success",
-                task_id=task.id,
-                file_count=len(source_files),
-            )
-            return True
-        else:
-            logger.warning(
-                "run_relevant_lint_post_failed",
-                task_id=task.id,
-                stderr=result.stderr,
-            )
-            return False
-
-    except subprocess.TimeoutExpired:
-        logger.error(
-            "run_relevant_lint_post_timeout",
-            task_id=task.id,
-            timeout=60,
-        )
-        return False
-    except Exception as e:
-        logger.error(
-            "run_relevant_lint_post_error",
-            task_id=task.id,
-            error=str(e),
-        )
-        return False
-
-
 def record_results(task: Task, result: PostflightResult) -> None:
     """Record execution results.
 
@@ -582,10 +456,10 @@ async def run_task_postflight(
             error = f"Review failed: {str(e)}"
 
         # Step 2: Run relevant tests
-        tests_passed = run_relevant_tests_post(task, config)
+        tests_passed = run_relevant_tests(task, config, phase="postflight")
 
         # Step 3: Run relevant linting
-        lint_passed = run_relevant_lint_post(task, config)
+        lint_passed = run_relevant_lint(task, config, phase="postflight")
 
         # Step 4: Record results
         result = PostflightResult(
