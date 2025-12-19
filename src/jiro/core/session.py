@@ -499,18 +499,8 @@ class SessionOrchestrator:
     def run(self, epic_id: str | None = None) -> SessionResult:
         """Execute a full session.
 
-        Orchestrates the complete lifecycle:
-        1. Create session record (status='running')
-        2. Run preflight checks
-           - If fails: update session status='failed', return
-        3. Get tasks (filtered by epic_id if provided)
-        4. Execute tasks in dependency order
-           - For each task: create TaskExecution, run task, update status
-           - On task failure: HALT, update session status='halted'
-        5. Run postflight checks
-           - If fails: update session status='failed'
-        6. Update session status='completed'
-        7. Return SessionResult
+        Orchestrates the complete lifecycle: session creation, preflight checks,
+        task execution, postflight checks, and status tracking.
 
         Args:
             epic_id: Optional epic ID to filter tasks.
@@ -518,7 +508,34 @@ class SessionOrchestrator:
         Returns:
             SessionResult with final status and statistics.
         """
-        # Step 1: Create session record
+        session = self._create_session(epic_id)
+        try:
+            preflight_result = self._run_preflight_phase(session)
+            if not preflight_result.passed:
+                return self._fail_session(session, preflight_result.errors, "Preflight")
+
+            tasks_result = self._execute_tasks_phase(session, epic_id)
+            if isinstance(tasks_result, SessionResult):
+                return tasks_result
+            tasks_completed, tasks_failed = tasks_result
+
+            postflight_result = self._run_postflight_phase(session)
+            if not postflight_result.passed:
+                return self._fail_session(session, postflight_result.errors, "Postflight")
+
+            return self._complete_session(session, tasks_completed, tasks_failed)
+        except Exception as e:
+            return self._handle_unexpected_error(session, e)
+
+    def _create_session(self, epic_id: str | None) -> Session:
+        """Create and initialize a new session.
+
+        Args:
+            epic_id: Optional epic ID to filter tasks.
+
+        Returns:
+            Newly created session record.
+        """
         session_id = str(uuid.uuid4().hex)
         branch_name = self._get_current_branch()
 
@@ -531,130 +548,179 @@ class SessionOrchestrator:
         )
         self.session_repo.create(session)
         self.logger.info("session_created", session_id=session_id, branch=branch_name)
+        return session
 
-        try:
-            # Step 2: Run preflight checks
-            preflight_result = self.run_preflight(self.config)
-            if not preflight_result.passed:
-                self.logger.warning(
-                    "preflight_failed",
-                    session_id=session_id,
-                    errors=preflight_result.errors,
-                )
-                session.status = "failed"
-                session.ended_at = datetime.now()
-                self.session_repo.update(session)
+    def _run_preflight_phase(self, session: Session) -> PreflightResult:
+        """Run preflight checks and record the passed timestamp.
 
-                return SessionResult(
-                    session_id=session_id,
-                    status="failed",
-                    tasks_completed=0,
-                    tasks_failed=0,
-                    error=f"Preflight checks failed: {'; '.join(preflight_result.errors)}",
-                )
+        Args:
+            session: Session to update with preflight results.
 
-            # Record preflight passed timestamp
+        Returns:
+            PreflightResult with check details.
+        """
+        preflight_result = self.run_preflight(self.config)
+
+        if preflight_result.passed:
             session.preflight_passed_at = datetime.now()
             self.session_repo.update(session)
-            self.logger.info("preflight_passed", session_id=session_id)
+            self.logger.info("preflight_passed", session_id=session.id)
 
-            # Step 3: Get tasks
-            tasks = self.get_tasks(epic_id=epic_id)
-            self.logger.info(
-                "tasks_retrieved",
-                session_id=session_id,
-                task_count=len(tasks),
-            )
+        return preflight_result
 
-            # Step 4: Execute tasks
-            tasks_completed = 0
-            tasks_failed = 0
+    def _execute_tasks_phase(
+        self, session: Session, epic_id: str | None
+    ) -> tuple[int, int] | SessionResult:
+        """Execute all tasks in the session.
 
-            for task in tasks:
-                try:
-                    self.execute_task(task, session_id)
-                    tasks_completed += 1
-                except Exception as e:
-                    tasks_failed += 1
-                    error_msg = str(e)
-                    self.logger.error(
-                        "task_execution_failed",
-                        session_id=session_id,
-                        task_id=task.id,
-                        error=error_msg,
-                    )
+        Args:
+            session: Session record to update with progress.
+            epic_id: Optional epic ID to filter tasks.
 
-                    # HALT on task failure
-                    session.status = "halted"
-                    session.halt_reason = error_msg
-                    session.ended_at = datetime.now()
-                    self.session_repo.update(session)
+        Returns:
+            Tuple of (tasks_completed, tasks_failed) if successful, or
+            SessionResult with halted status if a task fails.
+        """
+        tasks = self.get_tasks(epic_id=epic_id)
+        self.logger.info(
+            "tasks_retrieved",
+            session_id=session.id,
+            task_count=len(tasks),
+        )
 
-                    return SessionResult(
-                        session_id=session_id,
-                        status="halted",
-                        tasks_completed=tasks_completed,
-                        tasks_failed=tasks_failed,
-                        error=f"Task {task.id} failed: {error_msg}",
-                    )
+        tasks_completed = 0
+        tasks_failed = 0
 
-            # Step 5: Run postflight checks
-            postflight_result = self.run_postflight(self.config)
-            if not postflight_result.passed:
-                self.logger.warning(
-                    "postflight_failed",
-                    session_id=session_id,
-                    errors=postflight_result.errors,
+        for task in tasks:
+            try:
+                self.execute_task(task, session.id)
+                tasks_completed += 1
+            except Exception as e:
+                tasks_failed += 1
+                error_msg = str(e)
+                self.logger.error(
+                    "task_execution_failed",
+                    session_id=session.id,
+                    task_id=task.id,
+                    error=error_msg,
                 )
-                session.status = "failed"
+
+                # HALT on task failure
+                session.status = "halted"
+                session.halt_reason = error_msg
                 session.ended_at = datetime.now()
                 self.session_repo.update(session)
 
                 return SessionResult(
-                    session_id=session_id,
-                    status="failed",
+                    session_id=session.id,
+                    status="halted",
                     tasks_completed=tasks_completed,
                     tasks_failed=tasks_failed,
-                    error=f"Postflight checks failed: {'; '.join(postflight_result.errors)}",
+                    error=f"Task {task.id} failed: {error_msg}",
                 )
 
-            # Step 6: Update session to completed
-            session.status = "completed"
-            session.ended_at = datetime.now()
-            self.session_repo.update(session)
-            self.logger.info(
-                "session_completed",
-                session_id=session_id,
-                tasks_completed=tasks_completed,
-            )
+        return tasks_completed, tasks_failed
 
-            # Step 7: Return result
-            return SessionResult(
-                session_id=session_id,
-                status="completed",
-                tasks_completed=tasks_completed,
-                tasks_failed=tasks_failed,
-                error=None,
-            )
+    def _run_postflight_phase(self, session: Session) -> PostflightResult:
+        """Run postflight checks.
 
-        except Exception as e:
-            # Catch unexpected errors
-            self.logger.error(
-                "session_error",
-                session_id=session_id,
-                error=str(e),
-            )
-            session.status = "failed"
-            session.ended_at = datetime.now()
-            self.session_repo.update(session)
+        Args:
+            session: Session record (for context only).
 
-            return SessionResult(
-                session_id=session_id,
-                status="failed",
-                tasks_completed=0,
-                tasks_failed=0,
-                error=str(e),
-            )
+        Returns:
+            PostflightResult with check details.
+        """
+        return self.run_postflight(self.config)
+
+    def _complete_session(
+        self, session: Session, tasks_completed: int, tasks_failed: int
+    ) -> SessionResult:
+        """Mark session as completed and return final result.
+
+        Args:
+            session: Session to complete.
+            tasks_completed: Number of tasks completed successfully.
+            tasks_failed: Number of tasks that failed.
+
+        Returns:
+            SessionResult with completed status.
+        """
+        session.status = "completed"
+        session.ended_at = datetime.now()
+        self.session_repo.update(session)
+        self.logger.info(
+            "session_completed",
+            session_id=session.id,
+            tasks_completed=tasks_completed,
+        )
+
+        return SessionResult(
+            session_id=session.id,
+            status="completed",
+            tasks_completed=tasks_completed,
+            tasks_failed=tasks_failed,
+            error=None,
+        )
+
+    def _fail_session(
+        self,
+        session: Session,
+        errors: list[str],
+        phase: str,
+    ) -> SessionResult:
+        """Handle session failure in a phase.
+
+        Args:
+            session: Session to fail.
+            errors: List of error messages from the phase.
+            phase: Name of the phase that failed (e.g., "Preflight").
+
+        Returns:
+            SessionResult with failed status.
+        """
+        self.logger.warning(
+            f"{phase.lower()}_failed",
+            session_id=session.id,
+            errors=errors,
+        )
+        session.status = "failed"
+        session.ended_at = datetime.now()
+        self.session_repo.update(session)
+
+        return SessionResult(
+            session_id=session.id,
+            status="failed",
+            tasks_completed=0,
+            tasks_failed=0,
+            error=f"{phase} checks failed: {'; '.join(errors)}",
+        )
+
+    def _handle_unexpected_error(self, session: Session, error: Exception) -> SessionResult:
+        """Handle unexpected errors during session execution.
+
+        Args:
+            session: Session to fail.
+            error: Exception that occurred.
+
+        Returns:
+            SessionResult with failed status and error message.
+        """
+        self.logger.error(
+            "session_error",
+            session_id=session.id,
+            error=str(error),
+        )
+        session.status = "failed"
+        session.ended_at = datetime.now()
+        self.session_repo.update(session)
+
+        return SessionResult(
+            session_id=session.id,
+            status="failed",
+            tasks_completed=0,
+            tasks_failed=0,
+            error=str(error),
+        )
 
     def _get_current_branch(self) -> str:
         """Get the current git branch name.
