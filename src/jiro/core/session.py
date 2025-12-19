@@ -1,17 +1,24 @@
 """Session preflight checks for jiro workflow."""
 
+import asyncio
 import subprocess
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 import structlog
 
+from jiro.agents.client import AgentClient
+from jiro.agents.planning import PlanningAgent
+from jiro.agents.review import ReviewAgent
 from jiro.config.schema import Config
-from jiro.db.models import Session, SessionStatus
+from jiro.core.executor import TaskExecutor
+from jiro.db.models import Session, SessionStatus, TaskExecution
 from jiro.db.repository import SessionRepository, TaskExecutionRepository
+from jiro.trackers.beads import BeadsTracker
 
 
 class HaltError(Exception):
@@ -790,18 +797,6 @@ class SessionOrchestrator:
             HaltError: If task execution fails or review halts execution.
             Exception: If task execution fails.
         """
-        import asyncio
-        import uuid
-        from datetime import datetime
-        from pathlib import Path
-
-        from jiro.agents.client import AgentClient
-        from jiro.agents.planning import PlanningAgent
-        from jiro.agents.review import ReviewAgent
-        from jiro.core.executor import TaskExecutor
-        from jiro.db.models import TaskExecution
-        from jiro.trackers.beads import BeadsTracker
-
         self.logger.info(
             "task_execution_start",
             task_id=task.id,
