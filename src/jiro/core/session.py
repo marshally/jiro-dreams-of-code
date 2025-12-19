@@ -19,6 +19,7 @@ from jiro.core.executor import TaskExecutor
 from jiro.db.models import Session, SessionStatus, TaskExecution
 from jiro.db.repository import SessionRepository, TaskExecutionRepository
 from jiro.trackers.beads import BeadsTracker
+from jiro.trackers.interface import Task
 
 
 class HaltError(Exception):
@@ -770,7 +771,7 @@ class SessionOrchestrator:
         """
         return run_postflight(config)
 
-    def get_tasks(self, epic_id: str | None = None) -> list[Any]:
+    def get_tasks(self, epic_id: str | None = None) -> list[Task]:
         """Get tasks to execute.
 
         Args:
@@ -783,7 +784,7 @@ class SessionOrchestrator:
         # For now, return empty list for basic tests
         return []
 
-    def execute_task(self, task: Any, session_id: str) -> None:
+    def execute_task(self, task: Task, session_id: str) -> None:
         """Execute a single task.
 
         Orchestrates the full task lifecycle through initialization, execution,
