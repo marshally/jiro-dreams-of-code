@@ -2,7 +2,7 @@
 
 from sqlite_utils import Database
 
-from jiro.db.models import Commit, ExecutionPlan, Prompt, Session, TaskExecution
+from jiro.db.models import Commit, DreamSession, ExecutionPlan, Prompt, Session, TaskExecution
 
 
 class SessionRepository:
@@ -374,3 +374,84 @@ class ExecutionPlanRepository:
         """
         rows = list(self.db["execution_plans"].rows_where("task_id = ?", [task_id]))
         return [ExecutionPlan.from_row(row) for row in rows]
+
+
+class DreamSessionRepository:
+    """Repository for DreamSession CRUD operations.
+
+    Manages dream/interview sessions for crash recovery in jiro dream.
+    """
+
+    def __init__(self, db: Database) -> None:
+        """Initialize repository with database connection.
+
+        Args:
+            db: sqlite-utils Database instance.
+        """
+        self.db = db
+
+    def create(self, session: DreamSession) -> DreamSession:
+        """Create a new dream session in the database.
+
+        Args:
+            session: DreamSession instance to create.
+
+        Returns:
+            The created DreamSession instance.
+        """
+        row = session.to_row()
+        self.db["dream_sessions"].insert(row)
+        return session
+
+    def get(self, session_id: str) -> DreamSession | None:
+        """Retrieve a dream session by ID.
+
+        Args:
+            session_id: ID of the dream session to retrieve.
+
+        Returns:
+            DreamSession instance if found, None otherwise.
+        """
+        rows = list(self.db["dream_sessions"].rows_where("id = ?", [session_id]))
+        if not rows:
+            return None
+        return DreamSession.from_row(rows[0])
+
+    def get_incomplete(self) -> list[DreamSession]:
+        """Retrieve all incomplete dream sessions.
+
+        Returns sessions that are not 'completed' or 'abandoned',
+        ordered by most recently updated first.
+
+        Returns:
+            List of DreamSession instances that can be resumed.
+        """
+        rows = list(
+            self.db["dream_sessions"].rows_where(
+                "status NOT IN (?, ?)",
+                ["completed", "abandoned"],
+                order_by="-updated_at",
+            )
+        )
+        return [DreamSession.from_row(row) for row in rows]
+
+    def update(self, session: DreamSession) -> DreamSession:
+        """Update an existing dream session in the database.
+
+        Args:
+            session: DreamSession instance with updated values.
+
+        Returns:
+            The updated DreamSession instance.
+        """
+        row = session.to_row()
+        self.db["dream_sessions"].update(session.id, row)
+        return session
+
+    def delete(self, session_id: str) -> None:
+        """Delete a dream session from the database.
+
+        Args:
+            session_id: ID of the dream session to delete.
+        """
+        self.db["dream_sessions"].delete_where("id = ?", [session_id])

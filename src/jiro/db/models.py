@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any, Literal
 
 SessionStatus = Literal["running", "completed", "failed", "halted"]
+DreamSessionStatus = Literal["created", "interviewing", "generating", "completed", "abandoned"]
 AgentType = Literal["dreaming", "planning", "execution", "review"]
 TaskPhase = Literal["preflight", "executing", "postflight"]
 TaskStatus = Literal["running", "success", "failed", "halted"]
@@ -335,4 +336,61 @@ class ExecutionPlan:
             "plan_json": self.plan_json,
             "created_at": self.created_at.isoformat(),
             "session_id": self.session_id,
+        }
+
+
+@dataclass
+class DreamSession:
+    """Represents a dream/interview session for spec generation.
+
+    Tracks the conversation history and state of an interactive interview
+    session, enabling crash recovery and resume functionality.
+
+    The status field tracks the session lifecycle:
+    - 'created': Session exists, no messages yet
+    - 'interviewing': Q&A in progress
+    - 'generating': Spec being created from conversation
+    - 'completed': Spec saved, session done
+    - 'abandoned': User declined to resume, started fresh session
+    """
+
+    id: str
+    status: DreamSessionStatus
+    created_at: datetime
+    updated_at: datetime
+    conversation_json: str = "[]"
+    spec_json: str | None = None
+
+    @classmethod
+    def from_row(cls, row: dict) -> "DreamSession":
+        """Deserialize from a database row.
+
+        Args:
+            row: Dictionary from sqlite-utils query.
+
+        Returns:
+            DreamSession instance.
+        """
+        return cls(
+            id=row["id"],
+            status=row["status"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+            updated_at=datetime.fromisoformat(row["updated_at"]),
+            conversation_json=row.get("conversation_json", "[]"),
+            spec_json=row.get("spec_json"),
+        )
+
+    def to_row(self) -> dict:
+        """Serialize to a database row.
+
+        Returns:
+            Dictionary suitable for sqlite-utils insert/update.
+        """
+        return {
+            "id": self.id,
+            "status": self.status,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+            "conversation_json": self.conversation_json,
+            "spec_json": self.spec_json,
         }

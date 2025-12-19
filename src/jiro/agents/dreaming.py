@@ -273,6 +273,8 @@ Generate an improved specification in the same Markdown format, addressing the f
         display_message: Callable[[str], None] | None = None,
         on_thinking_start: Callable[[], None] | None = None,
         on_thinking_end: Callable[[], None] | None = None,
+        on_checkpoint: Callable[[list["InterviewMessage"]], None] | None = None,
+        initial_conversation: list["InterviewMessage"] | None = None,
     ) -> InterviewResult:
         """Conduct interactive interview to gather requirements.
 
@@ -286,6 +288,10 @@ Generate an improved specification in the same Markdown format, addressing the f
                 If not provided, messages are only logged.
             on_thinking_start: Optional callback called when agent starts processing.
             on_thinking_end: Optional callback called when agent finishes processing.
+            on_checkpoint: Optional callback called after each message is added.
+                Used for crash recovery - saves conversation state after each turn.
+            initial_conversation: Optional conversation history to resume from.
+                If provided, skips the initial question and continues from this state.
 
         Returns:
             InterviewResult containing the generated Spec and conversation history.
@@ -293,31 +299,39 @@ Generate an improved specification in the same Markdown format, addressing the f
         Raises:
             ValueError: If interview is cancelled or cannot complete.
         """
-        logger.info("interview_start")
-        conversation: list[InterviewMessage] = []
+        logger.info("interview_start", resuming=initial_conversation is not None)
 
-        # Get first question from agent
-        first_prompt = (
-            "Start the interview by asking the user what they want to build. Ask only ONE question."
-        )
-        if on_thinking_start:
-            on_thinking_start()
-        result = await self.client.execute(first_prompt)
-        if on_thinking_end:
-            on_thinking_end()
+        # Resume from previous conversation or start fresh
+        if initial_conversation:
+            conversation = list(initial_conversation)
+            question_count = sum(1 for m in conversation if m.role == "assistant")
+            logger.info("interview_resumed", question_count=question_count)
+        else:
+            conversation = []
 
-        if not result.success:
-            raise ValueError(f"Failed to start interview: {result.error}")
+            # Get first question from agent
+            first_prompt = "Start the interview by asking the user what they want to build. Ask only ONE question."
+            if on_thinking_start:
+                on_thinking_start()
+            result = await self.client.execute(first_prompt)
+            if on_thinking_end:
+                on_thinking_end()
 
-        agent_message = result.output.strip()
-        conversation.append(InterviewMessage(role="assistant", content=agent_message))
+            if not result.success:
+                raise ValueError(f"Failed to start interview: {result.error}")
 
-        if display_message:
-            display_message(agent_message)
+            agent_message = result.output.strip()
+            conversation.append(InterviewMessage(role="assistant", content=agent_message))
 
-        logger.info("interview_question", question_num=1, question=agent_message[:100])
+            # Save checkpoint after first question
+            if on_checkpoint:
+                on_checkpoint(conversation)
 
-        question_count = 1
+            if display_message:
+                display_message(agent_message)
+
+            logger.info("interview_question", question_num=1, question=agent_message[:100])
+            question_count = 1
 
         while question_count < MAX_INTERVIEW_QUESTIONS:
             # Get user response (handle both sync and async callables)
@@ -340,6 +354,10 @@ Generate an improved specification in the same Markdown format, addressing the f
 
             conversation.append(InterviewMessage(role="user", content=user_response))
             logger.info("interview_user_response", response=user_response[:100])
+
+            # Save checkpoint after user response
+            if on_checkpoint:
+                on_checkpoint(conversation)
 
             # Get next agent response
             prompt = self._build_interview_prompt(conversation)
@@ -369,6 +387,10 @@ Generate an improved specification in the same Markdown format, addressing the f
 
             conversation.append(InterviewMessage(role="assistant", content=agent_message))
             question_count += 1
+
+            # Save checkpoint after agent response
+            if on_checkpoint:
+                on_checkpoint(conversation)
 
             if display_message:
                 display_message(agent_message)

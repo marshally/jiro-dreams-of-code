@@ -119,6 +119,20 @@ def ensure_schema(db: Database) -> None:
         if_not_exists=True,
     )
 
+    # Dream sessions (for crash recovery in jiro dream)
+    db["dream_sessions"].create(
+        {
+            "id": str,
+            "status": str,
+            "conversation_json": str,
+            "spec_json": str,
+            "created_at": str,
+            "updated_at": str,
+        },
+        pk="id",
+        if_not_exists=True,
+    )
+
     # Create indexes for common queries
     _create_indexes(db)
 
@@ -139,6 +153,7 @@ def _create_indexes(db: Database) -> None:
         ("idx_commits_task", "commits", "task_id"),
         ("idx_execution_plans_session", "execution_plans", "session_id"),
         ("idx_execution_plans_task", "execution_plans", "task_id"),
+        ("idx_dream_sessions_status", "dream_sessions", "status"),
     ]
 
     for index_name, table, column in indexes:

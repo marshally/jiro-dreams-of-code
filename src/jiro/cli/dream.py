@@ -2,9 +2,12 @@
 
 import asyncio
 import io
+import json
 import sys
+import uuid
 from collections.abc import Generator
 from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -16,12 +19,13 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 
 from jiro.agents.client import AgentClient
-from jiro.agents.dreaming import DreamingAgent
+from jiro.agents.dreaming import DreamingAgent, InterviewMessage
 from jiro.config.loader import load_config
 from jiro.core.paths import get_database_path, get_specs_dir
 from jiro.core.planner import Spec
 from jiro.db.database import ensure_schema, get_database
-from jiro.db.repository import PromptRepository
+from jiro.db.models import DreamSession
+from jiro.db.repository import DreamSessionRepository, PromptRepository
 
 
 @contextmanager
@@ -243,10 +247,41 @@ def _display_spec(spec: Spec) -> None:
     console.print(panel)
 
 
+def _format_time_ago(dt: datetime) -> str:
+    """Format a datetime as a human-readable time ago string."""
+    now = datetime.now()
+    delta = now - dt
+    seconds = delta.total_seconds()
+
+    if seconds < 60:
+        return "just now"
+    elif seconds < 3600:
+        minutes = int(seconds / 60)
+        return f"{minutes} minute{'s' if minutes != 1 else ''} ago"
+    elif seconds < 86400:
+        hours = int(seconds / 3600)
+        return f"{hours} hour{'s' if hours != 1 else ''} ago"
+    else:
+        days = int(seconds / 86400)
+        return f"{days} day{'s' if days != 1 else ''} ago"
+
+
+def _conversation_to_json(conversation: list[InterviewMessage]) -> str:
+    """Serialize conversation to JSON string."""
+    return json.dumps([{"role": m.role, "content": m.content} for m in conversation])
+
+
+def _conversation_from_json(json_str: str) -> list[InterviewMessage]:
+    """Deserialize conversation from JSON string."""
+    data = json.loads(json_str)
+    return [InterviewMessage(role=m["role"], content=m["content"]) for m in data]
+
+
 async def _run_interactive_dream(
     model: str | None = None,
     project_root: Path | None = None,
     debug: bool = False,
+    resume: bool = False,
 ) -> None:
     """Run interactive dream mode with question-by-question interview.
 
@@ -254,6 +289,7 @@ async def _run_interactive_dream(
         model: Optional model override.
         project_root: The project root directory.
         debug: If True, show JSON log output.
+        resume: If True, directly resume most recent incomplete session.
     """
     if project_root is None:
         project_root = Path.cwd()
@@ -269,8 +305,57 @@ async def _run_interactive_dream(
     db = get_database(db_path)
     ensure_schema(db)
 
-    # Create repository
-    repository = PromptRepository(db)
+    # Create repositories
+    prompt_repository = PromptRepository(db)
+    dream_repository = DreamSessionRepository(db)
+
+    # Check for incomplete sessions
+    initial_conversation: list[InterviewMessage] | None = None
+    dream_session: DreamSession | None = None
+
+    incomplete_sessions = dream_repository.get_incomplete()
+    if incomplete_sessions:
+        session_to_resume = incomplete_sessions[0]
+        question_count = session_to_resume.conversation_json.count('"role": "assistant"')
+        time_ago = _format_time_ago(session_to_resume.updated_at)
+
+        if resume:
+            # --resume flag: directly resume without prompting
+            dream_session = session_to_resume
+            initial_conversation = _conversation_from_json(session_to_resume.conversation_json)
+            console.print(f"[cyan]Resuming interview from {time_ago}...[/cyan]\n")
+        else:
+            # Prompt user to resume or start fresh
+            console.print(
+                f"[yellow]Found incomplete interview from {time_ago} "
+                f"({question_count} questions answered).[/yellow]"
+            )
+            if typer.confirm("Resume this session?", default=True):
+                dream_session = session_to_resume
+                initial_conversation = _conversation_from_json(session_to_resume.conversation_json)
+                console.print("[cyan]Resuming interview...[/cyan]\n")
+            else:
+                # Mark old session as abandoned and start fresh
+                session_to_resume.status = "abandoned"
+                session_to_resume.updated_at = datetime.now()
+                dream_repository.update(session_to_resume)
+                console.print("[dim]Starting fresh interview...[/dim]\n")
+    elif resume:
+        console.print("[yellow]No incomplete session found to resume.[/yellow]")
+        raise typer.Exit(code=1)
+
+    # Create new session if not resuming
+    if dream_session is None:
+        now = datetime.now()
+        dream_session = DreamSession(
+            id=str(uuid.uuid4()),
+            status="created",
+            created_at=now,
+            updated_at=now,
+            conversation_json="[]",
+            spec_json=None,
+        )
+        dream_repository.create(dream_session)
 
     # Create agent config
     from jiro.agents.base import AgentConfig
@@ -282,20 +367,35 @@ async def _run_interactive_dream(
     )
 
     # Create client and agent
-    client = AgentClient(agent_config, repository)
+    client = AgentClient(agent_config, prompt_repository)
     agent = DreamingAgent(client)
 
-    # Welcome message
-    console.print("[cyan]Interactive Spec Generation[/cyan]")
-    console.print("I'll ask questions to understand what you want to build.\n")
+    # Welcome message (show resume context if resuming)
+    if initial_conversation:
+        console.print("[cyan]Interactive Spec Generation (Resumed)[/cyan]")
+        # Show last exchange to remind user where they were
+        if len(initial_conversation) >= 2:
+            last_agent = next(
+                (m for m in reversed(initial_conversation) if m.role == "assistant"), None
+            )
+            last_user = next((m for m in reversed(initial_conversation) if m.role == "user"), None)
+            if last_agent and last_user:
+                console.print("\n[dim]Last exchange:[/dim]")
+                console.print(f"[blue]Agent:[/blue] {last_agent.content[:200]}...")
+                console.print(f"[green]You:[/green] {last_user.content[:200]}...")
+                console.print()
+    else:
+        console.print("[cyan]Interactive Spec Generation[/cyan]")
+        console.print("I'll ask questions to understand what you want to build.\n")
+
     console.print("[dim]Enter to submit. Shift+Enter for a newline.[/dim]")
     console.print("[dim]Type 'quit', 'exit', or '/quit' to cancel[/dim]\n")
 
     # Create multiline input session
-    session = _create_multiline_session()
+    input_session = _create_multiline_session()
 
     async def get_input() -> str:
-        result: str = await session.prompt_async("> ")
+        result: str = await input_session.prompt_async("> ")
         return result.strip()
 
     def display_message(message: str) -> None:
@@ -311,15 +411,33 @@ async def _run_interactive_dream(
         # Clear the thinking line
         console.print(" " * 40, end="\r")
 
+    # Checkpoint callback to save conversation state
+    def on_checkpoint(conversation: list[InterviewMessage]) -> None:
+        nonlocal dream_session
+        dream_session.conversation_json = _conversation_to_json(conversation)
+        dream_session.status = "interviewing"
+        dream_session.updated_at = datetime.now()
+        dream_repository.update(dream_session)
+
     # Run interview (suppress JSON logs unless debug mode)
     if debug:
         result = await agent.interview(
-            get_input, display_message, on_thinking_start, on_thinking_end
+            get_input,
+            display_message,
+            on_thinking_start,
+            on_thinking_end,
+            on_checkpoint,
+            initial_conversation,
         )
     else:
         with _suppress_structlog_output():
             result = await agent.interview(
-                get_input, display_message, on_thinking_start, on_thinking_end
+                get_input,
+                display_message,
+                on_thinking_start,
+                on_thinking_end,
+                on_checkpoint,
+                initial_conversation,
             )
 
     # Display generated spec
@@ -365,6 +483,21 @@ async def _run_interactive_dream(
     # Save the final spec
     spec_path = _save_spec_to_file(spec, specs_dir)
     console.print(f"\n[green]Specification saved to:[/green] {spec_path}")
+
+    # Mark session as completed
+    dream_session.status = "completed"
+    dream_session.spec_json = json.dumps(
+        {
+            "title": spec.title,
+            "overview": spec.overview,
+            "requirements": spec.requirements,
+            "acceptance_criteria": spec.acceptance_criteria,
+            "out_of_scope": spec.out_of_scope,
+            "technical_notes": spec.technical_notes,
+        }
+    )
+    dream_session.updated_at = datetime.now()
+    dream_repository.update(dream_session)
 
 
 async def _run_dream(
@@ -477,12 +610,18 @@ def dream_callback(
         str | None, typer.Option("--model", help="Override the model for this operation")
     ] = None,
     debug: Annotated[bool, typer.Option("--debug", help="Show detailed JSON logs")] = False,
+    resume: Annotated[
+        bool, typer.Option("--resume", help="Resume the most recent incomplete interview")
+    ] = False,
 ) -> None:
     """
     Generate a specification from natural language.
 
     Run without arguments for interactive mode where the agent asks questions
     to understand requirements. Run with a prompt for direct spec generation.
+
+    If an incomplete interview exists, you'll be prompted to resume or start fresh.
+    Use --resume to skip the prompt and directly resume the last session.
 
     Opens interactive chat refinement mode. Saves spec to
     .jiro-dreams-of-code/specs/ (or stealth equivalent).
@@ -492,6 +631,7 @@ def dream_callback(
         jiro dream "build a user authentication system"     # Direct mode
         jiro dream "add GraphQL API support" --model claude-opus-4
         jiro dream --debug                                  # Show JSON logs
+        jiro dream --resume                                 # Resume last incomplete interview
     """
     # Only run if no subcommand was invoked
     if ctx.invoked_subcommand is not None:
@@ -503,8 +643,11 @@ def dream_callback(
         with _enhanced_keyboard_mode():
             if prompt is None:
                 # Interactive mode - agent asks questions
-                asyncio.run(_run_interactive_dream(model, project_root, debug))
+                asyncio.run(_run_interactive_dream(model, project_root, debug, resume))
             else:
+                if resume:
+                    console.print("[yellow]--resume is only valid in interactive mode[/yellow]")
+                    raise typer.Exit(code=1)
                 # Direct mode - generate spec from prompt
                 asyncio.run(_run_dream(prompt, model, project_root, debug))
     except Exception as e:
