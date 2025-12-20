@@ -207,6 +207,43 @@ def create_default_config(
     return config_path
 
 
+def update_gitignore(project_root: Path) -> bool:
+    """Add jiro-specific entries to .gitignore.
+
+    Args:
+        project_root: The project root directory.
+
+    Returns:
+        True if gitignore was updated, False if entries already exist.
+    """
+    gitignore_path = project_root / ".gitignore"
+    entries_to_add = [
+        "# jiro-dreams-of-code",
+        ".jiro-dreams-of-code/.beads/",
+        ".jiro-dreams-of-code/jiro.db",
+        ".jiro-dreams-of-code/logs/",
+    ]
+
+    # Read existing content
+    existing_content = ""
+    if gitignore_path.exists():
+        existing_content = gitignore_path.read_text()
+
+    # Check if already configured (either specific entries or entire directory)
+    if ".jiro-dreams-of-code/.beads/" in existing_content:
+        return False
+    if ".jiro-dreams-of-code/" in existing_content:
+        return False  # Entire directory is already ignored
+
+    # Append entries
+    with open(gitignore_path, "a") as f:
+        if existing_content and not existing_content.endswith("\n"):
+            f.write("\n")
+        f.write("\n".join(entries_to_add) + "\n")
+
+    return True
+
+
 def initialize_beads(
     project_root: Path,
     project_name: str,
@@ -299,6 +336,13 @@ def run_init(
         console.print("[green]✓[/green] Initialized beads database")
     else:
         console.print("[yellow]![/yellow] Beads database not initialized (manual setup required)")
+
+    # Update .gitignore (only in normal mode - stealth mode doesn't need it)
+    if not stealth:
+        if update_gitignore(project_root):
+            console.print("[green]✓[/green] Updated .gitignore")
+        else:
+            console.print("[dim]·[/dim] .gitignore already configured")
 
     console.print("\n[green]Initialization complete![/green]")
     return True
