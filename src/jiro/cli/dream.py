@@ -247,6 +247,92 @@ def _display_spec(spec: Spec) -> None:
     console.print(panel)
 
 
+def _display_resume_context(console: Console, conversation: list[InterviewMessage]) -> None:
+    """Display context when resuming a session.
+
+    Shows:
+    1. Summary of the session (exchange count, first topic)
+    2. The last question asked (before user's response)
+    3. User's last response
+    4. Agent's last followup question
+
+    Args:
+        console: Rich console for output.
+        conversation: The conversation history to summarize.
+    """
+    # Count exchanges
+    assistant_msgs = [m for m in conversation if m.role == "assistant"]
+    user_msgs = [m for m in conversation if m.role == "user"]
+
+    # Session summary
+    console.print(
+        Panel(
+            f"[bold]Questions asked:[/bold] {len(assistant_msgs)}\n"
+            f"[bold]Responses given:[/bold] {len(user_msgs)}",
+            title="Session Summary",
+            border_style="dim",
+        )
+    )
+
+    # Get the last few messages for context
+    # Pattern: ... -> agent asks -> user responds -> agent follows up
+    if len(conversation) >= 3:
+        # Find the question before the last user response
+        last_user_idx = None
+        for i in range(len(conversation) - 1, -1, -1):
+            if conversation[i].role == "user":
+                last_user_idx = i
+                break
+
+        if last_user_idx is not None and last_user_idx > 0:
+            # Question that prompted the user's response
+            prev_question = conversation[last_user_idx - 1]
+            if prev_question.role == "assistant":
+                console.print(
+                    Panel(
+                        Markdown(prev_question.content),
+                        title="Last Question Asked",
+                        border_style="blue",
+                    )
+                )
+
+            # User's response
+            user_response = conversation[last_user_idx]
+            console.print(
+                Panel(
+                    user_response.content,
+                    title="Your Response",
+                    border_style="green",
+                )
+            )
+
+            # Agent's followup (if exists)
+            if last_user_idx < len(conversation) - 1:
+                followup = conversation[last_user_idx + 1]
+                if followup.role == "assistant":
+                    console.print(
+                        Panel(
+                            Markdown(followup.content),
+                            title="Followup Question (waiting for your response)",
+                            border_style="cyan",
+                        )
+                    )
+    elif len(conversation) >= 1:
+        # Just show what we have
+        last_msg = conversation[-1]
+        title = "Last Question" if last_msg.role == "assistant" else "Your Last Response"
+        style = "blue" if last_msg.role == "assistant" else "green"
+        console.print(
+            Panel(
+                Markdown(last_msg.content) if last_msg.role == "assistant" else last_msg.content,
+                title=title,
+                border_style=style,
+            )
+        )
+
+    console.print()
+
+
 def _format_time_ago(dt: datetime) -> str:
     """Format a datetime as a human-readable time ago string."""
     now = datetime.now()
@@ -373,17 +459,7 @@ async def _run_interactive_dream(
     # Welcome message (show resume context if resuming)
     if initial_conversation:
         console.print("[cyan]Interactive Spec Generation (Resumed)[/cyan]")
-        # Show last exchange to remind user where they were
-        if len(initial_conversation) >= 2:
-            last_agent = next(
-                (m for m in reversed(initial_conversation) if m.role == "assistant"), None
-            )
-            last_user = next((m for m in reversed(initial_conversation) if m.role == "user"), None)
-            if last_agent and last_user:
-                console.print("\n[dim]Last exchange:[/dim]")
-                console.print(f"[blue]Agent:[/blue] {last_agent.content[:200]}...")
-                console.print(f"[green]You:[/green] {last_user.content[:200]}...")
-                console.print()
+        _display_resume_context(console, initial_conversation)
     else:
         console.print("[cyan]Interactive Spec Generation[/cyan]")
         console.print("I'll ask questions to understand what you want to build.\n")
