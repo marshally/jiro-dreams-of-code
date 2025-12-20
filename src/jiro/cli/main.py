@@ -12,7 +12,7 @@ from jiro import __version__
 from jiro.cli.assets import app as assets_app
 from jiro.cli.auth import app as auth_app
 from jiro.cli.config import app as config_app
-from jiro.cli.doctor import fix_missing_config, run_doctor
+from jiro.cli.doctor import fix_gitignore, fix_missing_config, run_doctor
 from jiro.cli.dream import app as dream_app
 from jiro.cli.execute import app as execute_app
 from jiro.cli.init import app as init_app
@@ -116,14 +116,22 @@ def doctor(
     # Apply fixes if requested
     if fix:
         console.print("\n[cyan]Attempting to fix issues...[/cyan]")
+        any_fixed = False
 
         # Fix missing config
         config_created = fix_missing_config(project_root, project_root.name)
         if config_created:
             config_path = project_root / ".jiro-dreams-of-code" / "config.yaml"
-            console.print(f"[green]Created config file:[/green] {config_path}")
+            console.print(f"[green]✓ Created config file:[/green] {config_path}")
+            any_fixed = True
 
-        if not config_created:
+        # Fix missing gitignore entries
+        gitignore_fixed = fix_gitignore(project_root)
+        if gitignore_fixed:
+            console.print("[green]✓ Updated .gitignore[/green]")
+            any_fixed = True
+
+        if not any_fixed:
             console.print("[yellow]No fixable issues found[/yellow]")
 
     # Exit with error code if checks failed

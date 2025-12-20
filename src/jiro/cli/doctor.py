@@ -406,6 +406,50 @@ def check_config(project_root: Path | None = None) -> CheckResult:
         )
 
 
+def fix_gitignore(project_root: Path | None = None) -> bool:
+    """Fix missing gitignore entries for jiro.
+
+    Adds required jiro entries to .gitignore if they don't exist.
+
+    Args:
+        project_root: Optional project root path. Defaults to current directory.
+
+    Returns:
+        True if gitignore was updated, False if already configured or failed.
+    """
+    if project_root is None:
+        project_root = Path.cwd()
+
+    gitignore_path = project_root / ".gitignore"
+    entries_to_add = [
+        "# jiro-dreams-of-code",
+        ".jiro-dreams-of-code/.beads/",
+        ".jiro-dreams-of-code/jiro.db",
+        ".jiro-dreams-of-code/logs/",
+    ]
+
+    # Read existing content
+    existing_content = ""
+    if gitignore_path.exists():
+        existing_content = gitignore_path.read_text()
+
+    # Check if already configured
+    if ".jiro-dreams-of-code/.beads/" in existing_content:
+        return False
+    if ".jiro-dreams-of-code/" in existing_content:
+        return False
+
+    # Append entries
+    try:
+        with open(gitignore_path, "a") as f:
+            if existing_content and not existing_content.endswith("\n"):
+                f.write("\n")
+            f.write("\n".join(entries_to_add) + "\n")
+        return True
+    except Exception:
+        return False
+
+
 def fix_missing_config(project_root: Path | None = None, project_name: str | None = None) -> bool:
     """Fix missing project configuration file.
 
