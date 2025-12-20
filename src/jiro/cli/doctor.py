@@ -311,6 +311,68 @@ def check_beads() -> CheckResult:
         )
 
 
+def check_gitignore(project_root: Path | None = None) -> CheckResult:
+    """Check if .gitignore has required jiro entries.
+
+    Verifies that jiro's local state files are properly ignored to prevent
+    accidental commits of database files and logs.
+
+    Args:
+        project_root: Optional project root path. Defaults to current directory.
+
+    Returns:
+        CheckResult indicating if gitignore is properly configured.
+    """
+    try:
+        if project_root is None:
+            project_root = Path.cwd()
+
+        gitignore_path = project_root / ".gitignore"
+
+        if not gitignore_path.exists():
+            return CheckResult(
+                name="gitignore",
+                passed=False,
+                error="No .gitignore file found",
+            )
+
+        content = gitignore_path.read_text()
+
+        # Check if entire directory is ignored (covers everything)
+        if ".jiro-dreams-of-code/" in content:
+            return CheckResult(
+                name="gitignore",
+                passed=True,
+            )
+
+        # Check for specific required entries
+        required_entries = [
+            ".jiro-dreams-of-code/.beads/",
+            ".jiro-dreams-of-code/jiro.db",
+            ".jiro-dreams-of-code/logs/",
+        ]
+
+        missing = [entry for entry in required_entries if entry not in content]
+
+        if missing:
+            return CheckResult(
+                name="gitignore",
+                passed=False,
+                error=f"Missing gitignore entries: {', '.join(missing)}",
+            )
+
+        return CheckResult(
+            name="gitignore",
+            passed=True,
+        )
+    except Exception as e:
+        return CheckResult(
+            name="gitignore",
+            passed=False,
+            error=f"Error checking gitignore: {str(e)}",
+        )
+
+
 def check_config(project_root: Path | None = None) -> CheckResult:
     """Check if project configuration can be loaded.
 
@@ -572,6 +634,20 @@ def run_doctor(project_root: Path | None = None) -> DoctorResult:
             error=str(e),
         )
         errors.append(f"config: {str(e)}")
+
+    # Run check_gitignore
+    try:
+        result = check_gitignore(project_root)
+        checks["gitignore"] = result
+        if not result.passed:
+            errors.append(f"gitignore: {result.error}")
+    except Exception as e:
+        checks["gitignore"] = CheckResult(
+            name="gitignore",
+            passed=False,
+            error=str(e),
+        )
+        errors.append(f"gitignore: {str(e)}")
 
     # Determine overall result
     all_passed = all(check.passed for check in checks.values())

@@ -79,13 +79,15 @@ class TestCheckAPIKey:
     @pytest.mark.unit
     def test_api_key_exists(self) -> None:
         """Should pass if ANTHROPIC_API_KEY is set."""
-        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key-12345"}):
-            with patch("jiro.cli.doctor.get_api_key", return_value="test-key-12345"):
-                result = check_api_key()
-                assert isinstance(result, CheckResult)
-                assert result.name == "api_key"
-                assert result.passed is True
-                assert result.error is None
+        with (
+            patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key-12345"}),
+            patch("jiro.cli.doctor.get_api_key", return_value="test-key-12345"),
+        ):
+            result = check_api_key()
+            assert isinstance(result, CheckResult)
+            assert result.name == "api_key"
+            assert result.passed is True
+            assert result.error is None
 
     @pytest.mark.unit
     def test_api_key_missing(self) -> None:
@@ -102,11 +104,13 @@ class TestCheckAPIKey:
     @pytest.mark.unit
     def test_api_key_empty(self) -> None:
         """Should fail if ANTHROPIC_API_KEY is empty."""
-        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": ""}):
-            with patch("jiro.cli.doctor.get_api_key", return_value=None):
-                result = check_api_key()
-                assert result.passed is False
-                assert result.error is not None
+        with (
+            patch.dict(os.environ, {"ANTHROPIC_API_KEY": ""}),
+            patch("jiro.cli.doctor.get_api_key", return_value=None),
+        ):
+            result = check_api_key()
+            assert result.passed is False
+            assert result.error is not None
 
 
 class TestCheckGit:
@@ -322,6 +326,7 @@ class TestRunDoctor:
             patch("jiro.cli.doctor.check_lint_command") as mock_lint,
             patch("jiro.cli.doctor.check_beads") as mock_beads,
             patch("jiro.cli.doctor.check_config") as mock_config,
+            patch("jiro.cli.doctor.check_gitignore") as mock_gitignore,
         ):
             # All checks pass
             check_obj = CheckResult("test", True)
@@ -333,11 +338,12 @@ class TestRunDoctor:
             mock_lint.return_value = check_obj
             mock_beads.return_value = check_obj
             mock_config.return_value = check_obj
+            mock_gitignore.return_value = check_obj
 
             result = run_doctor()
             assert isinstance(result, DoctorResult)
             assert result.passed is True
-            assert len(result.checks) == 8
+            assert len(result.checks) == 9
             assert len(result.errors) == 0
 
     @pytest.mark.unit
@@ -352,6 +358,7 @@ class TestRunDoctor:
             patch("jiro.cli.doctor.check_lint_command") as mock_lint,
             patch("jiro.cli.doctor.check_beads") as mock_beads,
             patch("jiro.cli.doctor.check_config") as mock_config,
+            patch("jiro.cli.doctor.check_gitignore") as mock_gitignore,
         ):
             # api_key check fails
             pass_check = CheckResult("test", True)
@@ -365,16 +372,17 @@ class TestRunDoctor:
             mock_lint.return_value = pass_check
             mock_beads.return_value = pass_check
             mock_config.return_value = pass_check
+            mock_gitignore.return_value = pass_check
 
             result = run_doctor()
             assert result.passed is False
-            assert len(result.checks) == 8
+            assert len(result.checks) == 9
             assert len(result.errors) >= 1
             assert any("api_key" in error for error in result.errors)
 
     @pytest.mark.unit
     def test_run_doctor_returns_all_checks(self) -> None:
-        """run_doctor should return all 8 checks."""
+        """run_doctor should return all 9 checks."""
         with (
             patch("jiro.cli.doctor.check_python_version") as mock_py,
             patch("jiro.cli.doctor.check_claude_sdk") as mock_sdk,
@@ -384,6 +392,7 @@ class TestRunDoctor:
             patch("jiro.cli.doctor.check_lint_command") as mock_lint,
             patch("jiro.cli.doctor.check_beads") as mock_beads,
             patch("jiro.cli.doctor.check_config") as mock_config,
+            patch("jiro.cli.doctor.check_gitignore") as mock_gitignore,
         ):
             check_obj = CheckResult("test", True)
             mock_py.return_value = check_obj
@@ -394,10 +403,11 @@ class TestRunDoctor:
             mock_lint.return_value = check_obj
             mock_beads.return_value = check_obj
             mock_config.return_value = check_obj
+            mock_gitignore.return_value = check_obj
 
             result = run_doctor()
 
-            # Verify all 8 checks are present
+            # Verify all 9 checks are present
             expected_checks = {
                 "python_version",
                 "claude_sdk",
@@ -407,6 +417,7 @@ class TestRunDoctor:
                 "lint_command",
                 "beads",
                 "config",
+                "gitignore",
             }
             assert expected_checks == set(result.checks.keys())
 
