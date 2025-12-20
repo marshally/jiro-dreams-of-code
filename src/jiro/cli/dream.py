@@ -4,6 +4,7 @@ import asyncio
 import io
 import json
 import sys
+import time
 import uuid
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -15,8 +16,10 @@ import typer
 from prompt_toolkit import PromptSession
 from prompt_toolkit.key_binding import KeyBindings
 from rich.console import Console
+from rich.live import Live
 from rich.markdown import Markdown
 from rich.panel import Panel
+from rich.text import Text
 
 from jiro.agents.client import AgentClient
 from jiro.agents.dreaming import DreamingAgent, InterviewMessage
@@ -94,6 +97,102 @@ def _print_divider(console: Console) -> None:
     """Print a horizontal divider line spanning the terminal width."""
     width = _get_terminal_width()
     console.print("[dim]" + "─" * width + "[/dim]")
+
+
+class ThinkingIndicator:
+    """Animated thinking indicator with elapsed time display.
+
+    Shows a spinning indicator with the thinking message and elapsed time,
+    similar to Claude Code's style:
+        · Dreaming… (thought for 3s)
+    """
+
+    # Spinner frames for animation
+    SPINNER_FRAMES = ["·", ":", "·", ":"]
+
+    def __init__(self, console: Console, message: str) -> None:
+        """Initialize the thinking indicator.
+
+        Args:
+            console: Rich console for output.
+            message: The thinking message to display (e.g., "Dreaming…").
+        """
+        self._console = console
+        self._message = message
+        self._start_time: float = 0
+        self._frame_index = 0
+        self._live: Live | None = None
+        self._task: asyncio.Task[None] | None = None
+        self._running = False
+
+    def _render(self) -> Text:
+        """Render the current indicator state."""
+        elapsed = int(time.time() - self._start_time)
+        frame = self.SPINNER_FRAMES[self._frame_index % len(self.SPINNER_FRAMES)]
+
+        text = Text()
+        text.append(f"{frame} ", style="red")
+        text.append(f"{self._message} ", style="red")
+        text.append(f"(thought for {elapsed}s)", style="dim red")
+        return text
+
+    async def _animate(self) -> None:
+        """Background task to animate the indicator."""
+        while self._running:
+            self._frame_index += 1
+            if self._live:
+                self._live.update(self._render())
+            await asyncio.sleep(0.25)
+
+    def start(self) -> None:
+        """Start the thinking indicator."""
+        self._start_time = time.time()
+        self._frame_index = 0
+        self._running = True
+
+        # Print blank line before
+        self._console.print()
+
+        # Start live display
+        self._live = Live(
+            self._render(),
+            console=self._console,
+            refresh_per_second=4,
+            transient=True,
+        )
+        self._live.start()
+
+        # Start animation task
+        try:
+            loop = asyncio.get_running_loop()
+            self._task = loop.create_task(self._animate())
+        except RuntimeError:
+            # No running loop, animation won't work but display will still show
+            pass
+
+    def stop(self) -> None:
+        """Stop the thinking indicator."""
+        self._running = False
+
+        # Cancel animation task
+        if self._task:
+            self._task.cancel()
+            self._task = None
+
+        # Stop live display
+        if self._live:
+            # Show final state with total time
+            elapsed = int(time.time() - self._start_time)
+            final_text = Text()
+            final_text.append("✓ ", style="green")
+            final_text.append(f"{self._message} ", style="dim")
+            final_text.append(f"(thought for {elapsed}s)", style="dim")
+            self._live.update(final_text)
+            self._live.stop()
+            self._live = None
+
+        # Print blank line after
+        self._console.print()
 
 
 def _create_multiline_session() -> PromptSession[str]:
@@ -494,13 +593,19 @@ async def _run_interactive_dream(
         console.print(Markdown(message))
         console.print()
 
-    # Simple text-based thinking indicator (avoids terminal state issues with Status)
+    # Animated thinking indicator with elapsed time
+    thinking_indicator: ThinkingIndicator | None = None
+
     def on_thinking_start() -> None:
-        console.print(f"[dim]✽ {_get_thinking_message()}[/dim]", end="\r")
+        nonlocal thinking_indicator
+        thinking_indicator = ThinkingIndicator(console, _get_thinking_message())
+        thinking_indicator.start()
 
     def on_thinking_end() -> None:
-        # Clear the thinking line
-        console.print(" " * 40, end="\r")
+        nonlocal thinking_indicator
+        if thinking_indicator:
+            thinking_indicator.stop()
+            thinking_indicator = None
 
     # Checkpoint callback to save conversation state
     def on_checkpoint(conversation: list[InterviewMessage]) -> None:
