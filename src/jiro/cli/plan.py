@@ -12,7 +12,7 @@ from rich.table import Table
 from jiro.agents.base import AgentConfig
 from jiro.agents.client import AgentClient
 from jiro.config.loader import load_config
-from jiro.core.paths import get_database_path
+from jiro.core.paths import get_database_path, get_specs_dir
 from jiro.core.planner import PlanResult, SpecPlanner, create_tasks, parse_spec
 from jiro.db.database import ensure_schema, get_database
 from jiro.db.repository import PromptRepository
@@ -25,6 +25,27 @@ app = typer.Typer(
 )
 
 console = Console()
+
+
+def _find_most_recent_spec(specs_dir: Path) -> Path | None:
+    """Find the most recently modified spec file in the specs directory.
+
+    Args:
+        specs_dir: Directory containing spec files.
+
+    Returns:
+        Path to the most recent spec file, or None if no specs exist.
+    """
+    if not specs_dir.exists():
+        return None
+
+    spec_files = list(specs_dir.glob("*.md"))
+    if not spec_files:
+        return None
+
+    # Sort by modification time, most recent first
+    spec_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return spec_files[0]
 
 
 def _display_plan_summary(plan_result: PlanResult) -> None:
@@ -157,7 +178,7 @@ async def _run_plan(
 @app.callback(invoke_without_command=True)
 def plan_callback(
     ctx: typer.Context,
-    spec: Annotated[str, typer.Option("--spec", help="Path to specification file")],
+    spec: Annotated[str | None, typer.Option("--spec", help="Path to specification file")] = None,
     model: Annotated[
         str | None, typer.Option("--model", help="Override the model for this operation")
     ] = None,
@@ -168,7 +189,10 @@ def plan_callback(
     Analyzes dependencies between tasks and prompts for confirmation
     before creating tasks in the issue tracker.
 
+    If --spec is not provided, uses the most recently modified spec file.
+
     Examples:
+        jiro plan                                        # Use most recent spec
         jiro plan --spec specs/auth-system.md
         jiro plan --spec specs/auth-system.md --model claude-opus-4
     """
@@ -177,10 +201,23 @@ def plan_callback(
         return
 
     project_root = Path.cwd()
+    project_name = project_root.name
+
+    # If no spec provided, find the most recent one
+    spec_file = spec
+    if spec_file is None:
+        specs_dir = get_specs_dir(project_root, stealth=False, project_name=project_name)
+        recent_spec = _find_most_recent_spec(specs_dir)
+        if recent_spec is None:
+            console.print("[red]Error: No spec files found.[/red]")
+            console.print("[dim]Run 'jiro dream' to create a specification first.[/dim]")
+            raise typer.Exit(code=1)
+        spec_file = str(recent_spec)
+        console.print(f"[cyan]Using most recent spec:[/cyan] {recent_spec.name}")
 
     try:
         # Run the async plan function
-        asyncio.run(_run_plan(spec, model, project_root))
+        asyncio.run(_run_plan(spec_file, model, project_root))
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
         raise typer.Exit(code=1) from e
