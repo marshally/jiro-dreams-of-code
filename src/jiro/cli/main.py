@@ -97,7 +97,34 @@ def doctor(
     """
     project_root = Path.cwd()
 
-    # Run all health checks
+    # Apply fixes if requested (run checks silently first, fix, then re-run)
+    if fix:
+        # Run initial checks silently
+        initial_result = run_doctor(project_root)
+
+        if not initial_result.passed:
+            console.print("[cyan]Attempting to fix issues...[/cyan]")
+            any_fixed = False
+
+            # Fix missing config
+            config_created = fix_missing_config(project_root, project_root.name)
+            if config_created:
+                config_path = project_root / ".jiro-dreams-of-code" / "config.yaml"
+                console.print(f"[green]✓ Created config file:[/green] {config_path}")
+                any_fixed = True
+
+            # Fix missing gitignore entries
+            gitignore_fixed = fix_gitignore(project_root)
+            if gitignore_fixed:
+                console.print("[green]✓ Updated .gitignore[/green]")
+                any_fixed = True
+
+            if not any_fixed:
+                console.print("[yellow]No fixable issues found[/yellow]")
+
+            console.print()
+
+    # Run (or re-run) health checks
     doctor_result = run_doctor(project_root)
 
     # Display results in a table
@@ -112,27 +139,6 @@ def doctor(
         table.add_row(check_name, status, details)
 
     console.print(table)
-
-    # Apply fixes if requested
-    if fix:
-        console.print("\n[cyan]Attempting to fix issues...[/cyan]")
-        any_fixed = False
-
-        # Fix missing config
-        config_created = fix_missing_config(project_root, project_root.name)
-        if config_created:
-            config_path = project_root / ".jiro-dreams-of-code" / "config.yaml"
-            console.print(f"[green]✓ Created config file:[/green] {config_path}")
-            any_fixed = True
-
-        # Fix missing gitignore entries
-        gitignore_fixed = fix_gitignore(project_root)
-        if gitignore_fixed:
-            console.print("[green]✓ Updated .gitignore[/green]")
-            any_fixed = True
-
-        if not any_fixed:
-            console.print("[yellow]No fixable issues found[/yellow]")
 
     # Exit with error code if checks failed
     if not doctor_result.passed:
