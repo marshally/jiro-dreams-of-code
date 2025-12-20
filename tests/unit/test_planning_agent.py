@@ -587,3 +587,61 @@ steps:
         assert result.steps
         assert result.estimated_tokens
         assert result.estimated_tokens == (tokens_after - tokens_before)
+
+
+class TestPlanningPromptDefinitionOfDone:
+    """Tests for Definition of Done constraints in planning prompt."""
+
+    @pytest.fixture
+    def mock_client(self):
+        """Create a mock AgentClient."""
+        client = MagicMock()
+        return client
+
+    @pytest.fixture
+    def sample_task(self):
+        """Create a sample task."""
+        return Task(
+            id="task-123",
+            title="Add feature X",
+            task_type="feature",
+            status="open",
+            created_at=datetime.now(),
+        )
+
+    @pytest.mark.unit
+    def test_prompt_forbids_separate_testing_phase(self, mock_client, sample_task):
+        """Prompt should explicitly forbid separate testing phases."""
+        agent = PlanningAgent(mock_client)
+        prompt = agent._build_planning_prompt(sample_task)
+
+        # The prompt should contain guidance about not creating separate testing phases
+        assert "NEVER create separate" in prompt or "never create separate" in prompt.lower()
+        assert "testing phase" in prompt.lower()
+
+    @pytest.mark.unit
+    def test_prompt_forbids_separate_linting_phase(self, mock_client, sample_task):
+        """Prompt should explicitly forbid separate linting phases."""
+        agent = PlanningAgent(mock_client)
+        prompt = agent._build_planning_prompt(sample_task)
+
+        # The prompt should contain guidance about not creating separate linting phases
+        assert "linting phase" in prompt.lower() or "lint phase" in prompt.lower()
+
+    @pytest.mark.unit
+    def test_prompt_forbids_separate_documentation_phase(self, mock_client, sample_task):
+        """Prompt should explicitly forbid separate documentation phases."""
+        agent = PlanningAgent(mock_client)
+        prompt = agent._build_planning_prompt(sample_task)
+
+        # The prompt should contain guidance about not creating separate documentation phases
+        assert "documentation phase" in prompt.lower()
+
+    @pytest.mark.unit
+    def test_prompt_includes_definition_of_done(self, mock_client, sample_task):
+        """Prompt should include definition of done concept."""
+        agent = PlanningAgent(mock_client)
+        prompt = agent._build_planning_prompt(sample_task)
+
+        # The prompt should explain definition of done
+        assert "definition of done" in prompt.lower()

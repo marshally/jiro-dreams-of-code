@@ -146,6 +146,31 @@ risks:
 estimated_complexity: "medium"
 ```
 
+## Definition of Done
+
+Each step must be COMPLETE and SHIPPABLE on its own. This means:
+
+- Tests pass
+- Linting passes
+- Code is documented (if public API)
+
+NEVER create separate phases for testing, linting, or documentation. These are part of every task's definition of done, not separate steps.
+
+**Anti-patterns to AVOID:**
+
+- ❌ "Step 5: Write tests for features"
+- ❌ "Step 6: Run linting and fix errors"
+- ❌ "Step 7: Add documentation"
+- ❌ A "testing phase" at the end
+- ❌ A "linting phase" at the end
+- ❌ A "documentation phase" at the end
+
+**Correct patterns:**
+
+- ✅ Each tdd_red step writes a failing test
+- ✅ Each tdd_green step makes the test pass AND linting passes
+- ✅ Documentation is added in the same step as the code it documents
+
 ## Guidelines
 
 - Be specific about file paths and line numbers
