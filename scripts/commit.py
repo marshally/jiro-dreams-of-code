@@ -35,6 +35,86 @@ def get_staged_files() -> list[str]:
     return [f for f in result.stdout.strip().split("\n") if f]
 
 
+def parse_hook_failures(output: str) -> list[dict]:
+    """Parse pre-commit hook failures into structured errors.
+
+    Returns list of:
+        {"hook": "ruff", "file": "src/foo.py", "line": 10, "error": "E501 ..."}
+    """
+    failures = []
+    lines = output.split("\n")
+
+    current_hook = None
+    in_hook_output = False
+
+    for line in lines:
+        # Skip empty lines and progress dots
+        stripped = line.strip()
+        if not stripped or re.match(r"^[\.\s]+$", stripped):
+            continue
+
+        # Detect hook failure: "ruff.....Failed" or "ruff...Failed"
+        if "Failed" in line and "..." in line:
+            # Extract hook name (everything before the dots)
+            hook_match = re.match(r"^([a-zA-Z0-9_-]+)\.+", stripped)
+            if hook_match:
+                current_hook = hook_match.group(1)
+                in_hook_output = True
+            continue
+
+        # Detect hook passed/skipped - reset state
+        if "Passed" in line or "Skipped" in line:
+            current_hook = None
+            in_hook_output = False
+            continue
+
+        # Skip hook metadata lines
+        if stripped.startswith("- hook id:") or stripped.startswith("- exit code:"):
+            continue
+
+        # Parse actual error lines when in a failed hook's output
+        if current_hook and in_hook_output:
+            # Pattern: file:line:col: error OR file:line: error
+            # Examples:
+            #   src/foo.py:10:5: E501 Line too long
+            #   src/foo.py:10: error: Type mismatch
+            #   +++ src/foo.py (for diff-based hooks)
+
+            # Skip diff headers
+            if stripped.startswith("+++") or stripped.startswith("---"):
+                continue
+
+            # Try to parse file:line:col: message
+            match = re.match(r"^([^:]+):(\d+):(\d+):\s*(.+)$", stripped)
+            if match:
+                failures.append(
+                    {
+                        "hook": current_hook,
+                        "file": match.group(1),
+                        "line": int(match.group(2)),
+                        "col": int(match.group(3)),
+                        "error": match.group(4)[:80],  # Truncate long messages
+                    }
+                )
+                continue
+
+            # Try to parse file:line: message (no column)
+            match = re.match(r"^([^:]+):(\d+):\s*(.+)$", stripped)
+            if match:
+                failures.append(
+                    {
+                        "hook": current_hook,
+                        "file": match.group(1),
+                        "line": int(match.group(2)),
+                        "error": match.group(3)[:80],
+                    }
+                )
+                continue
+
+    # Limit to first 10 errors
+    return failures[:10]
+
+
 def run_commit(message: str) -> dict:
     """Run git commit and return structured results."""
     # Get staged files before commit
@@ -72,37 +152,21 @@ def run_commit(message: str) -> dict:
         }
     else:
         # Parse hook failures
-        hook_failures = []
-        lines = output.split("\n")
+        hook_failures = parse_hook_failures(output)
 
-        current_hook = None
-        for line in lines:
-            # Detect hook names
-            if line.endswith("...Passed"):
-                continue
-            if line.endswith("...Failed"):
-                hook_name = line.replace("...Failed", "").strip()
-                hook_failures.append(hook_name[:40])
-            elif line.endswith("...Skipped"):
-                continue
-            elif "hook id:" in line.lower():
-                # pre-commit hook format
-                if match := re.search(r"hook id: (\S+)", line):
-                    current_hook = match.group(1)
-            elif current_hook and line.strip() and not line.startswith("-"):
-                # Capture first error line for current hook
-                if len(hook_failures) == 0 or hook_failures[-1] != current_hook:
-                    hook_failures.append(f"{current_hook}: {line.strip()[:50]}")
-                current_hook = None
-
-        # Dedupe and limit
-        hook_failures = list(dict.fromkeys(hook_failures))[:5]
+        # If no structured errors found, try to get hook names at least
+        if not hook_failures:
+            for line in output.split("\n"):
+                if "Failed" in line and "..." in line:
+                    hook_match = re.match(r"^([a-zA-Z0-9_-]+)\.+", line.strip())
+                    if hook_match:
+                        hook_failures.append({"hook": hook_match.group(1), "error": "check output"})
 
         return {
             "success": False,
             "sha": None,
             "files_changed": len(staged_files),
-            "error": "Commit failed",
+            "error": "hook_failed",
             "hook_failures": hook_failures,
         }
 
