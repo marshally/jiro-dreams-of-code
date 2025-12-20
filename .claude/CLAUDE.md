@@ -1,5 +1,45 @@
 # Project Instructions for Claude
 
+## Context-Efficient Commands
+
+**ALWAYS** use these wrapper scripts instead of raw commands to minimize context usage:
+
+### Running Tests
+
+```bash
+# ALWAYS use this:
+python scripts/test.py [args]
+
+# NEVER use raw pytest:
+# pytest tests/  ❌ (wastes context with verbose output)
+```
+
+Examples:
+
+```bash
+python scripts/test.py                      # All tests
+python scripts/test.py tests/unit/ --no-cov # Unit tests, no coverage
+python scripts/test.py -k "test_dream"      # Matching tests
+```
+
+Output is compact JSON: `{"success": true, "passed": 1992, "failed": 0, ...}`
+
+### Committing Code
+
+```bash
+# ALWAYS use this:
+python scripts/commit.py "commit message"
+
+# NEVER use raw git commit:
+# git commit -m "..."  ❌ (wastes context with hook output)
+```
+
+Output is compact JSON: `{"success": true, "sha": "abc123", "files_changed": 2, ...}`
+
+If commit fails, check `hook_failures` array for which hooks failed.
+
+______________________________________________________________________
+
 ## Pre-commit Hooks
 
 **CRITICAL**: NEVER skip or bypass pre-commit hooks.
