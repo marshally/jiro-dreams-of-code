@@ -248,7 +248,7 @@ def initialize_beads(
     project_root: Path,
     project_name: str,
     stealth: bool = False,
-) -> bool:
+) -> str:
     """Initialize the beads database.
 
     Args:
@@ -257,9 +257,14 @@ def initialize_beads(
         stealth: If True, use stealth mode paths.
 
     Returns:
-        True if successful, False otherwise.
+        "created" if newly initialized, "exists" if already initialized, "failed" if error.
     """
     jiro_dir = get_jiro_dir(project_root, stealth=stealth, project_name=project_name)
+    beads_dir = jiro_dir / ".beads"
+
+    # Check if already initialized
+    if beads_dir.exists():
+        return "exists"
 
     try:
         # bd init uses the current directory, so change to jiro_dir
@@ -269,15 +274,16 @@ def initialize_beads(
             capture_output=True,
             check=True,
         )
-        return True
-    except subprocess.CalledProcessError:
-        # bd might not be available or might already be initialized
-        console.print("[yellow]Warning: Could not initialize beads database.[/yellow]")
-        console.print("[dim]This is OK if 'bd' is not installed or already initialized.[/dim]")
-        return False
+        return "created"
+    except subprocess.CalledProcessError as e:
+        # Show the actual error for debugging
+        stderr = e.stderr.decode() if e.stderr else ""
+        console.print(f"[yellow]Warning: Could not initialize beads: {stderr.strip()}[/yellow]")
+        return "failed"
     except FileNotFoundError:
         console.print("[yellow]Warning: 'bd' command not found.[/yellow]")
-        return False
+        console.print("[dim]Install beads with: pip install beads-cli[/dim]")
+        return "failed"
 
 
 def run_init(
@@ -332,10 +338,13 @@ def run_init(
     console.print(f"[green]✓[/green] Created config: {config_path}")
 
     # Initialize beads
-    if initialize_beads(project_root, project_name, stealth=stealth):
+    beads_result = initialize_beads(project_root, project_name, stealth=stealth)
+    if beads_result == "created":
         console.print("[green]✓[/green] Initialized beads database")
+    elif beads_result == "exists":
+        console.print("[dim]·[/dim] Beads database already initialized")
     else:
-        console.print("[yellow]![/yellow] Beads database not initialized (manual setup required)")
+        console.print("[yellow]![/yellow] Beads database not initialized (see warning above)")
 
     # Update .gitignore (only in normal mode - stealth mode doesn't need it)
     if not stealth:
