@@ -15,6 +15,28 @@ from jiro.core.paths import get_logs_dir
 # Context variable storage for session and task IDs
 _context_vars: dict[str, Any] = {}
 
+# Silent mode flag - when True, suppress console output (still logs to file)
+_silent_mode: bool = False
+
+
+def set_silent_mode(silent: bool) -> None:
+    """Enable or disable silent mode (suppress console log output).
+
+    Args:
+        silent: If True, suppress console output. Logs still go to file.
+    """
+    global _silent_mode
+    _silent_mode = silent
+
+
+def is_silent_mode() -> bool:
+    """Check if silent mode is enabled.
+
+    Returns:
+        True if silent mode is enabled.
+    """
+    return _silent_mode
+
 
 def get_context_var(key: str) -> Any:
     """Get a context variable.
@@ -99,7 +121,9 @@ class JSONLRenderer:
             json.dump(event_dict, f)
             f.write("\n")
 
-        # Return the JSON string for console output
+        # Return empty string in silent mode, otherwise JSON for console output
+        if _silent_mode:
+            return ""
         return json.dumps(event_dict)
 
 

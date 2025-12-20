@@ -1,7 +1,6 @@
 """Dream command implementation for spec generation."""
 
 import asyncio
-import io
 import json
 import sys
 import time
@@ -24,6 +23,7 @@ from rich.text import Text
 from jiro.agents.client import AgentClient
 from jiro.agents.dreaming import DreamingAgent, InterviewMessage
 from jiro.config.loader import load_config
+from jiro.core.logging import set_silent_mode
 from jiro.core.paths import get_database_path, get_specs_dir
 from jiro.core.planner import Spec
 from jiro.db.database import ensure_schema, get_database
@@ -32,15 +32,13 @@ from jiro.db.repository import DreamSessionRepository, PromptRepository
 
 
 @contextmanager
-def _suppress_structlog_output() -> Generator[None, None, None]:
-    """Context manager to suppress structlog JSON output to stdout."""
-    # Capture stdout to suppress JSON log output
-    old_stdout = sys.stdout
-    sys.stdout = io.StringIO()
+def _silent_logging() -> Generator[None, None, None]:
+    """Context manager to suppress structlog console output."""
+    set_silent_mode(True)
     try:
         yield
     finally:
-        sys.stdout = old_stdout
+        set_silent_mode(False)
 
 
 @contextmanager
@@ -626,7 +624,7 @@ async def _run_interactive_dream(
             initial_conversation,
         )
     else:
-        with _suppress_structlog_output():
+        with _silent_logging():
             result = await agent.interview(
                 get_input,
                 display_message,
@@ -671,7 +669,7 @@ async def _run_interactive_dream(
                 if debug:
                     spec = await agent.refine(spec, feedback)
                 else:
-                    with _suppress_structlog_output():
+                    with _silent_logging():
                         spec = await agent.refine(spec, feedback)
             _display_spec(spec)
 
@@ -747,7 +745,7 @@ async def _run_dream(
         if debug:
             spec = await agent.dream(prompt)
         else:
-            with _suppress_structlog_output():
+            with _silent_logging():
                 spec = await agent.dream(prompt)
 
     # Display the spec
@@ -786,7 +784,7 @@ async def _run_dream(
                 if debug:
                     spec = await agent.refine(spec, feedback)
                 else:
-                    with _suppress_structlog_output():
+                    with _silent_logging():
                         spec = await agent.refine(spec, feedback)
 
             # Display updated spec
