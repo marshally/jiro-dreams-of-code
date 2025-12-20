@@ -67,7 +67,8 @@ class TestBeadsTrackerInit:
     def test_beads_dir_normal_mode(self, temp_project_root):
         """Test beads directory path in normal mode."""
         tracker = BeadsTracker(temp_project_root, stealth=False)
-        expected = temp_project_root / ".beads"
+        # Beads lives inside the jiro directory in both modes
+        expected = temp_project_root / ".jiro-dreams-of-code" / ".beads"
         assert tracker.beads_dir == expected
 
     def test_beads_dir_stealth_mode(self, temp_project_root):

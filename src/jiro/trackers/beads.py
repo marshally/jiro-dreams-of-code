@@ -34,11 +34,9 @@ class BeadsTracker:
         self.project_name = project_name or self.project_root.name
 
         # Determine the beads directory based on mode
-        if stealth:
-            jiro_dir = get_jiro_dir(self.project_root, stealth=True, project_name=self.project_name)
-            self.beads_dir = jiro_dir / ".beads"
-        else:
-            self.beads_dir = self.project_root / ".beads"
+        # In both modes, beads lives inside the jiro directory
+        jiro_dir = get_jiro_dir(self.project_root, stealth=stealth, project_name=self.project_name)
+        self.beads_dir = jiro_dir / ".beads"
 
     def _run_bd_command(self, *args: str) -> str:
         """Run a bd CLI command and return JSON output.

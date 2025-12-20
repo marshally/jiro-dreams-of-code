@@ -168,6 +168,13 @@ async def _run_plan(
     # Create tasks in tracker
     console.print("[cyan]Creating tasks in tracker...[/cyan]")
     tracker = BeadsTracker(project_root, stealth=False, project_name=project_name)
+
+    # Check if beads is initialized
+    if not tracker.beads_dir.exists():
+        console.print("[red]Error: jiro has not been initialized in this project.[/red]")
+        console.print("[dim]Run 'jiro init' first to set up the project.[/dim]")
+        return
+
     created_tasks = create_tasks(plan_result, tracker)
 
     console.print(f"\n[green]Created {len(created_tasks)} tasks:[/green]")
