@@ -20,21 +20,15 @@ from pathlib import Path
 
 def run_pytest(args: list[str]) -> dict:
     """Run pytest and return structured results."""
-    # Build command - use JSON report for structured output
+    # Build command with short traceback for parsing failures
     cmd = [
         sys.executable,
         "-m",
         "pytest",
-        "--tb=no",  # No tracebacks in main output
+        "--tb=line",  # One-line tracebacks for failure info
         "-q",  # Quiet mode
         *args,
     ]
-
-    # Check if coverage is disabled
-    no_cov = "--no-cov" in args
-    if no_cov:
-        cmd = [c for c in cmd if c != "--no-cov"]
-        cmd.extend(["--no-cov"])
 
     # Run pytest
     result = subprocess.run(
@@ -72,14 +66,45 @@ def run_pytest(args: list[str]) -> dict:
     if match := re.search(r"in ([\d.]+)s", summary_line):
         duration = match.group(1) + "s"
 
-    # Extract failed test names if any
+    # Extract failed test details
+    # --tb=line format: "/path/to/test.py:42: AssertionError: message"
     failed_tests = []
     if failed > 0 or errors > 0:
         for line in lines:
-            if line.startswith("FAILED ") or line.startswith("ERROR "):
-                # Extract test name
-                test_name = line.split(" ")[1].split("::")[1] if "::" in line else line
-                failed_tests.append(test_name[:60])  # Truncate long names
+            stripped = line.strip()
+
+            # Skip pytest internals and warnings
+            if "site-packages" in stripped or "Warning:" in stripped:
+                continue
+
+            # Match pytest's line traceback format
+            # e.g., "/full/path/test_foo.py:42: AssertionError"
+            match = re.match(
+                r"^(.+?):(\d+):\s*(Assert\w+|ValueError|TypeError|KeyError|RuntimeError|Exception):\s*(.*)$",
+                stripped,
+            )
+            if match:
+                file_path = match.group(1)
+                # Shorten path - keep just tests/... or src/...
+                if "tests/" in file_path:
+                    file_path = "tests/" + file_path.split("tests/")[-1]
+                elif "src/" in file_path:
+                    file_path = "src/" + file_path.split("src/")[-1]
+                else:
+                    # For other paths, just use basename
+                    file_path = Path(file_path).name
+
+                failed_tests.append(
+                    {
+                        "file": file_path,
+                        "line": int(match.group(2)),
+                        "error": match.group(3),
+                        "msg": match.group(4)[:60] if match.group(4) else "",
+                    }
+                )
+
+    # Limit to first 10
+    failed_tests = failed_tests[:10]
 
     # Extract coverage if present
     coverage = None
@@ -97,7 +122,7 @@ def run_pytest(args: list[str]) -> dict:
         "warnings": warnings,
         "duration": duration,
         "coverage": coverage,
-        "failed_tests": failed_tests[:5],  # Limit to first 5
+        "failures": failed_tests,
     }
 
 
