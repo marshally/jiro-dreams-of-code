@@ -6,6 +6,7 @@ import structlog
 import yaml
 
 from jiro.agents.client import AgentClient
+from jiro.assets.loader import load_prompt
 from jiro.core.execution_plan import (
     ExecutionPlanSchema,
     ExecutionStep,
@@ -92,17 +93,19 @@ class PlanningAgent:
     def _build_planning_prompt(self, task: Task) -> str:
         """Build a prompt for planning a task.
 
+        Loads the base prompt from the asset file and appends task context.
+
         Args:
             task: The Task to create a prompt for.
 
         Returns:
             A formatted prompt for the planning agent.
         """
-        # Valid step types matching commit types
-        step_types = "docs, tdd_red, tdd_green, tdd_refactor, lint_fix, bug_fix, config, test_only, performance"
+        # Load base prompt from asset file
+        base_prompt = load_prompt("planning_agent.md")
 
-        prompt = f"""You are a planning agent that creates detailed execution plans for software development tasks.
-
+        # Build task context section
+        task_context = f"""
 ## Task to Plan
 
 Task ID: {task.id}
@@ -116,80 +119,10 @@ Description:
 
 Labels: {", ".join(task.labels) if task.labels else "None"}
 
-## Your Task
+Generate the execution plan for this task now.
+"""
 
-Create a detailed execution plan for this task. Produce your response in YAML format with the following structure:
-
-```yaml
-task_id: "{task.id}"
-
-steps:
-  - description: "What this step accomplishes"
-    step_type: "docs"  # One of: {step_types}
-    files:
-      - path: "src/path/to/file.py"
-        action: "create"  # One of: create, modify, delete
-        content_hints: "Brief description of what to add/change"
-        location: "function name() or line 42"  # Optional: where in the file
-    verification_command: "pytest tests/unit/test_file.py"  # Command to verify this step
-
-  - description: "Second step"
-    step_type: "tdd_red"
-    files:
-      - path: "tests/test_foo.py"
-        action: "create"
-        content_hints: "Add failing test for feature X"
-    verification_command: "pytest tests/test_foo.py"
-```
-
-## Step Type Guidelines
-
-- **docs**: Documentation-only changes (README, docstrings, comments)
-- **tdd_red**: Write failing tests first (test file changes only)
-- **tdd_green**: Implement minimal code to pass tests (source file changes)
-- **tdd_refactor**: Refactor code while keeping tests passing
-- **lint_fix**: Fix linting errors (single error per step)
-- **bug_fix**: Fix a specific bug
-- **config**: Configuration file changes
-- **test_only**: Add tests to existing code
-- **performance**: Optimization changes
-
-## Definition of Done
-
-Each step must be COMPLETE and SHIPPABLE on its own. This means:
-- Tests pass
-- Linting passes
-- Code is documented (if public API)
-
-NEVER create separate phases for testing, linting, or documentation. These are part of every task's definition of done, not separate steps.
-
-**Anti-patterns to AVOID:**
-- ❌ "Step 5: Write tests for features"
-- ❌ "Step 6: Run linting and fix errors"
-- ❌ "Step 7: Add documentation"
-- ❌ A "testing phase" at the end
-- ❌ A "linting phase" at the end
-- ❌ A "documentation phase" at the end
-
-**Correct patterns:**
-- ✅ Each tdd_red step writes a failing test
-- ✅ Each tdd_green step makes the test pass AND linting passes
-- ✅ Documentation is added in the same step as the code it documents
-
-## Guidelines
-
-- Be specific about file paths (use exact, real paths)
-- Each step should be small enough to complete in one commit
-- Include test creation/modification as separate tdd_red steps
-- Use tdd_green for implementation that makes tests pass
-- Steps should be ordered logically
-- Each step must have a verification_command that can be run
-- For documentation tasks, use step_type: "docs"
-- The files list should include ALL files that will be touched in that step
-
-Generate the execution plan for this task now."""
-
-        return prompt
+        return base_prompt + task_context
 
     def _parse_plan_from_output(self, output: str, task_id: str) -> ExecutionPlanSchema:
         """Parse agent output into an ExecutionPlanSchema.

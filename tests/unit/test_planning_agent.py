@@ -645,3 +645,27 @@ class TestPlanningPromptDefinitionOfDone:
 
         # The prompt should explain definition of done
         assert "definition of done" in prompt.lower()
+
+    @pytest.mark.unit
+    def test_prompt_loads_from_asset_file(self, mock_client, sample_task):
+        """Prompt should be loaded from asset file, not inline."""
+        from jiro.assets.loader import load_prompt
+
+        agent = PlanningAgent(mock_client)
+        prompt = agent._build_planning_prompt(sample_task)
+
+        # Load the asset file content
+        asset_content = load_prompt("planning_agent.md")
+
+        # The prompt should contain key sections from the asset file
+        assert "## Step Types" in asset_content
+        assert "## Definition of Done" in asset_content
+
+        # The generated prompt should include content from the asset
+        assert "## Step Types" in prompt
+        assert "Definition of Done" in prompt
+        assert "NEVER create separate phases" in prompt
+
+        # The prompt should also include task context
+        assert sample_task.id in prompt
+        assert sample_task.title in prompt
