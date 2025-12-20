@@ -13,7 +13,9 @@ from typing import Annotated
 
 import typer
 from prompt_toolkit import PromptSession
+from prompt_toolkit.input import vt100_parser
 from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.keys import Keys
 from rich.console import Console
 from rich.live import Live
 from rich.markdown import Markdown
@@ -29,6 +31,21 @@ from jiro.core.planner import Spec
 from jiro.db.database import ensure_schema, get_database
 from jiro.db.models import DreamSession
 from jiro.db.repository import DreamSessionRepository, PromptRepository
+
+# Register Shift+Enter sequences with prompt_toolkit BEFORE any session is created.
+# By default, prompt_toolkit maps these to Keys.ControlM (Enter), which prevents
+# us from distinguishing Shift+Enter from plain Enter.
+#
+# CSI u protocol (kitty keyboard protocol): ESC [ 13 ; 2 u
+# modifyOtherKeys protocol: ESC [ 27 ; 2 ; 13 ~
+#
+# We map these to a distinguishable key sequence that we can bind to.
+# Using ShiftDown as a proxy since there's no built-in ShiftEnter.
+_SHIFT_ENTER_KEY = Keys.ShiftDown  # Repurpose as our Shift+Enter marker
+
+# Patch the ANSI sequences dict (must happen before any PromptSession is created)
+vt100_parser.ANSI_SEQUENCES["\x1b[13;2u"] = _SHIFT_ENTER_KEY  # CSI u protocol
+vt100_parser.ANSI_SEQUENCES["\x1b[27;2;13~"] = _SHIFT_ENTER_KEY  # modifyOtherKeys
 
 
 @contextmanager
@@ -207,8 +224,6 @@ def _create_multiline_session() -> PromptSession[str]:
     Returns:
         A configured PromptSession for multiline input.
     """
-    from prompt_toolkit.keys import Keys
-
     bindings = KeyBindings()
 
     # Enter submits (override default multiline behavior)
@@ -221,22 +236,12 @@ def _create_multiline_session() -> PromptSession[str]:
             buffer: Buffer = event.current_buffer
             buffer.validate_and_handle()
 
-    # CSI u protocol: ESC [ 13 ; 2 u = Shift+Enter
-    # This handles terminals configured to send CSI u sequences
-    # The sequence arrives as: ESC [ 1 3 ; 2 u
-    @bindings.add(Keys.Escape, "[", "1", "3", ";", "2", "u")
-    def _insert_newline_csi_u(event: object) -> None:
-        """Insert newline when Shift+Enter via CSI u is received."""
-        from prompt_toolkit.buffer import Buffer
-
-        if hasattr(event, "current_buffer"):
-            buffer: Buffer = event.current_buffer
-            buffer.insert_text("\n")
-
-    # Ghostty's modifyOtherKeys format: ESC [ 27 ; 2 ; 13 ~
-    @bindings.add(Keys.Escape, "[", "2", "7", ";", "2", ";", "1", "3", "~")
-    def _insert_newline_modify_other_keys(event: object) -> None:
-        """Insert newline when Shift+Enter via modifyOtherKeys is received."""
+    # Shift+Enter inserts newline (CSI u and modifyOtherKeys protocols)
+    # The sequences are registered at module load time to override prompt_toolkit's
+    # default mapping of these sequences to Keys.ControlM (Enter).
+    @bindings.add(_SHIFT_ENTER_KEY)
+    def _insert_newline_shift_enter(event: object) -> None:
+        """Insert newline when Shift+Enter is pressed."""
         from prompt_toolkit.buffer import Buffer
 
         if hasattr(event, "current_buffer"):
