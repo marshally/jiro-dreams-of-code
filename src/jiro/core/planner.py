@@ -147,7 +147,30 @@ Requirements:
 3. Analyze task dependencies intelligently
 4. Tasks in the same epic can often run in parallel
 5. Cross-epic dependencies should be minimized
-6. Return ONLY valid JSON, no markdown or extra text"""
+6. Return ONLY valid JSON, no markdown or extra text
+
+CRITICAL - Definition of Done:
+Each task represents a COMPLETE, SHIPPABLE unit of work. The following are PART OF every task's definition of done - they are NOT separate tasks or epics:
+- Testing (unit tests, integration tests)
+- Documentation (docstrings, comments, README updates)
+- Linting and code formatting
+- Type hints and type checking
+- Validation and error handling
+- Observability (logging, metrics, monitoring)
+
+ANTI-PATTERNS TO AVOID:
+❌ "Testing & Validation" epic
+❌ "Documentation" epic
+❌ "Write tests for X" task
+❌ "Add documentation for X" task
+❌ "Add type hints" task
+❌ "Add logging" task
+❌ Any task that is purely about testing, docs, linting, or observability
+
+CORRECT PATTERN:
+✅ Each task includes its own tests, docs, and validation as part of completion
+✅ Epics represent functional workstreams (e.g., "User Authentication", "API Endpoints")
+✅ Tasks deliver working, tested, documented functionality"""
         return prompt
 
     def _parse_plan_result(self, response: str, spec: Spec) -> PlanResult:
