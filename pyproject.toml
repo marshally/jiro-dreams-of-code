@@ -148,6 +148,7 @@ markers = [
     "integration: Integration tests",
     "e2e: End-to-end tests",
     "asyncio: Async tests",
+    "allow_api: Allow real API calls (consumes tokens)",
 ]
 
 [tool.coverage.run]
