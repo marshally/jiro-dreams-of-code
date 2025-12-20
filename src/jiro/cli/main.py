@@ -22,7 +22,7 @@ from jiro.cli.plan import app as plan_app
 from jiro.cli.status import app as status_app
 from jiro.cli.tasks import app as tasks_app
 from jiro.cli.web import app as web_app
-from jiro.core.logging import configure_logging
+from jiro.core.logging import configure_logging, set_silent_mode
 
 app = typer.Typer(
     name="jiro",
@@ -70,6 +70,10 @@ def main(
         log_level = logging.DEBUG  # Both -v and -vv map to DEBUG for now
     else:
         log_level = logging.INFO
+
+    # Enable silent mode by default - suppress console log output unless verbose
+    # Logs still go to file regardless of silent mode
+    set_silent_mode(verbose == 0)
 
     # Initialize logging
     configure_logging(verbosity=log_level)
