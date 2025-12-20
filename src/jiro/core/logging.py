@@ -159,14 +159,22 @@ def configure_logging(
     log_file = logs_dir / f"{today}.jsonl"
 
     # Configure standard logging
-    logging.basicConfig(
-        level=verbosity,
-        handlers=[
+    # Only add RichHandler for console output when in verbose mode (DEBUG level)
+    # Otherwise, use NullHandler to suppress external library logs from STDOUT
+    if verbosity <= logging.DEBUG:
+        handlers: list[logging.Handler] = [
             RichHandler(
-                console=Console(force_terminal=True),
+                console=Console(force_terminal=True, stderr=True),
                 rich_tracebacks=True,
             ),
-        ],
+        ]
+    else:
+        handlers = [logging.NullHandler()]
+
+    logging.basicConfig(
+        level=verbosity,
+        handlers=handlers,
+        force=True,  # Override any existing configuration
     )
 
     # Configure structlog
