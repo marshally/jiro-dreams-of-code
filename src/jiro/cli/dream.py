@@ -83,6 +83,19 @@ def _get_thinking_message() -> str:
     return random.choice(THINKING_MESSAGES)
 
 
+def _get_terminal_width() -> int:
+    """Get the terminal width, with a sensible default."""
+    import shutil
+
+    return shutil.get_terminal_size().columns
+
+
+def _print_divider(console: Console) -> None:
+    """Print a horizontal divider line spanning the terminal width."""
+    width = _get_terminal_width()
+    console.print("[dim]" + "─" * width + "[/dim]")
+
+
 def _create_multiline_session() -> PromptSession[str]:
     """Create a prompt_toolkit session with multiline support.
 
@@ -471,7 +484,9 @@ async def _run_interactive_dream(
     input_session = _create_multiline_session()
 
     async def get_input() -> str:
+        _print_divider(console)
         result: str = await input_session.prompt_async("> ")
+        _print_divider(console)
         return result.strip()
 
     def display_message(message: str) -> None:
@@ -535,7 +550,9 @@ async def _run_interactive_dream(
     try:
         while True:
             try:
+                _print_divider(console)
                 feedback = (await refinement_session.prompt_async("Refinement> ")).strip()
+                _print_divider(console)
             except EOFError:
                 console.print("\n[green]Exiting...[/green]")
                 break
@@ -645,7 +662,9 @@ async def _run_dream(
     try:
         while True:
             try:
+                _print_divider(console)
                 feedback = (await refinement_session.prompt_async("Refinement> ")).strip()
+                _print_divider(console)
             except EOFError:
                 # Ctrl+D was pressed
                 console.print("\n[green]Exiting...[/green]")
