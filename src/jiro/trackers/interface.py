@@ -45,6 +45,8 @@ class IssueTracker(Protocol):
         priority: int | None = None,
         epic_id: str | None = None,
         labels: list[str] | None = None,
+        design: str | None = None,
+        acceptance: list[str] | None = None,
     ) -> Task:
         """Create a new task.
 
@@ -55,6 +57,8 @@ class IssueTracker(Protocol):
             priority: Optional priority (1-5, 1 is highest).
             epic_id: Optional parent epic ID.
             labels: Optional list of labels.
+            design: Optional design/architecture notes.
+            acceptance: Optional list of acceptance criteria.
 
         Returns:
             The created task.

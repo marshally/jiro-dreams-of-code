@@ -135,6 +135,8 @@ class BeadsTracker:
         priority: int | None = None,
         epic_id: str | None = None,
         labels: list[str] | None = None,
+        design: str | None = None,
+        acceptance: list[str] | None = None,
     ) -> Task:
         """Create a new task.
 
@@ -145,6 +147,8 @@ class BeadsTracker:
             priority: Optional priority (0-4, 0 is highest).
             epic_id: Optional parent epic ID.
             labels: Optional list of labels.
+            design: Optional design/architecture notes.
+            acceptance: Optional list of acceptance criteria.
 
         Returns:
             The created task.
@@ -165,6 +169,14 @@ class BeadsTracker:
 
         if labels:
             args.extend(["-l", ",".join(labels)])
+
+        if design:
+            args.extend(["--design", design])
+
+        if acceptance:
+            # Format acceptance criteria as checkbox list
+            criteria_text = "\n".join(f"- [ ] {item}" for item in acceptance)
+            args.extend(["--acceptance", criteria_text])
 
         output = self._run_bd_command(*args)
         tasks = self._normalize_response(json.loads(output))

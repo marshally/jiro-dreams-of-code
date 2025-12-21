@@ -41,6 +41,8 @@ class Task:
     description: str
     epic_id: str
     dependencies: list[str] = field(default_factory=list)
+    design: str | None = None
+    acceptance: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -99,7 +101,7 @@ class SpecPlanner:
         criteria_str = "\n".join(f"  - {c}" for c in spec.acceptance_criteria)
         out_of_scope_str = "\n".join(f"  - {o}" for o in spec.out_of_scope)
 
-        prompt = f"""You are a task decomposition expert. Break down the following feature specification into parallel epics and detailed tasks.
+        prompt = f"""You are a task decomposition expert. Break down the following feature specification into parallel epics and detailed, actionable tasks.
 
 Feature: {spec.title}
 
@@ -131,8 +133,14 @@ Generate a JSON response with this exact structure:
     {{
       "id": "task-1",
       "title": "Task Title",
-      "description": "Task description",
+      "description": "What to implement - specific and actionable",
       "epic_id": "epic-1",
+      "design": "How to approach it - architecture, patterns, key decisions",
+      "acceptance": [
+        "Specific testable criterion 1",
+        "Specific testable criterion 2",
+        "Tests pass"
+      ],
       "dependencies": ["task-0"]
     }}
   ],
@@ -141,36 +149,58 @@ Generate a JSON response with this exact structure:
   ]
 }}
 
-Requirements:
-1. Create 2-4 parallel epics representing different workstreams
-2. Each epic should have 2-4 tasks
-3. Analyze task dependencies intelligently
-4. Tasks in the same epic can often run in parallel
-5. Cross-epic dependencies should be minimized
-6. Return ONLY valid JSON, no markdown or extra text
+TASK QUALITY REQUIREMENTS:
 
-CRITICAL - Definition of Done:
-Each task represents a COMPLETE, SHIPPABLE unit of work. The following are PART OF every task's definition of done - they are NOT separate tasks or epics:
+1. **Title**: Clear, action-oriented (e.g., "Create X", "Implement Y", "Add Z")
+
+2. **Description**: Specific implementation details
+   - What exactly to build
+   - Key behaviors and edge cases to handle
+   - Example inputs/outputs if helpful
+
+3. **Design**: Architecture and approach notes
+   - Suggested patterns or techniques
+   - Key design decisions
+   - File paths if known (e.g., "Create in src/utils/parser.py")
+
+4. **Acceptance Criteria**: 3-5 testable checkboxes
+   - Specific, measurable outcomes
+   - Include "Tests pass" as final criterion
+   - Focus on behavior, not implementation details
+
+TASK SIZING:
+- Each task should be completable in <30 minutes
+- Each task should change only ONE thing
+- Each task should be independently committable
+- If a task seems large, break it into smaller tasks
+
+EPIC STRUCTURE:
+- Create 2-4 parallel epics representing different workstreams
+- Each epic should have 2-4 tasks
+- Minimize cross-epic dependencies
+- Return ONLY valid JSON, no markdown or extra text
+
+DEFINITION OF DONE (applies to ALL tasks):
+Each task represents a COMPLETE, SHIPPABLE unit of work including:
 - Testing (unit tests, integration tests)
-- Documentation (docstrings, comments, README updates)
+- Documentation (docstrings, comments)
 - Linting and code formatting
 - Type hints and type checking
 - Validation and error handling
-- Observability (logging, metrics, monitoring)
 
 ANTI-PATTERNS TO AVOID:
 ❌ "Testing & Validation" epic
 ❌ "Documentation" epic
 ❌ "Write tests for X" task
 ❌ "Add documentation for X" task
-❌ "Add type hints" task
-❌ "Add logging" task
-❌ Any task that is purely about testing, docs, linting, or observability
+❌ Vague acceptance criteria like "Works correctly"
+❌ Tasks that take more than 30 minutes
 
-CORRECT PATTERN:
-✅ Each task includes its own tests, docs, and validation as part of completion
-✅ Epics represent functional workstreams (e.g., "User Authentication", "API Endpoints")
-✅ Tasks deliver working, tested, documented functionality"""
+CORRECT PATTERNS:
+✅ Each task includes its own tests as part of completion
+✅ Epics represent functional workstreams
+✅ Acceptance criteria are specific and testable
+✅ Design notes explain the approach"""
         return prompt
 
     def _parse_plan_result(self, response: str, spec: Spec) -> PlanResult:
@@ -214,6 +244,8 @@ CORRECT PATTERN:
                         description=task_data.get("description", ""),
                         epic_id=task_data.get("epic_id", ""),
                         dependencies=task_data.get("dependencies", []),
+                        design=task_data.get("design"),
+                        acceptance=task_data.get("acceptance", []),
                     )
                     tasks.append(task)
 
@@ -392,6 +424,8 @@ def create_tasks(plan: PlanResult, tracker: IssueTracker) -> list[TrackerTask]:
             description=task.description,
             task_type="task",
             epic_id=epic_tracker_id,
+            design=task.design,
+            acceptance=task.acceptance if task.acceptance else None,
         )
         plan_id_to_tracker_id[task.id] = created_task.id
         created_tasks.append(created_task)
