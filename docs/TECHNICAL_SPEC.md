@@ -1310,16 +1310,20 @@ ______________________________________________________________________
 
 ## Definition of Done
 
-Every feature must include:
+> **See [DEFINITION_OF_DONE.md](./DEFINITION_OF_DONE.md) for the full specification.**
 
-1. **Code written** - Implementation complete
-1. **Has tests** - Unit and/or integration tests with appropriate coverage
-1. **Has observability** - Logging at appropriate levels
-1. **Docs updated** - User-facing documentation current
-1. **Hooked to CLI and Web UI** - If applicable
-1. **Doctor updated** - If applicable, health checks added
+Every task is a complete, shippable unit of work. Testing, documentation, and quality checks are not separate tasks—they are part of every task's completion criteria.
 
-Coverage requirement: 70-80%
+A task is done when:
+
+1. **Code works** - The feature/fix functions as specified
+1. **Tests pass** - Unit tests cover the new/changed code
+1. **Linting passes** - No lint errors
+1. **Types check** - No type errors
+1. **Docs updated** - Docstrings for public APIs
+1. **Committed** - Changes committed with a clear message
+
+**Critical**: When planning tasks, never create separate tasks for testing, documentation, or linting. These are part of each task's definition of done.
 
 ______________________________________________________________________
 
