@@ -125,7 +125,13 @@ class TestPushToOrigin:
     def test_returns_true_when_push_succeeds(self) -> None:
         """push_to_origin should return True when git push succeeds."""
         with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0, stdout="")
+
+            def mock_git_command(cmd, *args, **kwargs):
+                if cmd[0:3] == ["git", "remote", "get-url"]:
+                    return MagicMock(returncode=0, stdout="https://github.com/test/repo\n")
+                return MagicMock(returncode=0, stdout="")
+
+            mock_run.side_effect = mock_git_command
 
             result = push_to_origin()
             assert result is True
@@ -133,20 +139,43 @@ class TestPushToOrigin:
     def test_returns_false_when_push_fails(self) -> None:
         """push_to_origin should return False when git push fails."""
         with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=1, stderr="push failed")
+
+            def mock_git_command(cmd, *args, **kwargs):
+                if cmd[0:3] == ["git", "remote", "get-url"]:
+                    return MagicMock(returncode=0, stdout="https://github.com/test/repo\n")
+                return MagicMock(returncode=1, stderr="push failed")
+
+            mock_run.side_effect = mock_git_command
 
             result = push_to_origin()
             assert result is False
 
+    def test_returns_true_when_no_origin(self) -> None:
+        """push_to_origin should return True when there is no origin remote."""
+        with patch("subprocess.run") as mock_run:
+            # Origin check fails - no remote
+            mock_run.return_value = MagicMock(returncode=1, stderr="fatal: No such remote")
+
+            result = push_to_origin()
+            assert result is True
+
     def test_uses_git_push_origin_head(self) -> None:
         """push_to_origin should use 'git push origin HEAD' command."""
         with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0, stdout="")
+
+            def mock_git_command(cmd, *args, **kwargs):
+                if cmd[0:3] == ["git", "remote", "get-url"]:
+                    return MagicMock(returncode=0, stdout="https://github.com/test/repo\n")
+                return MagicMock(returncode=0, stdout="")
+
+            mock_run.side_effect = mock_git_command
 
             push_to_origin()
 
-            mock_run.assert_called_once()
-            args = mock_run.call_args[0][0]
+            # Should be called twice: once for remote check, once for push
+            assert mock_run.call_count == 2
+            # Second call should be the push command
+            args = mock_run.call_args_list[1][0][0]
             assert args == ["git", "push", "origin", "HEAD"]
 
     def test_returns_false_on_exception(self) -> None:

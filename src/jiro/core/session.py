@@ -147,11 +147,23 @@ def check_up_to_date() -> bool:
     """Check if the local repository is up to date with origin.
 
     Performs git fetch and compares local HEAD with origin/HEAD.
+    If there is no origin remote, the check passes (returns True).
 
     Returns:
-        True if up to date with origin, False otherwise.
+        True if up to date with origin or no origin exists, False otherwise.
     """
     try:
+        # Check if origin remote exists
+        remote_result = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if remote_result.returncode != 0:
+            # No origin remote, skip this check
+            return True
+
         # Fetch latest from origin
         fetch_result = subprocess.run(
             ["git", "fetch"],
@@ -388,10 +400,23 @@ def run_full_lint(config: Config) -> bool:
 def push_to_origin() -> bool:
     """Push the current branch to origin.
 
+    If there is no origin remote, the check passes (returns True).
+
     Returns:
-        True if push succeeds, False otherwise.
+        True if push succeeds or no origin exists, False otherwise.
     """
     try:
+        # Check if origin remote exists
+        remote_result = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if remote_result.returncode != 0:
+            # No origin remote, skip this check
+            return True
+
         result = subprocess.run(
             ["git", "push", "origin", "HEAD"],
             capture_output=True,

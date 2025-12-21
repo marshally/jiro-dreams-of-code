@@ -115,8 +115,10 @@ class TestCheckUpToDate:
     def test_returns_true_when_up_to_date(self) -> None:
         """check_up_to_date should return True when local is up to date with origin."""
         with patch("subprocess.run") as mock_run:
-            # Mock both fetch and rev-parse calls
+            # Mock origin check, fetch, and rev-parse calls
             def mock_git_command(cmd, *args, **kwargs):
+                if cmd[0:3] == ["git", "remote", "get-url"]:
+                    return MagicMock(returncode=0, stdout="https://github.com/test/repo\n")
                 if cmd[0:2] == ["git", "fetch"]:
                     return MagicMock(returncode=0, stdout="")
                 # Both rev-parse calls return same SHA
@@ -132,6 +134,8 @@ class TestCheckUpToDate:
         with patch("subprocess.run") as mock_run:
 
             def mock_git_command(cmd, *args, **kwargs):
+                if cmd[0:3] == ["git", "remote", "get-url"]:
+                    return MagicMock(returncode=0, stdout="https://github.com/test/repo\n")
                 if cmd[0:2] == ["git", "fetch"]:
                     return MagicMock(returncode=0, stdout="")
                 if cmd[2] == "HEAD":
@@ -144,10 +148,26 @@ class TestCheckUpToDate:
             result = check_up_to_date()
             assert result is False
 
-    def test_returns_false_when_git_command_fails(self) -> None:
-        """check_up_to_date should return False if git command fails."""
+    def test_returns_true_when_no_origin(self) -> None:
+        """check_up_to_date should return True when there is no origin remote."""
         with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=1, stderr="fatal error")
+            # Origin check fails - no remote
+            mock_run.return_value = MagicMock(returncode=1, stderr="fatal: No such remote")
+
+            result = check_up_to_date()
+            assert result is True
+
+    def test_returns_false_when_fetch_fails(self) -> None:
+        """check_up_to_date should return False if git fetch fails."""
+        with patch("subprocess.run") as mock_run:
+
+            def mock_git_command(cmd, *args, **kwargs):
+                if cmd[0:3] == ["git", "remote", "get-url"]:
+                    return MagicMock(returncode=0, stdout="https://github.com/test/repo\n")
+                # Fetch fails
+                return MagicMock(returncode=1, stderr="fatal error")
+
+            mock_run.side_effect = mock_git_command
 
             result = check_up_to_date()
             assert result is False
