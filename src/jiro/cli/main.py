@@ -11,6 +11,7 @@ from rich.table import Table
 from jiro import __version__
 from jiro.cli.assets import app as assets_app
 from jiro.cli.auth import app as auth_app
+from jiro.cli.completions import app as completions_app
 from jiro.cli.config import app as config_app
 from jiro.cli.doctor import fix_gitignore, fix_missing_config, run_doctor
 from jiro.cli.dream import app as dream_app
@@ -28,6 +29,7 @@ app = typer.Typer(
     name="jiro",
     help="A disciplined AI agent orchestration system using the shokunin philosophy",
     no_args_is_help=True,
+    add_completion=False,
 )
 
 console = Console()
@@ -184,6 +186,9 @@ app.add_typer(assets_app, name="assets")
 
 # Wire auth subcommand from auth module
 app.add_typer(auth_app, name="auth")
+
+# Wire completions subcommand from completions module
+app.add_typer(completions_app, name="completions")
 
 
 if __name__ == "__main__":
