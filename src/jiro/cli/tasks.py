@@ -73,7 +73,6 @@ def _display_tasks_table(tasks: list[Task]) -> None:
     table.add_column("Type", style="magenta")
     table.add_column("Status", style="green")
     table.add_column("Priority", style="yellow")
-    table.add_column("Epic", style="blue")
 
     # Sort status order for display
     status_order = ["open", "in_progress", "blocked", "closed"]
@@ -84,7 +83,6 @@ def _display_tasks_table(tasks: list[Task]) -> None:
     for status in sorted_statuses:
         status_tasks = grouped[status]
         for task in status_tasks:
-            epic_display = task.epic_id if task.epic_id else "-"
             priority_display = str(task.priority) if task.priority is not None else "-"
             table.add_row(
                 task.id,
@@ -92,7 +90,6 @@ def _display_tasks_table(tasks: list[Task]) -> None:
                 task.task_type,
                 task.status,
                 priority_display,
-                epic_display,
             )
 
     console.print(table)
