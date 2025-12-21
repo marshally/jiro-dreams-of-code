@@ -266,3 +266,46 @@ def tasks_next(
     except Exception as e:  # noqa: B904
         console.print(f"[red]Error getting next task: {str(e)}[/red]")
         raise typer.Exit(code=1) from e
+
+
+@app.command("delete")
+def tasks_delete(
+    task_ids: Annotated[list[str], typer.Argument(help="Task ID(s) to delete")],
+    cascade: Annotated[
+        bool, typer.Option("--cascade", "-c", help="Recursively delete dependent tasks")
+    ] = False,
+    force: Annotated[bool, typer.Option("--force", "-f", help="Skip confirmation prompt")] = False,
+) -> None:
+    """
+    Delete one or more tasks permanently.
+
+    This is a destructive operation that cannot be undone.
+
+    Examples:
+        jiro tasks delete JIRO-15
+        jiro tasks delete JIRO-15 JIRO-16 JIRO-17
+        jiro tasks delete JIRO-15 --cascade  # Also delete dependents
+        jiro tasks delete JIRO-15 --force    # Skip confirmation
+    """
+    try:
+        tracker = _get_tracker()
+
+        # Confirm deletion unless --force is used
+        if not force:
+            task_list = ", ".join(task_ids)
+            cascade_msg = " (and all dependents)" if cascade else ""
+            if not typer.confirm(f"Delete {task_list}{cascade_msg}? This cannot be undone"):
+                console.print("[yellow]Deletion cancelled[/yellow]")
+                raise typer.Exit(code=0)
+
+        # Delete tasks
+        if len(task_ids) == 1:
+            tracker.delete_task(task_ids[0], cascade=cascade)
+        else:
+            tracker.delete_tasks(task_ids, cascade=cascade)
+
+        console.print(f"[green]Deleted {len(task_ids)} task(s)[/green]")
+
+    except Exception as e:  # noqa: B904
+        console.print(f"[red]Error deleting task(s): {str(e)}[/red]")
+        raise typer.Exit(code=1) from e

@@ -314,3 +314,40 @@ class BeadsTracker:
             args.extend(["-r", reason])
 
         self._run_bd_command(*args)
+
+    def delete_task(self, task_id: str, cascade: bool = False) -> None:
+        """Delete a task permanently.
+
+        Args:
+            task_id: The task to delete.
+            cascade: If True, recursively delete all dependent tasks.
+
+        Raises:
+            subprocess.CalledProcessError: If the task has dependents and cascade=False.
+        """
+        args = ["delete", task_id, "--force"]
+
+        if cascade:
+            args.append("--cascade")
+
+        self._run_bd_command(*args)
+
+    def delete_tasks(self, task_ids: list[str], cascade: bool = False) -> None:
+        """Delete multiple tasks permanently.
+
+        Args:
+            task_ids: List of task IDs to delete.
+            cascade: If True, recursively delete all dependent tasks.
+
+        Raises:
+            subprocess.CalledProcessError: If any task has dependents and cascade=False.
+        """
+        if not task_ids:
+            return
+
+        args = ["delete"] + task_ids + ["--force"]
+
+        if cascade:
+            args.append("--cascade")
+
+        self._run_bd_command(*args)
