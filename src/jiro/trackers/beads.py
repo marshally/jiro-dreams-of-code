@@ -88,6 +88,24 @@ class BeadsTracker:
             labels=data.get("labels"),
         )
 
+    def _normalize_response(self, data: dict | list) -> list[dict]:
+        """Normalize bd CLI response to always be a list.
+
+        bd commands may return a single object or an array.
+        This method normalizes to always return a list.
+
+        Args:
+            data: Parsed JSON data (dict or list).
+
+        Returns:
+            List of task dictionaries.
+        """
+        if isinstance(data, dict):
+            return [data]
+        elif isinstance(data, list):
+            return data
+        return []
+
     def _parse_datetime(self, timestamp: str | None) -> datetime | None:
         """Parse an ISO 8601 timestamp string.
 
@@ -149,7 +167,7 @@ class BeadsTracker:
             args.extend(["-l", ",".join(labels)])
 
         output = self._run_bd_command(*args)
-        tasks = json.loads(output)
+        tasks = self._normalize_response(json.loads(output))
 
         if not tasks:
             raise ValueError("No task returned from create")
@@ -169,7 +187,7 @@ class BeadsTracker:
             KeyError: If task not found.
         """
         output = self._run_bd_command("show", task_id)
-        tasks = json.loads(output)
+        tasks = self._normalize_response(json.loads(output))
 
         if not tasks:
             raise KeyError(f"Task {task_id} not found")
@@ -199,7 +217,7 @@ class BeadsTracker:
             args.extend(["--parent", epic_id])
 
         output = self._run_bd_command(*args)
-        tasks_data = json.loads(output)
+        tasks_data = self._normalize_response(json.loads(output))
 
         return [self._parse_task(task_data) for task_data in tasks_data]
 
@@ -243,7 +261,7 @@ class BeadsTracker:
             args.extend(["-l", ",".join(labels)])
 
         output = self._run_bd_command(*args)
-        tasks = json.loads(output)
+        tasks = self._normalize_response(json.loads(output))
 
         if not tasks:
             raise ValueError("No task returned from update")
@@ -267,7 +285,7 @@ class BeadsTracker:
             args.extend(["--parent", epic_id])
 
         output = self._run_bd_command(*args)
-        tasks = json.loads(output)
+        tasks = self._normalize_response(json.loads(output))
 
         if not tasks:
             return None
