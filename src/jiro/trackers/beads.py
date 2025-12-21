@@ -86,6 +86,8 @@ class BeadsTracker:
             updated_at=updated_at,
             closed_at=closed_at,
             labels=data.get("labels"),
+            design=data.get("design"),
+            acceptance=data.get("acceptance_criteria"),
         )
 
     def _normalize_response(self, data: dict | list) -> list[dict]:

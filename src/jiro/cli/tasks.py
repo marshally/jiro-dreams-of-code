@@ -40,6 +40,8 @@ def _format_task_json(task: Task) -> dict:
         "priority": task.priority,
         "epic_id": task.epic_id,
         "description": task.description,
+        "design": task.design,
+        "acceptance": task.acceptance,
         "created_at": task.created_at.isoformat() if task.created_at else None,
         "updated_at": task.updated_at.isoformat() if task.updated_at else None,
         "closed_at": task.closed_at.isoformat() if task.closed_at else None,
@@ -113,6 +115,14 @@ def _display_task_detail(task: Task) -> None:
     # Add epic info if present
     if task.epic_id:
         table.add_row("Epic", task.epic_id)
+
+    # Add design notes if present
+    if task.design:
+        table.add_row("Design", task.design)
+
+    # Add acceptance criteria if present
+    if task.acceptance:
+        table.add_row("Acceptance", task.acceptance)
 
     # Add timestamps
     if task.created_at:

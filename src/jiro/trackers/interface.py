@@ -27,6 +27,8 @@ class Task:
     updated_at: datetime | None = None
     closed_at: datetime | None = None
     labels: list[str] | None = None
+    design: str | None = None
+    acceptance: str | None = None
 
 
 @runtime_checkable
