@@ -280,7 +280,9 @@ def tasks_next(
 
 @app.command("delete")
 def tasks_delete(
-    task_ids: Annotated[list[str], typer.Argument(help="Task ID(s) to delete")],
+    task_ids: Annotated[
+        list[str], typer.Argument(help="Task ID(s) to delete, or '*' for all open")
+    ],
     cascade: Annotated[
         bool, typer.Option("--cascade", "-c", help="Recursively delete dependent tasks")
     ] = False,
@@ -294,15 +296,24 @@ def tasks_delete(
     Examples:
         jiro tasks delete JIRO-15
         jiro tasks delete JIRO-15 JIRO-16 JIRO-17
+        jiro tasks delete '*'              # Delete all open tasks
         jiro tasks delete JIRO-15 --cascade  # Also delete dependents
         jiro tasks delete JIRO-15 --force    # Skip confirmation
     """
     try:
         tracker = _get_tracker()
 
+        # Handle wildcard - delete all open tasks
+        if task_ids == ["*"]:
+            all_tasks = tracker.list_tasks(status="open")
+            if not all_tasks:
+                console.print("[yellow]No open tasks to delete[/yellow]")
+                raise typer.Exit(code=0)
+            task_ids = [t.id for t in all_tasks]
+
         # Confirm deletion unless --force is used
         if not force:
-            task_list = ", ".join(task_ids)
+            task_list = f"{len(task_ids)} tasks" if len(task_ids) > 5 else ", ".join(task_ids)
             cascade_msg = " (and all dependents)" if cascade else ""
             if not typer.confirm(f"Delete {task_list}{cascade_msg}? This cannot be undone"):
                 console.print("[yellow]Deletion cancelled[/yellow]")
