@@ -78,9 +78,10 @@ def run_pytest(args: list[str]) -> dict:
                 continue
 
             # Match pytest's line traceback format
-            # e.g., "/full/path/test_foo.py:42: AssertionError"
+            # e.g., "/full/path/test_foo.py:42: AttributeError: message"
+            # Exception pattern: any CamelCase word ending in Error or Exception
             match = re.match(
-                r"^(.+?):(\d+):\s*(Assert\w+|ValueError|TypeError|KeyError|RuntimeError|Exception):\s*(.*)$",
+                r"^(.+?):(\d+):\s*([A-Z]\w*(?:Error|Exception)):\s*(.*)$",
                 stripped,
             )
             if match:
