@@ -78,31 +78,47 @@ def run_pytest(args: list[str]) -> dict:
                 continue
 
             # Match pytest's line traceback format
-            # e.g., "/full/path/test_foo.py:42: AttributeError: message"
-            # Exception pattern: any CamelCase word ending in Error or Exception
+            # Format 1: "/path/test.py:42: ExceptionName: message"
+            # Format 2: "/path/test.py:42: module.Exception: message"
+            # Format 3: "/path/test.py:42: assert expr" (no exception name)
             match = re.match(
-                r"^(.+?):(\d+):\s*([A-Z]\w*(?:Error|Exception)):\s*(.*)$",
+                r"^(.+?):(\d+):\s*([\w.]+):\s*(.*)$",
                 stripped,
             )
             if match:
                 file_path = match.group(1)
-                # Shorten path - keep just tests/... or src/...
-                if "tests/" in file_path:
-                    file_path = "tests/" + file_path.split("tests/")[-1]
-                elif "src/" in file_path:
-                    file_path = "src/" + file_path.split("src/")[-1]
-                else:
-                    # For other paths, just use basename
-                    file_path = Path(file_path).name
-
-                failed_tests.append(
-                    {
-                        "file": file_path,
-                        "line": int(match.group(2)),
-                        "error": match.group(3),
-                        "msg": match.group(4)[:60] if match.group(4) else "",
-                    }
+                error_type = match.group(3)
+                msg = match.group(4)
+            else:
+                # Try format without exception name (bare assertions)
+                match = re.match(
+                    r"^(.+?):(\d+):\s*(assert\s+.*)$",
+                    stripped,
                 )
+                if match:
+                    file_path = match.group(1)
+                    error_type = "AssertionError"
+                    msg = match.group(3)
+                else:
+                    continue
+
+            # Shorten path - keep just tests/... or src/...
+            if "tests/" in file_path:
+                file_path = "tests/" + file_path.split("tests/")[-1]
+            elif "src/" in file_path:
+                file_path = "src/" + file_path.split("src/")[-1]
+            else:
+                # For other paths, just use basename
+                file_path = Path(file_path).name
+
+            failed_tests.append(
+                {
+                    "file": file_path,
+                    "line": int(match.group(2)),
+                    "error": error_type,
+                    "msg": msg[:60] if msg else "",
+                }
+            )
 
     # Limit to first 10
     failed_tests = failed_tests[:10]
