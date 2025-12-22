@@ -213,7 +213,9 @@ class TestPlanCommand:
             patch("jiro.cli.plan.SpecPlanner") as mock_planner_class,
             patch("jiro.cli.plan.BeadsTracker") as mock_tracker_class,
             patch("jiro.cli.plan.ProjectInspector") as mock_inspector_class,
-            patch("jiro.cli.plan.typer.confirm", side_effect=[False, False]),  # Skip bootstrap, proceed with planning
+            patch(
+                "jiro.cli.plan.typer.confirm", side_effect=[False, False]
+            ),  # Skip bootstrap, proceed with planning
         ):
             # Setup mocks
             mock_config = MagicMock()

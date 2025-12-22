@@ -98,7 +98,9 @@ class ProjectInspector:
                 version_file=self._find_python_version_file(),
             )
             languages.append(lang)
-            logger.info("detected_language", language="Python", package_manager=lang.package_manager)
+            logger.info(
+                "detected_language", language="Python", package_manager=lang.package_manager
+            )
 
         # JavaScript/TypeScript detection
         if self._has_javascript():
@@ -108,7 +110,11 @@ class ProjectInspector:
                 version_file="package.json",
             )
             languages.append(lang)
-            logger.info("detected_language", language="JavaScript/TypeScript", package_manager=lang.package_manager)
+            logger.info(
+                "detected_language",
+                language="JavaScript/TypeScript",
+                package_manager=lang.package_manager,
+            )
 
         # Go detection
         if self._has_go():

@@ -147,7 +147,9 @@ def _detect_and_suggest_bootstrap_tasks(
         console.print(f"  - {component}")
 
     # Offer to create bootstrap tasks
-    console.print("\n[yellow]jiro can create bootstrap tasks to set up missing infrastructure.[/yellow]")
+    console.print(
+        "\n[yellow]jiro can create bootstrap tasks to set up missing infrastructure.[/yellow]"
+    )
     create_bootstrap: bool = typer.confirm(
         "Would you like to create bootstrap tasks for missing infrastructure?",
         default=True,

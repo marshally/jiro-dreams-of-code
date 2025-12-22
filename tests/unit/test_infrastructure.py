@@ -96,8 +96,7 @@ class TestProjectInspectorPackageManagers:
         inspector = ProjectInspector(tmp_path)
         analysis = inspector.analyze()
         assert any(
-            lang.name == "Python" and lang.package_manager == "uv"
-            for lang in analysis.languages
+            lang.name == "Python" and lang.package_manager == "uv" for lang in analysis.languages
         )
 
     @pytest.mark.unit
@@ -161,9 +160,7 @@ class TestProjectInspectorFrameworkDetection:
     @pytest.mark.unit
     def test_detects_react(self, tmp_path: Path) -> None:
         """Should detect React in JavaScript projects."""
-        (tmp_path / "package.json").write_text(
-            '{"name":"test","dependencies":{"react":"^18.0.0"}}'
-        )
+        (tmp_path / "package.json").write_text('{"name":"test","dependencies":{"react":"^18.0.0"}}')
         inspector = ProjectInspector(tmp_path)
         analysis = inspector.analyze()
         assert any(fw.name == "React" for fw in analysis.frameworks)
@@ -171,9 +168,7 @@ class TestProjectInspectorFrameworkDetection:
     @pytest.mark.unit
     def test_detects_nextjs(self, tmp_path: Path) -> None:
         """Should detect Next.js in JavaScript projects."""
-        (tmp_path / "package.json").write_text(
-            '{"name":"test","dependencies":{"next":"^13.0.0"}}'
-        )
+        (tmp_path / "package.json").write_text('{"name":"test","dependencies":{"next":"^13.0.0"}}')
         inspector = ProjectInspector(tmp_path)
         analysis = inspector.analyze()
         assert any(fw.name == "Next.js" for fw in analysis.frameworks)
@@ -390,8 +385,10 @@ class TestBootstrapTaskGenerator:
         )
         generator = BootstrapTaskGenerator(analysis)
         tasks = generator.generate_tasks()
-        assert any("ci" in task["title"].lower() or "github actions" in task["title"].lower()
-                  for task in tasks)
+        assert any(
+            "ci" in task["title"].lower() or "github actions" in task["title"].lower()
+            for task in tasks
+        )
 
     @pytest.mark.unit
     def test_task_has_required_fields(self) -> None:
@@ -426,9 +423,7 @@ class TestIntegrationCompleteProject:
     def test_analyzes_python_project_completely(self, tmp_path: Path) -> None:
         """Should completely analyze a Python project."""
         # Create a complete Python project
-        (tmp_path / "pyproject.toml").write_text(
-            "[project]\nname = 'test'\nversion = '0.1.0'\n"
-        )
+        (tmp_path / "pyproject.toml").write_text("[project]\nname = 'test'\nversion = '0.1.0'\n")
         (tmp_path / "requirements.txt").write_text("fastapi>=0.100.0\n")
         (tmp_path / "pytest.ini").touch()
         (tmp_path / "ruff.toml").touch()
