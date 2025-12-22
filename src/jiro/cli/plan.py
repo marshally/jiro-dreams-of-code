@@ -12,6 +12,7 @@ from rich.table import Table
 from jiro.agents.base import AgentConfig
 from jiro.agents.client import AgentClient
 from jiro.config.loader import load_config
+from jiro.core.infrastructure import BootstrapTaskGenerator, ProjectInspector
 from jiro.core.paths import get_database_path, get_specs_dir
 from jiro.core.planner import PlanResult, SpecPlanner, create_tasks, parse_spec
 from jiro.db.database import ensure_schema, get_database
@@ -101,6 +102,98 @@ Plan Summary:
     console.print(panel)
 
 
+def _detect_and_suggest_bootstrap_tasks(
+    project_root: Path,
+    tracker: BeadsTracker,
+) -> bool:
+    """Detect missing infrastructure and offer to create bootstrap tasks.
+
+    Args:
+        project_root: The project root directory.
+        tracker: The issue tracker.
+
+    Returns:
+        True if user wants to continue with planning, False to cancel.
+    """
+    inspector = ProjectInspector(project_root)
+    analysis = inspector.analyze()
+
+    if not analysis.missing_components:
+        console.print("[green]✓ Project infrastructure is complete[/green]")
+        return True
+
+    # Display detected infrastructure
+    console.print("\n[bold blue]Infrastructure Detection[/bold blue]\n")
+
+    if analysis.languages:
+        console.print("[cyan]Detected Languages:[/cyan]")
+        for lang in analysis.languages:
+            pm = f" ({lang.package_manager})" if lang.package_manager else ""
+            console.print(f"  - {lang.name}{pm}")
+
+    if analysis.frameworks:
+        console.print("[cyan]Detected Frameworks:[/cyan]")
+        for fw in analysis.frameworks:
+            console.print(f"  - {fw.name}")
+
+    if analysis.tools:
+        console.print("[cyan]Detected Tools:[/cyan]")
+        for tool in analysis.tools:
+            console.print(f"  - {tool.name} ({tool.category})")
+
+    # Display missing components
+    console.print("\n[yellow]Missing Infrastructure Components:[/yellow]")
+    for component in analysis.missing_components:
+        console.print(f"  - {component}")
+
+    # Offer to create bootstrap tasks
+    console.print("\n[yellow]jiro can create bootstrap tasks to set up missing infrastructure.[/yellow]")
+    create_bootstrap: bool = typer.confirm(
+        "Would you like to create bootstrap tasks for missing infrastructure?",
+        default=True,
+    )
+
+    if create_bootstrap:
+        generator = BootstrapTaskGenerator(analysis)
+        bootstrap_tasks = generator.generate_tasks()
+
+        if bootstrap_tasks:
+            # Create an infrastructure epic if not exists
+            bootstrap_epic = tracker.create_task(
+                title="Project Infrastructure",
+                description="Bootstrap tasks for setting up project infrastructure",
+                task_type="epic",
+            )
+
+            # Create bootstrap tasks
+            created_count = 0
+            for task_data in bootstrap_tasks:
+                try:
+                    _ = tracker.create_task(
+                        title=task_data["title"],
+                        description=task_data["description"],
+                        task_type="task",
+                        epic_id=bootstrap_epic.id,
+                        design=task_data.get("design"),
+                        acceptance=task_data.get("acceptance"),
+                    )
+                    created_count += 1
+                except Exception as e:
+                    console.print(f"[red]Error creating bootstrap task: {e}[/red]")
+
+            console.print(f"\n[green]Created {created_count} bootstrap tasks[/green]")
+
+            # Ask if user wants to proceed with feature planning
+            console.print("\n[yellow]Bootstrap tasks have been created.[/yellow]")
+            proceed: bool = typer.confirm(
+                "Do you want to proceed with planning the feature specification?",
+                default=True,
+            )
+            return proceed
+
+    return True
+
+
 async def _run_plan(
     spec_file: str,
     model: str | None = None,
@@ -133,6 +226,21 @@ async def _run_plan(
 
     # Create repository
     repository = PromptRepository(db)
+
+    # Create tracker for infrastructure detection
+    tracker = BeadsTracker(project_root, stealth=False, project_name=project_name)
+
+    # Check if beads is initialized
+    if not tracker.beads_dir.exists():
+        console.print("[red]Error: jiro has not been initialized in this project.[/red]")
+        console.print("[dim]Run 'jiro init' first to set up the project.[/dim]")
+        return
+
+    # Detect infrastructure and offer bootstrap tasks
+    console.print("[cyan]Analyzing project infrastructure...[/cyan]\n")
+    if not _detect_and_suggest_bootstrap_tasks(project_root, tracker):
+        console.print("[yellow]Plan cancelled.[/yellow]")
+        return
 
     # Create agent config
     model_to_use = model or config.models.planning
@@ -167,14 +275,6 @@ async def _run_plan(
 
     # Create tasks in tracker
     console.print("[cyan]Creating tasks in tracker...[/cyan]")
-    tracker = BeadsTracker(project_root, stealth=False, project_name=project_name)
-
-    # Check if beads is initialized
-    if not tracker.beads_dir.exists():
-        console.print("[red]Error: jiro has not been initialized in this project.[/red]")
-        console.print("[dim]Run 'jiro init' first to set up the project.[/dim]")
-        return
-
     created_tasks = create_tasks(plan_result, tracker)
 
     console.print(f"\n[green]Created {len(created_tasks)} tasks:[/green]")

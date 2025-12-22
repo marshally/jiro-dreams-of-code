@@ -211,7 +211,9 @@ class TestPlanCommand:
             patch("jiro.cli.plan.load_config") as mock_load_config,
             patch("jiro.cli.plan.get_database") as mock_get_db,
             patch("jiro.cli.plan.SpecPlanner") as mock_planner_class,
-            patch("jiro.cli.plan.typer.confirm", return_value=False),
+            patch("jiro.cli.plan.BeadsTracker") as mock_tracker_class,
+            patch("jiro.cli.plan.ProjectInspector") as mock_inspector_class,
+            patch("jiro.cli.plan.typer.confirm", side_effect=[False, False]),  # Skip bootstrap, proceed with planning
         ):
             # Setup mocks
             mock_config = MagicMock()
@@ -220,6 +222,18 @@ class TestPlanCommand:
 
             mock_db = MagicMock()
             mock_get_db.return_value = mock_db
+
+            # Mock BeadsTracker
+            mock_tracker = MagicMock()
+            mock_tracker.beads_dir = MagicMock()
+            mock_tracker.beads_dir.exists = MagicMock(return_value=True)
+            mock_tracker_class.return_value = mock_tracker
+
+            # Mock ProjectInspector to return no missing components
+            mock_inspector = MagicMock()
+            mock_inspector.analyze = MagicMock()
+            mock_inspector.analyze.return_value = MagicMock(missing_components=[])
+            mock_inspector_class.return_value = mock_inspector
 
             mock_planner = AsyncMock()
             mock_planner.plan = AsyncMock(return_value=sample_plan_result)
@@ -328,6 +342,8 @@ class TestPlanCommand:
             patch("jiro.cli.plan.load_config") as mock_load_config,
             patch("jiro.cli.plan.get_database") as mock_get_db,
             patch("jiro.cli.plan.SpecPlanner") as mock_planner_class,
+            patch("jiro.cli.plan.BeadsTracker") as mock_tracker_class,
+            patch("jiro.cli.plan.ProjectInspector") as mock_inspector_class,
             patch("jiro.cli.plan.typer.confirm") as mock_confirm,
         ):
             # Setup mocks
@@ -337,6 +353,18 @@ class TestPlanCommand:
 
             mock_db = MagicMock()
             mock_get_db.return_value = mock_db
+
+            # Mock BeadsTracker
+            mock_tracker = MagicMock()
+            mock_tracker.beads_dir = MagicMock()
+            mock_tracker.beads_dir.exists = MagicMock(return_value=True)
+            mock_tracker_class.return_value = mock_tracker
+
+            # Mock ProjectInspector to return no missing components
+            mock_inspector = MagicMock()
+            mock_inspector.analyze = MagicMock()
+            mock_inspector.analyze.return_value = MagicMock(missing_components=[])
+            mock_inspector_class.return_value = mock_inspector
 
             mock_planner = AsyncMock()
             mock_planner.plan = AsyncMock(return_value=sample_plan_result)

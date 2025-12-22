@@ -18,6 +18,24 @@ def cli_runner() -> CliRunner:
 
 
 @pytest.fixture
+def mock_beads_tracker():
+    """Create a mock BeadsTracker with initialized beads directory."""
+    tracker = MagicMock()
+    tracker.beads_dir = MagicMock()
+    tracker.beads_dir.exists = MagicMock(return_value=True)
+    return tracker
+
+
+@pytest.fixture
+def mock_project_inspector():
+    """Create a mock ProjectInspector with no missing components."""
+    inspector = MagicMock()
+    inspector.analyze = MagicMock()
+    inspector.analyze.return_value = MagicMock(missing_components=[])
+    return inspector
+
+
+@pytest.fixture
 def mock_spec() -> Spec:
     """Create a realistic mock Spec object for testing."""
     return Spec(
@@ -187,6 +205,8 @@ class TestPlanFlowIntegration:
             patch("jiro.cli.plan.load_config") as mock_load_config,
             patch("jiro.cli.plan.get_database") as mock_get_db,
             patch("jiro.cli.plan.SpecPlanner") as mock_planner_class,
+            patch("jiro.cli.plan.BeadsTracker") as mock_tracker_class,
+            patch("jiro.cli.plan.ProjectInspector") as mock_inspector_class,
         ):
             # Configure mocks
             mock_config = MagicMock()
@@ -195,6 +215,30 @@ class TestPlanFlowIntegration:
 
             mock_db = MagicMock()
             mock_get_db.return_value = mock_db
+
+            # Mock BeadsTracker
+            mock_tracker = MagicMock()
+            mock_tracker.beads_dir = MagicMock()
+            mock_tracker.beads_dir.exists = MagicMock(return_value=True)
+            mock_tracker_class.return_value = mock_tracker
+
+            # Mock ProjectInspector
+            mock_inspector = MagicMock()
+            mock_inspector.analyze = MagicMock()
+            mock_inspector.analyze.return_value = MagicMock(missing_components=[])
+            mock_inspector_class.return_value = mock_inspector
+
+            # Mock BeadsTracker
+            mock_tracker = MagicMock()
+            mock_tracker.beads_dir = MagicMock()
+            mock_tracker.beads_dir.exists = MagicMock(return_value=True)
+            mock_tracker_class.return_value = mock_tracker
+
+            # Mock ProjectInspector
+            mock_inspector = MagicMock()
+            mock_inspector.analyze = MagicMock()
+            mock_inspector.analyze.return_value = MagicMock(missing_components=[])
+            mock_inspector_class.return_value = mock_inspector
 
             mock_planner = MagicMock()
             mock_planner.plan = AsyncMock()
@@ -259,6 +303,8 @@ class TestPlanFlowIntegration:
             patch("jiro.cli.plan.load_config") as mock_load_config,
             patch("jiro.cli.plan.get_database") as mock_get_db,
             patch("jiro.cli.plan.SpecPlanner") as mock_planner_class,
+            patch("jiro.cli.plan.BeadsTracker") as mock_tracker_class,
+            patch("jiro.cli.plan.ProjectInspector") as mock_inspector_class,
         ):
             # Configure mocks
             mock_config = MagicMock()
@@ -267,6 +313,18 @@ class TestPlanFlowIntegration:
 
             mock_db = MagicMock()
             mock_get_db.return_value = mock_db
+
+            # Mock BeadsTracker
+            mock_tracker = MagicMock()
+            mock_tracker.beads_dir = MagicMock()
+            mock_tracker.beads_dir.exists = MagicMock(return_value=True)
+            mock_tracker_class.return_value = mock_tracker
+
+            # Mock ProjectInspector
+            mock_inspector = MagicMock()
+            mock_inspector.analyze = MagicMock()
+            mock_inspector.analyze.return_value = MagicMock(missing_components=[])
+            mock_inspector_class.return_value = mock_inspector
 
             # Create a mock plan result
             plan_result = PlanResult(
@@ -427,6 +485,7 @@ class TestPlanFlowIntegration:
             patch("jiro.cli.plan.get_database") as mock_get_db,
             patch("jiro.cli.plan.SpecPlanner") as mock_planner_class,
             patch("jiro.cli.plan.BeadsTracker") as mock_tracker_class,
+            patch("jiro.cli.plan.ProjectInspector") as mock_inspector_class,
             patch("jiro.cli.plan.create_tasks") as mock_create_tasks,
         ):
             # Configure mocks
@@ -436,6 +495,18 @@ class TestPlanFlowIntegration:
 
             mock_db = MagicMock()
             mock_get_db.return_value = mock_db
+
+            # Mock BeadsTracker
+            mock_tracker = MagicMock()
+            mock_tracker.beads_dir = MagicMock()
+            mock_tracker.beads_dir.exists = MagicMock(return_value=True)
+            mock_tracker_class.return_value = mock_tracker
+
+            # Mock ProjectInspector
+            mock_inspector = MagicMock()
+            mock_inspector.analyze = MagicMock()
+            mock_inspector.analyze.return_value = MagicMock(missing_components=[])
+            mock_inspector_class.return_value = mock_inspector
 
             # Create mock plan result
             plan_result = PlanResult(
@@ -547,6 +618,8 @@ class TestPlanFlowIntegration:
             patch("jiro.cli.plan.load_config") as mock_load_config,
             patch("jiro.cli.plan.get_database") as mock_get_db,
             patch("jiro.cli.plan.SpecPlanner") as mock_planner_class,
+            patch("jiro.cli.plan.BeadsTracker") as mock_tracker_class,
+            patch("jiro.cli.plan.ProjectInspector") as mock_inspector_class,
         ):
             mock_config = MagicMock()
             mock_config.models.planning = "claude-opus-4"
@@ -554,6 +627,18 @@ class TestPlanFlowIntegration:
 
             mock_db = MagicMock()
             mock_get_db.return_value = mock_db
+
+            # Mock BeadsTracker
+            mock_tracker = MagicMock()
+            mock_tracker.beads_dir = MagicMock()
+            mock_tracker.beads_dir.exists = MagicMock(return_value=True)
+            mock_tracker_class.return_value = mock_tracker
+
+            # Mock ProjectInspector
+            mock_inspector = MagicMock()
+            mock_inspector.analyze = MagicMock()
+            mock_inspector.analyze.return_value = MagicMock(missing_components=[])
+            mock_inspector_class.return_value = mock_inspector
 
             plan_result = PlanResult(
                 epics=[
@@ -636,6 +721,8 @@ class TestPlanFlowIntegration:
             patch("jiro.cli.plan.load_config") as mock_load_config,
             patch("jiro.cli.plan.get_database") as mock_get_db,
             patch("jiro.cli.plan.SpecPlanner") as mock_planner_class,
+            patch("jiro.cli.plan.BeadsTracker") as mock_tracker_class,
+            patch("jiro.cli.plan.ProjectInspector") as mock_inspector_class,
         ):
             mock_config = MagicMock()
             mock_config.models.planning = "claude-opus-4"
@@ -643,6 +730,18 @@ class TestPlanFlowIntegration:
 
             mock_db = MagicMock()
             mock_get_db.return_value = mock_db
+
+            # Mock BeadsTracker
+            mock_tracker = MagicMock()
+            mock_tracker.beads_dir = MagicMock()
+            mock_tracker.beads_dir.exists = MagicMock(return_value=True)
+            mock_tracker_class.return_value = mock_tracker
+
+            # Mock ProjectInspector
+            mock_inspector = MagicMock()
+            mock_inspector.analyze = MagicMock()
+            mock_inspector.analyze.return_value = MagicMock(missing_components=[])
+            mock_inspector_class.return_value = mock_inspector
 
             plan_result = PlanResult(
                 epics=[
@@ -701,6 +800,8 @@ class TestPlanFlowIntegration:
             patch("jiro.cli.plan.Path.cwd", return_value=tmp_path),
             patch("jiro.cli.plan.load_config") as mock_load_config,
             patch("jiro.cli.plan.get_database") as mock_get_db,
+            patch("jiro.cli.plan.BeadsTracker") as mock_tracker_class,
+            patch("jiro.cli.plan.ProjectInspector") as mock_inspector_class,
         ):
             mock_config = MagicMock()
             mock_config.models.planning = "claude-opus-4"
@@ -708,6 +809,18 @@ class TestPlanFlowIntegration:
 
             mock_db = MagicMock()
             mock_get_db.return_value = mock_db
+
+            # Mock BeadsTracker
+            mock_tracker = MagicMock()
+            mock_tracker.beads_dir = MagicMock()
+            mock_tracker.beads_dir.exists = MagicMock(return_value=True)
+            mock_tracker_class.return_value = mock_tracker
+
+            # Mock ProjectInspector
+            mock_inspector = MagicMock()
+            mock_inspector.analyze = MagicMock()
+            mock_inspector.analyze.return_value = MagicMock(missing_components=[])
+            mock_inspector_class.return_value = mock_inspector
 
             result = cli_runner.invoke(
                 app,
@@ -739,6 +852,8 @@ class TestPlanFlowIntegration:
             patch("jiro.cli.plan.Path.cwd", return_value=tmp_path),
             patch("jiro.cli.plan.load_config") as mock_load_config,
             patch("jiro.cli.plan.get_database") as mock_get_db,
+            patch("jiro.cli.plan.BeadsTracker") as mock_tracker_class,
+            patch("jiro.cli.plan.ProjectInspector") as mock_inspector_class,
         ):
             mock_config = MagicMock()
             mock_config.models.planning = "claude-opus-4"
@@ -746,6 +861,18 @@ class TestPlanFlowIntegration:
 
             mock_db = MagicMock()
             mock_get_db.return_value = mock_db
+
+            # Mock BeadsTracker
+            mock_tracker = MagicMock()
+            mock_tracker.beads_dir = MagicMock()
+            mock_tracker.beads_dir.exists = MagicMock(return_value=True)
+            mock_tracker_class.return_value = mock_tracker
+
+            # Mock ProjectInspector
+            mock_inspector = MagicMock()
+            mock_inspector.analyze = MagicMock()
+            mock_inspector.analyze.return_value = MagicMock(missing_components=[])
+            mock_inspector_class.return_value = mock_inspector
 
             result = cli_runner.invoke(
                 app,
@@ -807,6 +934,7 @@ class TestPlanFlowIntegration:
             patch("jiro.cli.plan.get_database") as mock_get_db,
             patch("jiro.cli.plan.SpecPlanner") as mock_planner_class,
             patch("jiro.cli.plan.BeadsTracker") as mock_tracker_class,
+            patch("jiro.cli.plan.ProjectInspector") as mock_inspector_class,
             patch("jiro.cli.plan.create_tasks") as mock_create_tasks,
         ):
             mock_config = MagicMock()
@@ -815,6 +943,18 @@ class TestPlanFlowIntegration:
 
             mock_db = MagicMock()
             mock_get_db.return_value = mock_db
+
+            # Mock BeadsTracker
+            mock_tracker = MagicMock()
+            mock_tracker.beads_dir = MagicMock()
+            mock_tracker.beads_dir.exists = MagicMock(return_value=True)
+            mock_tracker_class.return_value = mock_tracker
+
+            # Mock ProjectInspector
+            mock_inspector = MagicMock()
+            mock_inspector.analyze = MagicMock()
+            mock_inspector.analyze.return_value = MagicMock(missing_components=[])
+            mock_inspector_class.return_value = mock_inspector
 
             # Create comprehensive plan result
             plan_result = PlanResult(
