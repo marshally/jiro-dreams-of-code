@@ -178,26 +178,28 @@ class TestCheckTestsPass:
     """Test check_tests_pass function."""
 
     def test_returns_true_when_tests_pass(self) -> None:
-        """check_tests_pass should return True when test command succeeds."""
+        """check_tests_pass should return (True, None) when test command succeeds."""
         config = MagicMock()
         config.commands.test = "pytest"
 
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="all tests passed\n")
 
-            result = check_tests_pass(config)
-            assert result is True
+            passed, error = check_tests_pass(config)
+            assert passed is True
+            assert error is None
 
-    def test_returns_false_when_tests_fail(self) -> None:
-        """check_tests_pass should return False when test command fails."""
+    def test_returns_false_with_error_when_tests_fail(self) -> None:
+        """check_tests_pass should return (False, error) when test command fails."""
         config = MagicMock()
         config.commands.test = "pytest"
 
         with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=1, stderr="test failures")
+            mock_run.return_value = MagicMock(returncode=1, stderr="test failures", stdout="")
 
-            result = check_tests_pass(config)
-            assert result is False
+            passed, error = check_tests_pass(config)
+            assert passed is False
+            assert error == "test failures"
 
     def test_uses_configured_test_command(self) -> None:
         """check_tests_pass should use the command from config."""
@@ -220,26 +222,28 @@ class TestCheckLintPass:
     """Test check_lint_pass function."""
 
     def test_returns_true_when_lint_passes(self) -> None:
-        """check_lint_pass should return True when lint command succeeds."""
+        """check_lint_pass should return (True, None) when lint command succeeds."""
         config = MagicMock()
         config.commands.lint = "ruff check"
 
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="")
 
-            result = check_lint_pass(config)
-            assert result is True
+            passed, error = check_lint_pass(config)
+            assert passed is True
+            assert error is None
 
-    def test_returns_false_when_lint_fails(self) -> None:
-        """check_lint_pass should return False when lint command fails."""
+    def test_returns_false_with_error_when_lint_fails(self) -> None:
+        """check_lint_pass should return (False, error) when lint command fails."""
         config = MagicMock()
         config.commands.lint = "ruff check"
 
         with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=1, stderr="lint violations")
+            mock_run.return_value = MagicMock(returncode=1, stderr="lint violations", stdout="")
 
-            result = check_lint_pass(config)
-            assert result is False
+            passed, error = check_lint_pass(config)
+            assert passed is False
+            assert error == "lint violations"
 
     def test_uses_configured_lint_command(self) -> None:
         """check_lint_pass should use the command from config."""

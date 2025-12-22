@@ -203,14 +203,14 @@ def check_up_to_date() -> bool:
         return False
 
 
-def check_tests_pass(config: Config) -> bool:
+def check_tests_pass(config: Config) -> tuple[bool, str | None]:
     """Check if all tests pass.
 
     Args:
         config: Configuration object containing test command.
 
     Returns:
-        True if tests pass, False otherwise.
+        Tuple of (passed, error_output). error_output is None if passed.
     """
     try:
         test_command = config.commands.test
@@ -221,19 +221,23 @@ def check_tests_pass(config: Config) -> bool:
             check=False,
             shell=True,
         )
-        return result.returncode == 0
-    except Exception:
-        return False
+        if result.returncode == 0:
+            return True, None
+        # Combine stderr and stdout for full error context
+        output = result.stderr or result.stdout or "Tests failed (no output)"
+        return False, output.strip()
+    except Exception as e:
+        return False, str(e)
 
 
-def check_lint_pass(config: Config) -> bool:
+def check_lint_pass(config: Config) -> tuple[bool, str | None]:
     """Check if linting passes.
 
     Args:
         config: Configuration object containing lint command.
 
     Returns:
-        True if lint passes, False otherwise.
+        Tuple of (passed, error_output). error_output is None if passed.
     """
     try:
         lint_command = config.commands.lint
@@ -244,14 +248,17 @@ def check_lint_pass(config: Config) -> bool:
             check=False,
             shell=True,
         )
-        return result.returncode == 0
-    except Exception:
-        return False
+        if result.returncode == 0:
+            return True, None
+        output = result.stderr or result.stdout or "Linting failed (no output)"
+        return False, output.strip()
+    except Exception as e:
+        return False, str(e)
 
 
 def run_check(
     name: str,
-    check_fn: Callable[[], bool],
+    check_fn: Callable[[], bool | tuple[bool, str | None]],
     error_message: str,
     checks: dict[str, CheckResult],
     errors: list[str],
@@ -263,20 +270,29 @@ def run_check(
 
     Args:
         name: The name of the check.
-        check_fn: Callable that performs the check and returns a boolean.
+        check_fn: Callable that performs the check and returns either a boolean
+                  or a tuple of (passed, detailed_error).
         error_message: Default error message if the check fails.
         checks: Dictionary to store the CheckResult.
         errors: List to accumulate error messages.
     """
     try:
-        passed = check_fn()
+        result = check_fn()
+        # Handle both bool and tuple return types
+        if isinstance(result, tuple):
+            passed, detailed_error = result
+            actual_error = detailed_error if detailed_error else error_message
+        else:
+            passed = result
+            actual_error = error_message
+
         checks[name] = CheckResult(
             name=name,
             passed=passed,
-            error=None if passed else error_message,
+            error=None if passed else actual_error,
         )
         if not passed:
-            errors.append(f"{name}: {error_message}")
+            errors.append(f"{name}: {actual_error}")
     except Exception as e:
         checks[name] = CheckResult(name=name, passed=False, error=str(e))
         errors.append(f"{name}: {str(e)}")
