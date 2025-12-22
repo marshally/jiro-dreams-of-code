@@ -216,6 +216,19 @@ class TestCheckTestsPass:
             args = mock_run.call_args[0][0]
             assert args[0] == "custom-test-command"
 
+    def test_returns_true_when_no_tests_collected(self) -> None:
+        """check_tests_pass should return (True, None) when pytest finds no tests (exit code 5)."""
+        config = MagicMock()
+        config.commands.test = "pytest"
+
+        with patch("subprocess.run") as mock_run:
+            # pytest exit code 5 means no tests collected
+            mock_run.return_value = MagicMock(returncode=5, stdout="", stderr="")
+
+            passed, error = check_tests_pass(config)
+            assert passed is True
+            assert error is None
+
 
 @pytest.mark.unit
 class TestCheckLintPass:

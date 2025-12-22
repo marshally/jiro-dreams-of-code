@@ -221,7 +221,9 @@ def check_tests_pass(config: Config) -> tuple[bool, str | None]:
             check=False,
             shell=True,
         )
-        if result.returncode == 0:
+        # Exit code 0: all tests passed
+        # Exit code 5: no tests collected (pytest) - treat as pass
+        if result.returncode == 0 or result.returncode == 5:
             return True, None
         # Combine stderr and stdout for full error context
         output = result.stderr or result.stdout or "Tests failed (no output)"
