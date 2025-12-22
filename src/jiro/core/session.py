@@ -17,7 +17,7 @@ from jiro.agents.review import ReviewAgent
 from jiro.config.schema import Config
 from jiro.core.executor import TaskExecutor
 from jiro.db.models import Session, SessionStatus, TaskExecution
-from jiro.db.repository import SessionRepository, TaskExecutionRepository
+from jiro.db.repository import PromptRepository, SessionRepository, TaskExecutionRepository
 from jiro.trackers.beads import BeadsTracker
 from jiro.trackers.interface import Task
 
@@ -535,6 +535,7 @@ class SessionOrchestrator:
         config: Config,
         session_repo: SessionRepository,
         task_repo: TaskExecutionRepository,
+        prompt_repo: "PromptRepository | None" = None,
         tracker: BeadsTracker | None = None,
         progress_callback: ProgressCallback | None = None,
     ) -> None:
@@ -544,6 +545,7 @@ class SessionOrchestrator:
             config: Configuration object for checks and commands.
             session_repo: Repository for session persistence.
             task_repo: Repository for task execution persistence.
+            prompt_repo: Repository for storing agent prompt/response data.
             tracker: Issue tracker for fetching tasks.
             progress_callback: Optional callback for progress reporting.
                               Called with (message, status) where status is
@@ -552,6 +554,7 @@ class SessionOrchestrator:
         self.config = config
         self.session_repo = session_repo
         self.task_repo = task_repo
+        self.prompt_repo = prompt_repo
         self.tracker = tracker
         self.logger = logger  # Use module-level logger
         self.progress_callback = progress_callback
@@ -951,11 +954,25 @@ class SessionOrchestrator:
 
         Returns:
             Configured TaskExecutor instance.
+
+        Raises:
+            ValueError: If prompt_repo is not configured.
         """
-        client = AgentClient(config=self.config, repository=None)  # type: ignore[arg-type]
+        if self.prompt_repo is None:
+            raise ValueError("prompt_repo must be configured for task execution")
+
+        from jiro.agents.base import AgentConfig
+
+        # Create agent config for task execution
+        agent_config = AgentConfig(
+            model=self.config.models.execution,
+            system_prompt="You are an expert software engineer executing tasks with TDD discipline.",
+        )
+
+        client = AgentClient(config=agent_config, repository=self.prompt_repo)
         planning_agent = PlanningAgent(client)
         review_agent = ReviewAgent(client, self.config)
-        tracker = BeadsTracker(Path.cwd())
+        tracker = self.tracker or BeadsTracker(Path.cwd())
 
         return TaskExecutor(
             config=self.config,
