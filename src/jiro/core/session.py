@@ -535,6 +535,7 @@ class SessionOrchestrator:
         config: Config,
         session_repo: SessionRepository,
         task_repo: TaskExecutionRepository,
+        tracker: BeadsTracker | None = None,
         progress_callback: ProgressCallback | None = None,
     ) -> None:
         """Initialize with dependencies.
@@ -543,6 +544,7 @@ class SessionOrchestrator:
             config: Configuration object for checks and commands.
             session_repo: Repository for session persistence.
             task_repo: Repository for task execution persistence.
+            tracker: Issue tracker for fetching tasks.
             progress_callback: Optional callback for progress reporting.
                               Called with (message, status) where status is
                               'pass', 'fail', 'skip', or None.
@@ -550,6 +552,7 @@ class SessionOrchestrator:
         self.config = config
         self.session_repo = session_repo
         self.task_repo = task_repo
+        self.tracker = tracker
         self.logger = logger  # Use module-level logger
         self.progress_callback = progress_callback
 
@@ -865,15 +868,25 @@ class SessionOrchestrator:
     def get_tasks(self, epic_id: str | None = None) -> list[Task]:
         """Get tasks to execute.
 
+        Fetches open tasks from the tracker. Only returns tasks that are
+        ready to work on (no blocking dependencies).
+
         Args:
             epic_id: Optional epic ID to filter tasks.
 
         Returns:
             List of tasks to execute.
         """
-        # This will be implemented to fetch from issue tracker
-        # For now, return empty list for basic tests
-        return []
+        if self.tracker is None:
+            return []
+
+        # Get all open tasks, filtering by epic if specified
+        tasks = self.tracker.list_tasks(status="open", epic_id=epic_id)
+
+        # Filter to only non-epic tasks (we execute tasks, not epics)
+        tasks = [t for t in tasks if t.task_type != "epic"]
+
+        return tasks
 
     def execute_task(self, task: Task, session_id: str) -> None:
         """Execute a single task.

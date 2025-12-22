@@ -11,6 +11,7 @@ from jiro.core.paths import get_database_path
 from jiro.core.session import HaltError, SessionOrchestrator
 from jiro.db.database import ensure_schema, get_database
 from jiro.db.repository import SessionRepository, TaskExecutionRepository
+from jiro.trackers.beads import BeadsTracker
 
 app = typer.Typer(
     name="execute",
@@ -66,10 +67,11 @@ def execute(
     session_repo = SessionRepository(db)
     task_repo = TaskExecutionRepository(db)
 
-    # Create orchestrator and run session
+    # Create tracker and orchestrator
+    tracker = BeadsTracker(project_root, stealth=False)
     progress_callback = _verbose_callback if verbose else None
     orchestrator = SessionOrchestrator(
-        config, session_repo, task_repo, progress_callback=progress_callback
+        config, session_repo, task_repo, tracker=tracker, progress_callback=progress_callback
     )
 
     console.print("[cyan]Starting execution session...[/cyan]")

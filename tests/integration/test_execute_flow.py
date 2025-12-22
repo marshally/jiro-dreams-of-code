@@ -284,6 +284,7 @@ class TestExecuteFlowIntegration:
             patch("jiro.cli.execute.ensure_schema") as mock_ensure_schema,
             patch("jiro.cli.execute.SessionRepository") as mock_session_repo_class,
             patch("jiro.cli.execute.TaskExecutionRepository") as mock_task_repo_class,
+            patch("jiro.cli.execute.BeadsTracker") as mock_tracker_class,
             patch("jiro.cli.execute.SessionOrchestrator") as mock_orchestrator_class,
         ):
             mock_config = MagicMock()
@@ -299,6 +300,9 @@ class TestExecuteFlowIntegration:
             mock_task_repo = MagicMock()
             mock_task_repo_class.return_value = mock_task_repo
 
+            mock_tracker = MagicMock()
+            mock_tracker_class.return_value = mock_tracker
+
             mock_orchestrator = MagicMock()
             mock_orchestrator.run.return_value = mock_session_result_completed
             mock_orchestrator_class.return_value = mock_orchestrator
@@ -309,8 +313,13 @@ class TestExecuteFlowIntegration:
             mock_ensure_schema.assert_called_once_with(mock_db)
             mock_session_repo_class.assert_called_once_with(mock_db)
             mock_task_repo_class.assert_called_once_with(mock_db)
+            mock_tracker_class.assert_called_once_with(tmp_path, stealth=False)
             mock_orchestrator_class.assert_called_once_with(
-                mock_config, mock_session_repo, mock_task_repo, progress_callback=None
+                mock_config,
+                mock_session_repo,
+                mock_task_repo,
+                tracker=mock_tracker,
+                progress_callback=None,
             )
 
     @pytest.mark.integration
