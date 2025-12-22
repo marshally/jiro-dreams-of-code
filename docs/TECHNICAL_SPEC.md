@@ -298,6 +298,8 @@ jiro dream "prompt"
 jiro plan --spec "auth-system.md" ["optional refinement prompt"]
 ```
 
+- **Detect project infrastructure** (languages, frameworks, testing, linting, package managers, commit hooks, CI/CD)
+- **Generate bootstrap tasks** for any missing infrastructure (test harness, linting config, etc.)
 - Parse spec and generate epics + tasks
 - Analyze dependencies between tasks
 - Output summary with clickable spec file path
@@ -434,6 +436,32 @@ Interactive refinement via chat (terminal or web UI)
 ```
 User: jiro plan --spec "auth-system.md"
 
+Step 1: Infrastructure Detection
+Agent inspects project for existing infrastructure:
+- Programming languages (Python, JavaScript, TypeScript, Go, Rust, etc.)
+- Frameworks (FastAPI, Django, React, Next.js, etc.)
+- Testing setup (pytest, jest, go test, etc.)
+- Linting configuration (ruff, eslint, golangci-lint, etc.)
+- Package managers (pip/poetry/uv, npm/yarn/pnpm, cargo, go mod, etc.)
+- Commit hooks (pre-commit, husky, etc.)
+- CI/CD (.github/workflows, .gitlab-ci.yml, etc.)
+
+If any infrastructure is missing, bootstrap tasks are created first:
+┌─────────────────────────────────────────┐
+│ Project Infrastructure Analysis         │
+│                                         │
+│ ✓ Language: Python detected             │
+│ ✗ Testing: No pytest setup found        │
+│ ✗ Linting: No ruff/flake8 config        │
+│ ✓ Package manager: pyproject.toml found │
+│ ✗ Commit hooks: No pre-commit config    │
+│ ✗ CI/CD: No workflow files found        │
+│                                         │
+│ Bootstrap tasks will be created for     │
+│ missing infrastructure.                 │
+└─────────────────────────────────────────┘
+
+Step 2: Task Decomposition
 Agent analyzes spec and produces:
 - Multiple epics (parallelizable workstreams)
 - Tasks within each epic (with dependencies)
@@ -450,11 +478,14 @@ Output:
 │ Spec: .jiro-dreams-of-code/specs/auth-system.md│
 │                                         │
 │ This will create:                       │
-│ - 3 epics (2 parallel, 1 dependent)     │
-│ - 14 tasks total                        │
+│ - 4 epics (3 parallel, 1 dependent)     │
+│ - 18 tasks total                        │
 │                                         │
+│ Epic 0: Project Bootstrap (4 tasks)     │  ← Bootstrap tasks first
 │ Epic 1: OAuth Integration (5 tasks)     │
+│   └── depends on Epic 0                 │
 │ Epic 2: Session Management (5 tasks)    │
+│   └── depends on Epic 0                 │
 │ Epic 3: User Profile (4 tasks)          │
 │   └── depends on Epic 1, Epic 2         │
 │                                         │
@@ -1447,6 +1478,7 @@ ______________________________________________________________________
 
 ### Near-term
 
+- **Project infrastructure detection and bootstrap** - Detect missing project infrastructure (testing, linting, CI/CD, etc.) and generate bootstrap tasks automatically
 - Parallel execution with git worktrees
 - Static analysis for relevant test detection
 - Additional issue tracker integrations
