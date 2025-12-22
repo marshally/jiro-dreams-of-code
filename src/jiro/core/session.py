@@ -106,7 +106,8 @@ def check_git_clean() -> bool:
             return False
         # Empty output means clean working directory
         return result.stdout.strip() == ""
-    except Exception:
+    except FileNotFoundError:
+        # Git command not found
         return False
 
 
@@ -139,7 +140,8 @@ def check_correct_branch(config: Config) -> bool:
             return True
 
         return current_branch == target_branch
-    except Exception:
+    except FileNotFoundError:
+        # Git command not found
         return False
 
 
@@ -199,7 +201,8 @@ def check_up_to_date() -> bool:
         origin_sha = origin_result.stdout.strip()
 
         return local_sha == origin_sha
-    except Exception:
+    except FileNotFoundError:
+        # Git command not found
         return False
 
 
@@ -390,7 +393,8 @@ def run_full_tests(config: Config) -> bool:
         # Exit code 0: all tests passed
         # Exit code 5: no tests collected (pytest) - treat as pass for greenfield projects
         return result.returncode == 0 or result.returncode == 5
-    except Exception:
+    except FileNotFoundError:
+        # Test command not found
         return False
 
 
@@ -413,7 +417,8 @@ def run_full_lint(config: Config) -> bool:
             shell=True,
         )
         return result.returncode == 0
-    except Exception:
+    except FileNotFoundError:
+        # Lint command not found
         return False
 
 
@@ -444,7 +449,8 @@ def push_to_origin() -> bool:
             check=False,
         )
         return result.returncode == 0
-    except Exception:
+    except FileNotFoundError:
+        # Git command not found
         return False
 
 
@@ -844,7 +850,8 @@ class SessionOrchestrator:
             )
             if result.returncode == 0:
                 return result.stdout.strip()
-        except Exception:
+        except FileNotFoundError:
+            # Git command not found
             pass
         return "unknown"
 

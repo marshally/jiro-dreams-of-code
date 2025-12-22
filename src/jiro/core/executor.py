@@ -146,7 +146,9 @@ def run_relevant_tests(
             timeout=60,
         )
         return False
-    except Exception as e:
+    except (FileNotFoundError, OSError) as e:
+        # FileNotFoundError: command not found
+        # OSError: other subprocess-related errors
         logger.error(
             f"run_relevant_tests_{phase}_error",
             task_id=task.id,
@@ -219,7 +221,9 @@ def run_relevant_lint(
             timeout=60,
         )
         return False
-    except Exception as e:
+    except (FileNotFoundError, OSError) as e:
+        # FileNotFoundError: command not found
+        # OSError: other subprocess-related errors
         logger.error(
             f"run_relevant_lint_{phase}_error",
             task_id=task.id,
@@ -392,7 +396,10 @@ def close_task_in_tracker(task: Task, tracker: IssueTracker) -> None:
         tracker.close_task(task.id, reason="Task completed successfully")
 
         logger.info("close_task_in_tracker_success", task_id=task.id)
-    except Exception as e:
+    except (ValueError, KeyError, OSError) as e:
+        # ValueError: invalid task state
+        # KeyError: task not found
+        # OSError: tracker operation failed
         logger.error(
             "close_task_in_tracker_error",
             task_id=task.id,
@@ -451,6 +458,10 @@ async def run_task_postflight(
             review_result = await review_commits(task, commits, review_agent)
             review_passed = review_result.passed
         except Exception as e:
+            # Catch all exceptions during review because:
+            # 1. Review can fail for many reasons (git, agent, state)
+            # 2. We want to continue with other checks and report results
+            # 3. The exception type may vary by implementation
             logger.error("run_task_postflight_review_failed", task_id=task.id, error=str(e))
             review_passed = False
             error = f"Review failed: {str(e)}"
@@ -479,6 +490,10 @@ async def run_task_postflight(
             task_closed = True
 
     except Exception as e:
+        # Catch all exceptions during postflight because:
+        # 1. Tests and linting can fail for many reasons
+        # 2. We want to catch any unexpected state changes
+        # 3. We log the error and return results even if unhandled
         logger.error(
             "run_task_postflight_error",
             task_id=task.id,
@@ -541,6 +556,10 @@ async def run_task_preflight(task: Task, config: Config, agent: PlanningAgent) -
         enhanced_task = await enhance_task_with_planning(task, agent)
         planning_done = True
     except Exception as e:
+        # Catch all exceptions during planning because:
+        # 1. Planning can fail for many reasons (agent, task state)
+        # 2. We want to report the error and continue
+        # 3. Specific exception types may vary by agent implementation
         logger.error(
             "run_task_preflight_planning_failed",
             task_id=task.id,
@@ -718,6 +737,8 @@ class TaskExecutor:
                     )
 
                 except Exception as e:
+                    # Catch all exceptions from step execution
+                    # Step implementations may raise various exception types
                     logger.error(
                         "task_executor_step_failed",
                         task_id=task.id,
@@ -748,6 +769,8 @@ class TaskExecutor:
             return postflight_result
 
         except Exception as e:
+            # Catch all exceptions during task execution
+            # Task can fail at any phase for multiple reasons
             logger.error(
                 "task_executor_execute_failed",
                 task_id=task.id,

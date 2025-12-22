@@ -120,7 +120,11 @@ class AgentClient:
             return result
 
         except Exception as e:
-            # Log the error
+            # Catch all exceptions during agent execution because:
+            # 1. RuntimeError, TimeoutError, OSError are expected
+            # 2. But SDK can raise other errors we may not anticipate
+            # 3. We want graceful failure with proper logging
+            # The agent should return an error result rather than crash
             error_message = str(e)
             logger.error(
                 "agent_execution_error",
@@ -188,6 +192,11 @@ class AgentClient:
                 success=result.success,
             )
         except Exception as e:
+            # Catch all exceptions during storage because:
+            # 1. Database errors can be ValueError, OSError, or db-specific
+            # 2. Type errors can occur during serialization
+            # 3. We want to ensure storage errors don't fail agent execution
+            # This is a fallback - we don't want to lose agent results
             logger.error(
                 "agent_result_storage_failed",
                 error=str(e),

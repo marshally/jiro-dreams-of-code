@@ -60,7 +60,7 @@ class TestRunFullTests:
         config.commands.test = "pytest"
 
         with patch("subprocess.run") as mock_run:
-            mock_run.side_effect = Exception("subprocess error")
+            mock_run.side_effect = FileNotFoundError("pytest command not found")
 
             result = run_full_tests(config)
             assert result is False
@@ -112,7 +112,7 @@ class TestRunFullLint:
         config.commands.lint = "ruff check"
 
         with patch("subprocess.run") as mock_run:
-            mock_run.side_effect = Exception("subprocess error")
+            mock_run.side_effect = FileNotFoundError("ruff command not found")
 
             result = run_full_lint(config)
             assert result is False
@@ -181,7 +181,7 @@ class TestPushToOrigin:
     def test_returns_false_on_exception(self) -> None:
         """push_to_origin should return False if subprocess raises exception."""
         with patch("subprocess.run") as mock_run:
-            mock_run.side_effect = Exception("subprocess error")
+            mock_run.side_effect = FileNotFoundError("git command not found")
 
             result = push_to_origin()
             assert result is False
