@@ -310,7 +310,7 @@ class TestExecuteFlowIntegration:
             mock_session_repo_class.assert_called_once_with(mock_db)
             mock_task_repo_class.assert_called_once_with(mock_db)
             mock_orchestrator_class.assert_called_once_with(
-                mock_config, mock_session_repo, mock_task_repo
+                mock_config, mock_session_repo, mock_task_repo, progress_callback=None
             )
 
     @pytest.mark.integration

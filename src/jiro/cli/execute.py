@@ -21,11 +21,26 @@ app = typer.Typer(
 console = Console()
 
 
+def _verbose_callback(message: str, status: str | None = None) -> None:
+    """Print verbose progress messages."""
+    if status == "pass":
+        console.print(f"  [green]✓[/green] {message}")
+    elif status == "fail":
+        console.print(f"  [red]✗[/red] {message}")
+    elif status == "skip":
+        console.print(f"  [yellow]○[/yellow] {message}")
+    else:
+        console.print(f"  [dim]→[/dim] {message}")
+
+
 @app.callback(invoke_without_command=True)
 def execute(
     epic: Annotated[
         str | None, typer.Option("--epic", help="Limit execution to a specific epic")
     ] = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Print detailed progress information")
+    ] = False,
 ) -> None:
     """
     Execute tasks with preflight and postflight checks.
@@ -36,6 +51,7 @@ def execute(
     Examples:
         jiro execute
         jiro execute --epic JIRO-42
+        jiro execute --verbose
     """
     project_root = Path.cwd()
     project_name = project_root.name
@@ -51,7 +67,10 @@ def execute(
     task_repo = TaskExecutionRepository(db)
 
     # Create orchestrator and run session
-    orchestrator = SessionOrchestrator(config, session_repo, task_repo)
+    progress_callback = _verbose_callback if verbose else None
+    orchestrator = SessionOrchestrator(
+        config, session_repo, task_repo, progress_callback=progress_callback
+    )
 
     console.print("[cyan]Starting execution session...[/cyan]")
     if epic:

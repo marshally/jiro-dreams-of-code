@@ -520,6 +520,9 @@ class SessionResult:
     error: str | None = None
 
 
+ProgressCallback = Callable[[str, str | None], None]
+
+
 class SessionOrchestrator:
     """Orchestrates the full session lifecycle.
 
@@ -532,6 +535,7 @@ class SessionOrchestrator:
         config: Config,
         session_repo: SessionRepository,
         task_repo: TaskExecutionRepository,
+        progress_callback: ProgressCallback | None = None,
     ) -> None:
         """Initialize with dependencies.
 
@@ -539,11 +543,20 @@ class SessionOrchestrator:
             config: Configuration object for checks and commands.
             session_repo: Repository for session persistence.
             task_repo: Repository for task execution persistence.
+            progress_callback: Optional callback for progress reporting.
+                              Called with (message, status) where status is
+                              'pass', 'fail', 'skip', or None.
         """
         self.config = config
         self.session_repo = session_repo
         self.task_repo = task_repo
         self.logger = logger  # Use module-level logger
+        self.progress_callback = progress_callback
+
+    def _report(self, message: str, status: str | None = None) -> None:
+        """Report progress if callback is set."""
+        if self.progress_callback:
+            self.progress_callback(message, status)
 
     def run(self, epic_id: str | None = None) -> SessionResult:
         """Execute a full session.
@@ -608,12 +621,26 @@ class SessionOrchestrator:
         Returns:
             PreflightResult with check details.
         """
+        self._report("Running preflight checks...")
         preflight_result = self.run_preflight(self.config)
+
+        # Report individual check results
+        for name, check in preflight_result.checks.items():
+            status = "pass" if check.passed else "fail"
+            msg = f"{name}"
+            if not check.passed and check.error:
+                # Truncate long errors for display
+                error_preview = check.error[:200] + "..." if len(check.error) > 200 else check.error
+                msg = f"{name}: {error_preview}"
+            self._report(msg, status)
 
         if preflight_result.passed:
             session.preflight_passed_at = datetime.now()
             self.session_repo.update(session)
             self.logger.info("preflight_passed", session_id=session.id)
+            self._report("Preflight checks passed", "pass")
+        else:
+            self._report("Preflight checks failed", "fail")
 
         return preflight_result
 
@@ -636,6 +663,11 @@ class SessionOrchestrator:
             session_id=session.id,
             task_count=len(tasks),
         )
+
+        if tasks:
+            self._report(f"Executing {len(tasks)} task(s)...")
+        else:
+            self._report("No tasks to execute", "skip")
 
         tasks_completed = 0
         tasks_failed = 0
@@ -679,7 +711,25 @@ class SessionOrchestrator:
         Returns:
             PostflightResult with check details.
         """
-        return self.run_postflight(self.config)
+        self._report("Running postflight checks...")
+        postflight_result = self.run_postflight(self.config)
+
+        # Report individual check results
+        for name, check in postflight_result.checks.items():
+            status = "pass" if check.passed else "fail"
+            msg = f"{name}"
+            if not check.passed and check.error:
+                # Truncate long errors for display
+                error_preview = check.error[:200] + "..." if len(check.error) > 200 else check.error
+                msg = f"{name}: {error_preview}"
+            self._report(msg, status)
+
+        if postflight_result.passed:
+            self._report("Postflight checks passed", "pass")
+        else:
+            self._report("Postflight checks failed", "fail")
+
+        return postflight_result
 
     def _complete_session(
         self, session: Session, tasks_completed: int, tasks_failed: int
