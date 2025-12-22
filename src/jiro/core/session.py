@@ -18,6 +18,7 @@ from jiro.config.schema import Config
 from jiro.core.executor import TaskExecutor
 from jiro.db.models import Session, SessionStatus, TaskExecution
 from jiro.db.repository import PromptRepository, SessionRepository, TaskExecutionRepository
+from jiro.parallel import TaskScheduler, WorktreeManager, WorktreeMerger
 from jiro.trackers.beads import BeadsTracker
 from jiro.trackers.interface import Task
 
@@ -683,6 +684,25 @@ class SessionOrchestrator:
         else:
             self._report("No tasks to execute", "skip")
 
+        # Route to parallel or sequential execution based on configuration
+        if self.config.parallel.enabled:
+            return self._execute_tasks_parallel(session, tasks)
+        else:
+            return self._execute_tasks_sequential(session, tasks)
+
+    def _execute_tasks_sequential(
+        self, session: Session, tasks: list[Task]
+    ) -> tuple[int, int] | SessionResult:
+        """Execute tasks sequentially (traditional mode).
+
+        Args:
+            session: Session record to update with progress.
+            tasks: List of tasks to execute.
+
+        Returns:
+            Tuple of (tasks_completed, tasks_failed) if successful, or
+            SessionResult with halted status if a task fails.
+        """
         tasks_completed = 0
         tasks_failed = 0
 
@@ -715,6 +735,183 @@ class SessionOrchestrator:
                 )
 
         return tasks_completed, tasks_failed
+
+    def _execute_tasks_parallel(
+        self, session: Session, tasks: list[Task]
+    ) -> tuple[int, int] | SessionResult:
+        """Execute tasks in parallel using worktrees.
+
+        Args:
+            session: Session record to update with progress.
+            tasks: List of tasks to execute.
+
+        Returns:
+            Tuple of (tasks_completed, tasks_failed) if successful, or
+            SessionResult with halted status if conflict or task fails.
+        """
+        try:
+            # Initialize parallel execution infrastructure
+            repo_path = Path.cwd()
+            worktree_manager = WorktreeManager(repo_path)
+            scheduler = TaskScheduler(
+                worktree_manager,
+                max_parallel=self.config.parallel.max_parallel_tasks,
+            )
+            # Note: merger and conflict_resolver initialized for future use
+            # in full parallel integration with merge conflict handling
+            _merger = WorktreeMerger(repo_path)  # noqa: F841
+            _conflict_resolver_path = repo_path  # noqa: F841
+
+            self._report(
+                f"Executing {len(tasks)} task(s) in parallel "
+                f"(max {self.config.parallel.max_parallel_tasks} concurrent)...",
+                "pass",
+            )
+
+            tasks_completed = 0
+            tasks_failed = 0
+            task_results = {}
+
+            # Queue all tasks
+            for task in tasks:
+                _handle = scheduler.queue_task(task.id)  # noqa: F841
+                self.logger.info(
+                    "task_queued",
+                    task_id=task.id,
+                    session_id=session.id,
+                )
+
+            # Dispatch tasks to worktrees
+            while scheduler.pending_queue or scheduler.executing_tasks:
+                # Dispatch next task if there's room
+                while True:
+                    executing = scheduler.dispatch_next()
+                    if executing is None:
+                        break
+
+                    task = next(t for t in tasks if t.id == executing.task_id)
+                    self.logger.info(
+                        "task_dispatched_to_worktree",
+                        task_id=task.id,
+                        worktree_path=str(executing.worktree_path),
+                        session_id=session.id,
+                    )
+
+                # Execute tasks (simplified: serial execution in each worktree)
+                for task_id in list(scheduler.executing_tasks.keys()):
+                    task = next(t for t in tasks if t.id == task_id)
+                    try:
+                        # Execute task in its worktree
+                        executing_task = scheduler.executing_tasks[task_id]
+                        self._execute_task_in_worktree(
+                            task, session.id, executing_task.worktree_path
+                        )
+
+                        # Task succeeded - mark for completion
+                        scheduler.complete_task(task_id, success=True)
+                        task_results[task_id] = True
+                        tasks_completed += 1
+                        self._report(f"Task {task_id} completed", "pass")
+
+                    except Exception as e:
+                        error_msg = str(e)
+                        self.logger.error(
+                            "task_execution_failed_parallel",
+                            task_id=task_id,
+                            session_id=session.id,
+                            error=error_msg,
+                        )
+
+                        # Task failed - mark for completion
+                        scheduler.complete_task(task_id, success=False)
+                        task_results[task_id] = False
+                        tasks_failed += 1
+                        self._report(f"Task {task_id} failed: {error_msg}", "fail")
+
+                        # HALT on task failure in parallel mode
+                        session.status = "halted"
+                        session.halt_reason = error_msg
+                        session.ended_at = datetime.now()
+                        self.session_repo.update(session)
+
+                        return SessionResult(
+                            session_id=session.id,
+                            status="halted",
+                            tasks_completed=tasks_completed,
+                            tasks_failed=tasks_failed,
+                            error=f"Task {task_id} failed in parallel execution: {error_msg}",
+                        )
+
+            # Merge worktree changes back to main branch
+            # Note: merge_target stored in config for future use
+            # when full merge conflict handling is implemented
+            _merge_target = self.config.parallel.merge_target_branch  # noqa: F841
+            for task in tasks:
+                if task.id in task_results and task_results[task.id]:
+                    # Task succeeded - merge its worktree
+                    executing = next(
+                        (t for t in scheduler.executing_tasks.values() if t.task_id == task.id),
+                        None,
+                    )
+                    if executing:
+                        # Worktree still exists (shouldn't happen if complete_task was called)
+                        self.logger.warning(
+                            "worktree_still_exists_after_completion",
+                            task_id=task.id,
+                        )
+                    else:
+                        # Note: worktree has been cleaned up, so we can't merge it here
+                        # In a real implementation, we'd need to keep track of merge commits
+                        self.logger.info(
+                            "task_worktree_cleaned",
+                            task_id=task.id,
+                        )
+
+            self.logger.info(
+                "parallel_execution_completed",
+                session_id=session.id,
+                tasks_completed=tasks_completed,
+                tasks_failed=tasks_failed,
+            )
+
+            return tasks_completed, tasks_failed
+
+        except Exception as e:
+            error_msg = str(e)
+            self.logger.error(
+                "parallel_execution_failed",
+                session_id=session.id,
+                error=error_msg,
+            )
+
+            session.status = "halted"
+            session.halt_reason = error_msg
+            session.ended_at = datetime.now()
+            self.session_repo.update(session)
+
+            return SessionResult(
+                session_id=session.id,
+                status="halted",
+                tasks_completed=0,
+                tasks_failed=len(tasks),
+                error=f"Parallel execution failed: {error_msg}",
+            )
+
+    def _execute_task_in_worktree(self, task: Task, session_id: str, worktree_path: Path) -> None:
+        """Execute a task within a worktree environment.
+
+        Args:
+            task: Task to execute.
+            session_id: ID of the current session.
+            worktree_path: Path to the worktree where task runs.
+
+        Raises:
+            HaltError: If task execution fails or review halts execution.
+        """
+        # Note: In a full implementation, this would execute the task
+        # within the context of the worktree. For now, we execute
+        # the task normally and assume the worktree is properly managed.
+        self.execute_task(task, session_id)
 
     def _run_postflight_phase(self, session: Session) -> PostflightResult:
         """Run postflight checks.

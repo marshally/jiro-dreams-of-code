@@ -33,6 +33,16 @@ class PreflightConfig:
     """Configuration for preflight checks."""
 
     skip_if_recent_minutes: int = 60
+    target_branch: str | None = None
+
+
+@dataclass
+class ParallelConfig:
+    """Configuration for parallel task execution."""
+
+    enabled: bool = False
+    max_parallel_tasks: int = 4
+    merge_target_branch: str = "main"
 
 
 @dataclass
@@ -81,5 +91,6 @@ class Config:
     commands: CommandsConfig = field(default_factory=CommandsConfig)
     conventions: ConventionsConfig = field(default_factory=ConventionsConfig)
     preflight: PreflightConfig = field(default_factory=PreflightConfig)
+    parallel: ParallelConfig = field(default_factory=ParallelConfig)
     slack: SlackConfig = field(default_factory=SlackConfig)
     email: EmailConfig = field(default_factory=EmailConfig)

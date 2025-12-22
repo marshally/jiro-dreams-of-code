@@ -763,3 +763,289 @@ class TestSessionOrchestratorHalt:
         updated_session = session_repo.get("test-session")
         assert updated_session is not None
         assert updated_session.ended_at is not None
+
+
+class TestSessionOrchestratorParallelExecution:
+    """Tests for parallel task execution."""
+
+    @pytest.mark.unit
+    @patch("jiro.core.session.subprocess.run")
+    @patch("jiro.core.session.uuid.uuid4")
+    def test_orchestrator_routes_to_sequential_when_parallel_disabled(
+        self,
+        mock_uuid,
+        mock_subprocess,
+        config: Config,
+        session_repo: SessionRepository,
+        task_repo: TaskExecutionRepository,
+    ) -> None:
+        """Should execute sequentially when parallel mode is disabled."""
+        from jiro.core.session import SessionOrchestrator
+
+        mock_uuid.return_value.hex = "test-session-id"
+        mock_subprocess.return_value.returncode = 0
+        mock_subprocess.return_value.stdout = "test-branch\n"
+
+        # Ensure parallel is disabled (default)
+        assert config.parallel.enabled is False
+
+        orchestrator = SessionOrchestrator(
+            config=config,
+            session_repo=session_repo,
+            task_repo=task_repo,
+        )
+
+        # Mock preflight to pass
+        with (
+            patch.object(orchestrator, "run_preflight") as mock_preflight,
+            patch.object(orchestrator, "get_tasks") as mock_get_tasks,
+            patch.object(orchestrator, "execute_task") as mock_execute,
+            patch.object(orchestrator, "run_postflight") as mock_postflight,
+        ):
+            mock_preflight.return_value = PreflightResult(passed=True)
+
+            # Mock get_tasks to return a task
+            mock_task = MagicMock(id="task-1")
+            mock_get_tasks.return_value = [mock_task]
+
+            # Mock postflight to pass
+            mock_postflight.return_value = PostflightResult(passed=True)
+
+            result = orchestrator.run()
+
+            # Task should have been executed
+            mock_execute.assert_called_once_with(mock_task, "test-session-id")
+
+        # Result should be successful
+        assert result.status == "completed"
+        assert result.tasks_completed == 1
+
+    @pytest.mark.unit
+    @patch("jiro.core.session.subprocess.run")
+    @patch("jiro.core.session.uuid.uuid4")
+    @patch("jiro.core.session.WorktreeMerger")
+    @patch("jiro.core.session.TaskScheduler")
+    @patch("jiro.core.session.WorktreeManager")
+    def test_orchestrator_routes_to_parallel_when_enabled(
+        self,
+        mock_worktree_class,
+        mock_scheduler_class,
+        mock_merger_class,
+        mock_uuid,
+        mock_subprocess,
+        config: Config,
+        session_repo: SessionRepository,
+        task_repo: TaskExecutionRepository,
+    ) -> None:
+        """Should execute in parallel when parallel mode is enabled."""
+        from jiro.core.session import SessionOrchestrator
+
+        # Enable parallel execution
+        config.parallel.enabled = True
+        config.parallel.max_parallel_tasks = 4
+
+        mock_uuid.return_value.hex = "test-session-id"
+        mock_subprocess.return_value.returncode = 0
+        mock_subprocess.return_value.stdout = "test-branch\n"
+
+        # Mock parallel components
+        mock_scheduler = MagicMock()
+        mock_scheduler_class.return_value = mock_scheduler
+        mock_scheduler.pending_queue = []
+        mock_scheduler.executing_tasks = {}
+        mock_scheduler.queue_task.return_value = MagicMock()
+        mock_scheduler.dispatch_next.return_value = None
+
+        orchestrator = SessionOrchestrator(
+            config=config,
+            session_repo=session_repo,
+            task_repo=task_repo,
+        )
+
+        # Mock preflight to pass
+        with patch.object(orchestrator, "run_preflight") as mock_preflight:
+            mock_preflight.return_value = PreflightResult(passed=True)
+
+            # Mock get_tasks to return no tasks
+            with patch.object(orchestrator, "get_tasks") as mock_get_tasks:
+                mock_get_tasks.return_value = []
+
+                # Mock postflight to pass
+                with patch.object(orchestrator, "run_postflight") as mock_postflight:
+                    mock_postflight.return_value = PostflightResult(passed=True)
+
+                    result = orchestrator.run()
+
+        # Parallel components should be initialized
+        mock_worktree_class.assert_called_once()
+        mock_scheduler_class.assert_called_once()
+
+        # Result should be successful
+        assert result.status == "completed"
+
+    @pytest.mark.unit
+    @patch("jiro.core.session.subprocess.run")
+    @patch("jiro.core.session.uuid.uuid4")
+    def test_orchestrator_respects_max_parallel_tasks_config(
+        self,
+        mock_uuid,
+        mock_subprocess,
+        config: Config,
+        session_repo: SessionRepository,
+        task_repo: TaskExecutionRepository,
+    ) -> None:
+        """Should pass max_parallel_tasks to scheduler."""
+        from jiro.core.session import SessionOrchestrator
+
+        # Configure parallel execution with custom max
+        config.parallel.enabled = True
+        config.parallel.max_parallel_tasks = 8
+
+        mock_uuid.return_value.hex = "test-session-id"
+        mock_subprocess.return_value.returncode = 0
+        mock_subprocess.return_value.stdout = "test-branch\n"
+
+        orchestrator = SessionOrchestrator(
+            config=config,
+            session_repo=session_repo,
+            task_repo=task_repo,
+        )
+
+        # Mock preflight to pass
+        with patch.object(orchestrator, "run_preflight") as mock_preflight:
+            mock_preflight.return_value = PreflightResult(passed=True)
+
+            # Mock get_tasks to return no tasks
+            with patch.object(orchestrator, "get_tasks") as mock_get_tasks:
+                mock_get_tasks.return_value = []
+
+                # Mock postflight to pass
+                with patch.object(orchestrator, "run_postflight") as mock_postflight:
+                    mock_postflight.return_value = PostflightResult(passed=True)
+
+                    with patch("jiro.core.session.TaskScheduler") as mock_scheduler_class:
+                        mock_scheduler = MagicMock()
+                        mock_scheduler_class.return_value = mock_scheduler
+                        mock_scheduler.pending_queue = []
+                        mock_scheduler.executing_tasks = {}
+
+                        orchestrator.run()
+
+                        # TaskScheduler should be initialized with max_parallel_tasks=8
+                        call_args = mock_scheduler_class.call_args
+                        assert call_args is not None
+                        assert call_args[1]["max_parallel"] == 8
+
+    @pytest.mark.unit
+    @patch("jiro.core.session.subprocess.run")
+    @patch("jiro.core.session.uuid.uuid4")
+    def test_orchestrator_uses_merge_target_branch(
+        self,
+        mock_uuid,
+        mock_subprocess,
+        config: Config,
+        session_repo: SessionRepository,
+        task_repo: TaskExecutionRepository,
+    ) -> None:
+        """Should use configured merge target branch."""
+        from jiro.core.session import SessionOrchestrator
+
+        # Configure parallel execution with custom merge target
+        config.parallel.enabled = True
+        config.parallel.merge_target_branch = "develop"
+
+        mock_uuid.return_value.hex = "test-session-id"
+        mock_subprocess.return_value.returncode = 0
+        mock_subprocess.return_value.stdout = "test-branch\n"
+
+        orchestrator = SessionOrchestrator(
+            config=config,
+            session_repo=session_repo,
+            task_repo=task_repo,
+        )
+
+        # Mock preflight to pass
+        with patch.object(orchestrator, "run_preflight") as mock_preflight:
+            mock_preflight.return_value = PreflightResult(passed=True)
+
+            # Mock get_tasks to return no tasks
+            with patch.object(orchestrator, "get_tasks") as mock_get_tasks:
+                mock_get_tasks.return_value = []
+
+                # Mock postflight to pass
+                with patch.object(orchestrator, "run_postflight") as mock_postflight:
+                    mock_postflight.return_value = PostflightResult(passed=True)
+
+                    with patch("jiro.core.session.TaskScheduler") as mock_scheduler_class:
+                        mock_scheduler = MagicMock()
+                        mock_scheduler_class.return_value = mock_scheduler
+                        mock_scheduler.pending_queue = []
+                        mock_scheduler.executing_tasks = {}
+
+                        orchestrator.run()
+
+                        # Merge target should be stored in config
+                        assert config.parallel.merge_target_branch == "develop"
+
+    @pytest.mark.unit
+    @patch("jiro.core.session.subprocess.run")
+    @patch("jiro.core.session.uuid.uuid4")
+    def test_orchestrator_halts_on_parallel_task_failure(
+        self,
+        mock_uuid,
+        mock_subprocess,
+        config: Config,
+        session_repo: SessionRepository,
+        task_repo: TaskExecutionRepository,
+    ) -> None:
+        """Should halt session if a task fails in parallel mode."""
+        from jiro.core.session import SessionOrchestrator
+
+        config.parallel.enabled = True
+
+        mock_uuid.return_value.hex = "test-session-id"
+        mock_subprocess.return_value.returncode = 0
+        mock_subprocess.return_value.stdout = "test-branch\n"
+
+        orchestrator = SessionOrchestrator(
+            config=config,
+            session_repo=session_repo,
+            task_repo=task_repo,
+        )
+
+        # Mock preflight to pass
+        with patch.object(orchestrator, "run_preflight") as mock_preflight:
+            mock_preflight.return_value = PreflightResult(passed=True)
+
+            # Mock execute_task to raise an exception
+            with patch.object(orchestrator, "execute_task") as mock_execute:
+                mock_execute.side_effect = Exception("Task execution failed")
+
+                # Mock get_tasks to return a task
+                with patch.object(orchestrator, "get_tasks") as mock_get_tasks:
+                    mock_task = MagicMock(id="task-1")
+                    mock_get_tasks.return_value = [mock_task]
+
+                    with patch("jiro.core.session.TaskScheduler") as mock_scheduler_class:
+                        mock_scheduler = MagicMock()
+                        mock_scheduler_class.return_value = mock_scheduler
+
+                        # Simulate task queuing and dispatching
+                        mock_scheduler.pending_queue = []
+                        mock_scheduler.executing_tasks = {"task-1": MagicMock(task_id="task-1")}
+                        mock_scheduler.queue_task.return_value = MagicMock()
+                        mock_scheduler.dispatch_next.side_effect = [
+                            MagicMock(task_id="task-1", worktree_path="/tmp/wt"),
+                            None,
+                        ]
+
+                        result = orchestrator.run()
+
+        # Session should be marked as halted
+        session = session_repo.get("test-session-id")
+        assert session is not None
+        assert session.status == "halted"
+
+        # Result should indicate halt
+        assert result.status == "halted"
+        assert result.error is not None

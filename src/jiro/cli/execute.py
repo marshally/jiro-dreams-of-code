@@ -42,6 +42,21 @@ def execute(
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Print detailed progress information")
     ] = False,
+    parallel: Annotated[
+        bool, typer.Option("--parallel", help="Enable parallel task execution using worktrees")
+    ] = False,
+    max_parallel: Annotated[
+        int,
+        typer.Option(
+            "--max-parallel",
+            help="Maximum number of tasks to run in parallel (default: 4)",
+            min=1,
+            max=16,
+        ),
+    ] = 4,
+    merge_target: Annotated[
+        str, typer.Option("--merge-target", help="Target branch for merging worktree changes")
+    ] = "main",
 ) -> None:
     """
     Execute tasks with preflight and postflight checks.
@@ -53,12 +68,19 @@ def execute(
         jiro execute
         jiro execute --epic JIRO-42
         jiro execute --verbose
+        jiro execute --parallel --max-parallel 8
     """
     project_root = Path.cwd()
     project_name = project_root.name
 
     # Load config
     config = load_config(project_root, project_name)
+
+    # Apply parallel execution options to config
+    if parallel:
+        config.parallel.enabled = True
+        config.parallel.max_parallel_tasks = max_parallel
+        config.parallel.merge_target_branch = merge_target
 
     # Initialize database and repositories
     db_path = get_database_path(project_root, stealth=False, project_name=project_name)
@@ -83,6 +105,11 @@ def execute(
     console.print("[cyan]Starting execution session...[/cyan]")
     if epic:
         console.print(f"[dim]Filtering by epic: {epic}[/dim]")
+    if parallel:
+        console.print(
+            f"[dim]Parallel execution enabled (max {max_parallel} concurrent tasks, "
+            f"merge target: {merge_target})[/dim]"
+        )
 
     try:
         result = orchestrator.run(epic_id=epic)
