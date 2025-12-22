@@ -188,7 +188,7 @@ class ReviewAgent:
         """Run tests using configured test command.
 
         Returns:
-            True if tests passed, False otherwise.
+            True if tests passed or no tests exist, False otherwise.
         """
         try:
             result = subprocess.run(
@@ -197,7 +197,9 @@ class ReviewAgent:
                 capture_output=True,
                 timeout=300,
             )
-            return result.returncode == 0
+            # Exit code 0: all tests passed
+            # Exit code 5: no tests collected (pytest) - treat as pass for greenfield projects
+            return result.returncode == 0 or result.returncode == 5
         except subprocess.TimeoutExpired:
             logger.error("tests_timeout")
             return False

@@ -376,7 +376,7 @@ def run_full_tests(config: Config) -> bool:
         config: Configuration object containing test command.
 
     Returns:
-        True if tests pass, False otherwise.
+        True if tests pass or no tests exist, False otherwise.
     """
     try:
         test_command = config.commands.test
@@ -387,7 +387,9 @@ def run_full_tests(config: Config) -> bool:
             check=False,
             shell=True,
         )
-        return result.returncode == 0
+        # Exit code 0: all tests passed
+        # Exit code 5: no tests collected (pytest) - treat as pass for greenfield projects
+        return result.returncode == 0 or result.returncode == 5
     except Exception:
         return False
 
